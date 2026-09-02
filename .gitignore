@@ -1,0 +1,34 @@
+# --- Secretos y configuración local (NUNCA subir) ---
+.env
+.env.local
+.env.*.local
+
+# --- Python / FastAPI ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+env/
+*.sqlite3
+.pytest_cache/
+.mypy_cache/
+
+# --- Node / React / Next.js ---
+node_modules/
+.next/
+out/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+npm-debug.log*
