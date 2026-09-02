@@ -1,0 +1,82 @@
+classDiagram
+  class Titulo {
+    +nombre
+    +sinopsis
+    +portadaUrl
+    +anio
+    +director
+    +guionista
+    +pais
+    +popularidad
+    +voteAverageTMDB
+    +voteCountTMDB
+    +/promedioPuntaje
+    +/cantidadVotos
+  }
+  class Pelicula {
+    +duracion
+  }
+  class Serie {
+    +estadoRenovacionTMDB
+  }
+  Titulo <|-- Pelicula
+  Titulo <|-- Serie
+
+  class Actor {
+    +nombre
+  }
+  Titulo "*" --> "*" Actor : reparto
+
+  class Genero {
+    +nombre
+  }
+  Titulo "*" --> "*" Genero : tiene
+
+  class Temporada {
+    +numero
+    +sinopsis
+    +fechaEstreno
+  }
+  Serie "1" --> "*" Temporada : tiene
+
+  class Episodio {
+    +numero
+    +nombre
+    +fechaEstreno
+    +duracion
+  }
+  Temporada "1" --> "*" Episodio : tiene
+
+  class Usuario {
+    +nombreUsuario
+    +passwordHash
+    +pais
+    +ciudad
+    +descripcion
+    +fechaRegistro
+    +avatarUrl
+  }
+
+  class EstadoUsuarioTitulo {
+    +favorito
+    +fechaFavorito
+    +estado
+    +fechaEstado
+  }
+  Usuario "1" --> "*" EstadoUsuarioTitulo : marca
+  Titulo "1" --> "*" EstadoUsuarioTitulo : tiene
+
+  class EpisodioVisto {
+    +fechaVisto
+  }
+  Usuario "1" --> "*" EpisodioVisto : registra
+  Episodio "1" --> "*" EpisodioVisto : referencia
+
+  class Resena {
+    +puntaje
+    +texto
+    +fecha
+    +autorTMDB?
+  }
+  Titulo "1" --> "*" Resena : recibe
+  Usuario "0..1" --> "*" Resena : escribe

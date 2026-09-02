@@ -1,0 +1,31 @@
+stateDiagram-v2
+  [*] --> SinEstado
+
+  SinEstado --> Watchlist : usuario agrega (bookmark)
+  Watchlist --> SinEstado : usuario quita (bookmark)
+  SinEstado --> Siguiendo : marca 1er episodio visto
+  SinEstado --> Vista : marca serie entera (ojo)
+
+  Watchlist --> Siguiendo : marca 1er episodio visto
+  Watchlist --> Vista : marca serie entera (ojo)
+
+  Siguiendo --> Vista : completa todos los episodios disponibles
+  Siguiendo --> SinEstado : Abandonar (X)
+  Siguiendo --> SinEstado : desmarca el unico episodio visto (caso borde)
+
+  Vista --> Siguiendo : renueva temporada (TMDB, automatico)
+  Vista --> Siguiendo : desmarca 1 episodio (deshacer error)
+  Vista --> SinEstado : desmarca serie entera (ojo tachado) - empezar de cero
+
+  note right of Watchlist
+    icono en ese momento: bookmark lleno
+  end note
+  note right of Siguiendo
+    icono no interactuable: play
+    (bloquea el icono de Watchlist)
+  end note
+  note right of Vista
+    icono en ese momento: ojo lleno
+    NO se puede ir directo a Watchlist:
+    icono bookmark bloqueado mientras esta Vista
+  end note
