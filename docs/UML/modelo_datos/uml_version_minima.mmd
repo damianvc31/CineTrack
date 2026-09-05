@@ -1,26 +1,24 @@
 classDiagram
   class Titulo {
+    +tipo "movie | tv"
     +nombre
     +sinopsis
     +portadaUrl
-    +anio
+    +anioEstreno
+    +anioFin
+    +duracion "solo peliculas"
+    +estadoRenovacionTMDB "solo series"
+    +proximoEpisodioFecha "solo series"
     +director
     +guionista
     +pais
     +popularidad
+    +popularidadPercentil
     +voteAverageTMDB
     +voteCountTMDB
     +/promedioPuntaje
     +/cantidadVotos
   }
-  class Pelicula {
-    +duracion
-  }
-  class Serie {
-    +estadoRenovacionTMDB
-  }
-  Titulo <|-- Pelicula
-  Titulo <|-- Serie
 
   class Actor {
     +nombre
@@ -37,7 +35,7 @@ classDiagram
     +sinopsis
     +fechaEstreno
   }
-  Serie "1" --> "*" Temporada : tiene
+  Titulo "1" --> "*" Temporada : temporadas (solo si tipo=tv)
 
   class Episodio {
     +numero
@@ -60,7 +58,7 @@ classDiagram
   class EstadoUsuarioTitulo {
     +favorito
     +fechaFavorito
-    +estado
+    +estado "watchlist | siguiendo | vista | null"
     +fechaEstado
   }
   Usuario "1" --> "*" EstadoUsuarioTitulo : marca
@@ -76,7 +74,8 @@ classDiagram
     +puntaje
     +texto
     +fecha
-    +autorTMDB?
+    +autorTMDB
+    +tmdbReviewId
   }
   Titulo "1" --> "*" Resena : recibe
   Usuario "0..1" --> "*" Resena : escribe
