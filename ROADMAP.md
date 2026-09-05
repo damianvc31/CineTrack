@@ -11,10 +11,10 @@
   - Modelos SQLAlchemy 2.0 (Usuarios, Títulos, Temporadas, Episodios, Estados, Reseñas).
   - Configuración de Alembic y migración inicial `0001_initial_schema.py`.
   - Suite de tests de integridad y relaciones en verde (7 tests).
-- [ ] **Fase 3: Autenticación y Motor de Estados de Título**
-  - Registro y login con hash `bcrypt`/`argon2` y tokens JWT.
+- [x] **Fase 3: Autenticación y Motor de Estados de Título**
+  - Registro y login con hash `bcrypt` y tokens JWT con `AUTH_SECRET_KEY`.
   - Lógica de estados: Favorito independiente, transiciones Watchlist/Siguiendo/Vista/Abandonar.
-  - Suite de tests unitarios exhaustivos para la máquina de estados.
+  - Suite de tests unitarios exhaustivos para auth y máquina de estados en verde (16 tests totales).
 - [ ] **Fase 4: Integración TMDB y Sincronización**
   - Cliente asíncrono con `httpx` y control de cuota.
   - Importación inicial de catálogo acotado (~200 títulos variados).
@@ -40,3 +40,4 @@
 - [ ] Pantallas de extensión ("Ver más") con paginación para cada sección.
 - [ ] Soporte multirregión para plataformas de streaming (JustWatch / TMDB Watch Providers).
 - [ ] Selector independiente de idioma de interfaz y contenido.
+- [ ] Posible refinamiento UX en desmarques de episodios: diálogo opcional para advertir al usuario o resetear progreso posterior al desmarcar un episodio intermedio.

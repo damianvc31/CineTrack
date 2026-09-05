@@ -2,6 +2,20 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.3.0] - 2026-09-05
+### Agregado
+- Módulo de seguridad con hashing de contraseñas (`bcrypt`) y tokens JWT (`pyjwt`) firmado con `AUTH_SECRET_KEY` en `backend/app/core/security.py`.
+- Endpoints de autenticación en `backend/app/api/v1/auth.py` (`POST /register`, `POST /login`, `GET /me`) y dependencia de seguridad `get_current_user`.
+- Esquemas Pydantic v2 para autenticación y estados en `backend/app/schemas/`.
+- Motor transaccional de estados de título en `backend/app/services/state_service.py` con soporte completo de transiciones para películas y series:
+  - Toggle de Favorito (ortogonal).
+  - Watchlist con bloqueo estricto (400) si el título está en Vista o Siguiendo.
+  - Visto con limpieza de episodios asociados al desmarcar serie completa.
+  - Abandonar serie (❌) conservando episodios vistos.
+  - Seguimiento granular por episodio con recálculo automático de estado de serie y bloqueo de episodios futuros.
+- Endpoints de estados en `backend/app/api/v1/states.py` (`/titles/{id}/favorite`, `/titles/{id}/watchlist`, `/titles/{id}/watched`, `/titles/{id}/unfollow`, `/titles/{id}/user-state`, `/episodes/{id}/watch`).
+- Suite exhaustiva de pruebas en `backend/tests/test_auth.py` y `backend/tests/test_state_machine.py` (16 tests totales en verde).
+
 ## [v0.2.0] - 2026-09-05
 ### Agregado
 - Modelos relacionales declarativos con SQLAlchemy 2.0 async en `backend/app/models/` (`Usuario`, `Titulo`, `Genero`, `Actor`, `Temporada`, `Episodio`, `EstadoUsuarioTitulo`, `EpisodioVisto`, `Resena`).
