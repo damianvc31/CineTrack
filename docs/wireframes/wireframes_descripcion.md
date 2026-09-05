@@ -16,7 +16,7 @@
 
 **Header:** mismo logo unificado que Home. Buscador centrado. Campanita de notificaciones. Avatar de usuario cerrado (su despliegue se documenta aparte, ver sección de interacción más abajo) con nombre al lado.
 
-**Contenido principal:** póster grande a la izquierda. A la derecha: puntaje combinado (⭐ X.X /10, cantidad de votos), título, mensaje de estado de renovación (ej. "Renewed — new season on [fecha]", en verde), tags de género, año y país, sinopsis, director, guionista, elenco principal.
+**Contenido principal:** póster grande a la izquierda. A la derecha: puntaje combinado (⭐ X.X /10, cantidad de votos), título, badge/mensaje de estado de emisión (verde: "Renovada — nueva temporada el DD/MM" o "por confirmar"; neutro/gris: "Finalizada"; rojo: "Cancelada"), tags de género, año y país, sinopsis, director, guionista, elenco principal.
 
 **4 íconos de acción** debajo de los datos: ❤️ Favorite, 👁 Watched, ▶️ Following (bloqueado/no interactuable — reemplaza al bookmark cuando la serie está en seguimiento activo), ❌ Unfollow (solo visible si está siguiendo).
 
@@ -41,7 +41,7 @@
 
 **Sección "Following" (fila completa, ancho total):** tarjetas grandes con imagen, nombre de la serie, y una barra de progreso por temporada (coloreada: vista / en progreso resaltada distinto / no vista), con leyenda de estado (ej. "S2 in progress", "S3 watchlist").
 
-**Trío de secciones (Favorites | Watchlist | Recently Watched):** cada una con contador entre paréntesis, link "View All", y 3 tarjetas chicas (póster, título, año, puntaje).
+**Trío de secciones (Favorites | Watchlist | Recently Watched):** cada una con contador entre paréntesis, link "View All", y 3 tarjetas chicas (póster, título, año, puntaje). En las tarjetas de series completadas de la sección "Recently Watched" / "Vista", se incluye el badge visual de estado (🟢 Renovada, ⬛ Finalizada, 🔴 Cancelada) para distinguir rápidamente su continuidad sin alterar el estado de la serie.
 
 ## Comportamiento no visible en las imágenes estáticas (Detail y Perfil)
 
