@@ -7,9 +7,10 @@
   - Evaluación crítica de arquitectura aprobada.
   - Estructura base de backend (`FastAPI`) y frontend (`Vite + React + TS`).
   - Configuración de runners de tests (`pytest`, `vitest`) con smoke tests en verde.
-- [ ] **Fase 2: Persistencia y Modelo Relacional**
+- [x] **Fase 2: Persistencia y Modelo Relacional**
   - Modelos SQLAlchemy 2.0 (Usuarios, Títulos, Temporadas, Episodios, Estados, Reseñas).
-  - Configuración de Alembic y migración inicial.
+  - Configuración de Alembic y migración inicial `0001_initial_schema.py`.
+  - Suite de tests de integridad y relaciones en verde (7 tests).
 - [ ] **Fase 3: Autenticación y Motor de Estados de Título**
   - Registro y login con hash `bcrypt`/`argon2` y tokens JWT.
   - Lógica de estados: Favorito independiente, transiciones Watchlist/Siguiendo/Vista/Abandonar.
