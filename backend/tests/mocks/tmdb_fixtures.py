@@ -113,3 +113,19 @@ MOCK_SEASON_1_DETAILS = {
     ],
 }
 
+MOCK_REVIEWS_DATA = {
+    "page": 1,
+    "results": [
+        {
+            "id": f"rev_{i}",
+            "author": f"Reviewer {i}",
+            "author_details": {"rating": 8.0 + (i % 3)},
+            "content": f"Esta es una crítica detallada {i} sobre la producción.",
+            "created_at": "2023-01-15T12:00:00.000Z",
+        }
+        for i in range(25)  # 25 reviews para probar que corta en 20
+    ],
+    "total_pages": 1,
+    "total_results": 25,
+}
+

@@ -7,6 +7,7 @@ from app.models import (
     Actor,
     Episodio,
     Genero,
+    Resena,
     Temporada,
     Titulo,
     titulos_elenco,
@@ -21,6 +22,7 @@ from tests.mocks.tmdb_fixtures import (
     MOCK_MOVIE_DETAILS,
     MOCK_SERIES_DETAILS,
     MOCK_SEASON_1_DETAILS,
+    MOCK_REVIEWS_DATA,
 )
 
 
@@ -30,6 +32,7 @@ def mock_tmdb_client():
     client.get_genres.side_effect = lambda m: MOCK_MOVIE_GENRES if m == "movie" else MOCK_TV_GENRES
     client.get_details.side_effect = lambda m, id_: MOCK_MOVIE_DETAILS if m == "movie" else MOCK_SERIES_DETAILS
     client.get_season_details.return_value = MOCK_SEASON_1_DETAILS
+    client.get_reviews.return_value = MOCK_REVIEWS_DATA
     client.search.return_value = {"results": [{"id": 157336, "title": "Interstellar"}]}
     return client
 
@@ -200,4 +203,27 @@ async def test_daily_sync_updates_tracked_series(db_session, mock_tmdb_client):
 
     res_sync = await service.run_daily_sync()
     assert res_sync["updated_series"] == 1
+
+
+@pytest.mark.asyncio
+async def test_sync_reviews_caps_at_limit(db_session, mock_tmdb_client):
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    await service.sync_genres()
+
+    # MOCK_REVIEWS_DATA tiene 25 reseñas, debe recortar al límite configurado (20)
+    movie = await service.upsert_movie(157336, MOCK_MOVIE_DETAILS)
+    await db_session.commit()
+
+    res = await db_session.execute(
+        select(Resena).where(Resena.titulo_id == movie.id)
+    )
+    reviews = res.scalars().all()
+    assert len(reviews) == 20
+    assert all(r.usuario_id is None for r in reviews)
+    assert all(r.autor_tmdb is not None for r in reviews)
+    assert all(r.tmdb_review_id is not None for r in reviews)
+
+    # Si volvemos a correr la sincronización de reseñas, no agrega ninguna porque ya llegó a 20
+    added_second = await service.sync_reviews_for_title(movie)
+    assert added_second == 0
 

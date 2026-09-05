@@ -54,11 +54,21 @@ python -m app.jobs.sync_tmdb --daily
 # Recalcular percentiles de popularidad
 python -m app.jobs.sync_tmdb --percentiles
 
+# Sincronizar reseñas de TMDB para todos los títulos hasta el tope (20)
+python -m app.jobs.sync_tmdb --reviews
+
 # Carga manual mediante archivo JSON (ver docs/templates/ para formato)
 python -m app.jobs.sync_tmdb --import-json docs/templates/template_pelicula.json
 
 # Importar título individual por ID de TMDB
 python -m app.jobs.sync_tmdb --import-tmdb-id 157336 --type movie
+```
+
+#### Tareas Programadas en Producción (Cron)
+Para mantener actualizado el catálogo automáticamente en un servidor o contenedor, se programa la ejecución diaria del comando `--daily` mediante cron:
+```bash
+# Ejemplo: ejecutar todos los días a las 03:00 AM
+0 3 * * * cd /app/backend && /app/backend/.venv/bin/python -m app.jobs.sync_tmdb --daily >> /var/log/cinetrack_sync.log 2>&1
 ```
 
 ### Frontend

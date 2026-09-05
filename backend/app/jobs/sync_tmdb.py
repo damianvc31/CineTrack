@@ -23,6 +23,7 @@ async def main():
     parser.add_argument("--priority", choices=["popular_first", "toprated_first"], default=None, help="Prioridad de ingesta inicial")
     parser.add_argument("--daily", action="store_true", help="Ejecutar sincronización diaria")
     parser.add_argument("--percentiles", action="store_true", help="Recalcular percentiles de popularidad")
+    parser.add_argument("--reviews", action="store_true", help="Sincronizar reseñas de TMDB para todos los títulos hasta el tope (20)")
     parser.add_argument("--import-json", type=str, help="Ruta al archivo JSON con títulos a importar")
     parser.add_argument("--import-tmdb-id", type=int, help="Importar un título específico por su ID de TMDB")
     parser.add_argument("--type", choices=["movie", "tv"], default="movie", help="Tipo de título para --import-tmdb-id")
@@ -54,6 +55,11 @@ async def main():
                 logger.info("-> Recalculando percentiles de popularidad...")
                 await service.recalculate_percentiles()
                 logger.info("Percentiles recalculados exitosamente.")
+
+            elif args.reviews:
+                logger.info("-> Sincronizando reseñas de TMDB para todos los títulos...")
+                res = await service.sync_all_missing_reviews()
+                logger.info(f"Resultado de sincronización de reseñas: {res}")
 
             elif args.import_json:
                 path = Path(args.import_json)

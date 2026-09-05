@@ -12,6 +12,7 @@ from app.models import (
     Actor,
     Episodio,
     Genero,
+    Resena,
     Temporada,
     Titulo,
     titulos_elenco,
@@ -133,6 +134,94 @@ class TMDBSyncService:
             )
 
     # -------------------------------------------------------------------------
+    # RESEÑAS DE TMDB
+    # -------------------------------------------------------------------------
+    async def sync_reviews_for_title(self, titulo: Titulo, limit: Optional[int] = None) -> int:
+        """Sincroniza reseñas de TMDB para un título hasta alcanzar el límite configurado (máximo 20)."""
+        max_limit = limit or settings.TMDB_REVIEWS_PER_TITLE_LIMIT
+        if not titulo.tmdb_id:
+            return 0
+
+        # Contar cuántas reseñas de TMDB ya existen para este título
+        res_count = await self.db.execute(
+            select(func.count(Resena.id)).where(
+                Resena.titulo_id == titulo.id,
+                Resena.tmdb_review_id.isnot(None)
+            )
+        )
+        current_count = res_count.scalar() or 0
+        if current_count >= max_limit:
+            return 0
+
+        needed = max_limit - current_count
+        try:
+            reviews_data = await self.client.get_reviews(titulo.tipo, titulo.tmdb_id)
+            results = reviews_data.get("results", [])
+        except Exception as e:
+            logger.warning(f"No se pudieron obtener reseñas de TMDB para {titulo.nombre}: {e}")
+            return 0
+
+        added = 0
+        for r in results:
+            if added >= needed:
+                break
+            r_id = r.get("id")
+            if not r_id:
+                continue
+
+            existing = await self.db.execute(
+                select(Resena.id).where(Resena.tmdb_review_id == r_id)
+            )
+            if existing.scalar_one_or_none():
+                continue
+
+            author = r.get("author") or "Usuario TMDB"
+            author_details = r.get("author_details", {})
+            rating = author_details.get("rating")
+            content = r.get("content", "")
+            if not content.strip():
+                continue
+
+            created_at = None
+            if r.get("created_at"):
+                try:
+                    created_at = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00"))
+                except Exception:
+                    created_at = datetime.now()
+
+            resena = Resena(
+                titulo_id=titulo.id,
+                usuario_id=None,
+                autor_tmdb=author,
+                puntaje=float(rating) if rating is not None else None,
+                texto=content,
+                fecha=created_at or datetime.now(),
+                tmdb_review_id=r_id,
+            )
+            self.db.add(resena)
+            added += 1
+
+        return added
+
+    async def sync_all_missing_reviews(self, limit_per_title: Optional[int] = None) -> Dict[str, int]:
+        """Recorre todos los títulos de la base de datos y absorbe reseñas de TMDB hasta completar el tope."""
+        logger.info("Iniciando sincronización masiva de reseñas para todos los títulos...")
+        res = await self.db.execute(select(Titulo).where(Titulo.tmdb_id.isnot(None)))
+        titulos = res.scalars().all()
+        
+        total_added = 0
+        titles_updated = 0
+        for titulo in titulos:
+            added = await self.sync_reviews_for_title(titulo, limit=limit_per_title)
+            if added > 0:
+                total_added += added
+                titles_updated += 1
+                await self.db.commit()
+
+        logger.info(f"Sincronización de reseñas completada: {total_added} reseñas agregadas en {titles_updated} títulos.")
+        return {"total_reviews_added": total_added, "titles_updated": titles_updated}
+
+    # -------------------------------------------------------------------------
     # UPSERT DE PELÍCULA
     # -------------------------------------------------------------------------
     async def upsert_movie(self, tmdb_id: int, details: Optional[Dict[str, Any]] = None) -> Optional[Titulo]:
@@ -202,6 +291,9 @@ class TMDBSyncService:
 
         # Elenco
         await self._attach_cast(titulo, elenco_list)
+
+        # Reseñas de TMDB (hasta 20)
+        await self.sync_reviews_for_title(titulo)
 
         return titulo
 
@@ -365,6 +457,9 @@ class TMDBSyncService:
                         episodio.nombre = ep_data.get("name", episodio.nombre)
                         episodio.fecha_estreno = ep_air_date or episodio.fecha_estreno
                         episodio.duracion = ep_data.get("runtime", episodio.duracion)
+
+        # Reseñas de TMDB (hasta 20)
+        await self.sync_reviews_for_title(titulo)
 
         return titulo
 

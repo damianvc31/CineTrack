@@ -143,3 +143,24 @@ class TMDBClient:
                 params["first_air_date_year"] = year
         return await self._request("GET", endpoint, params=params)
 
+    async def get_reviews(
+        self,
+        media_type: str,
+        tmdb_id: int,
+        page: int = 1,
+    ) -> Dict[str, Any]:
+        endpoint = f"/{media_type}/{tmdb_id}/reviews"
+        return await self._request("GET", endpoint, params={"page": page})
+
+    async def get_changes(
+        self,
+        media_type: str,
+        start_date: Optional[str] = None,
+        page: int = 1,
+    ) -> Dict[str, Any]:
+        endpoint = f"/{media_type}/changes"
+        params: Dict[str, Any] = {"page": page}
+        if start_date:
+            params["start_date"] = start_date
+        return await self._request("GET", endpoint, params=params)
+

@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     TMDB_DAILY_SYNC_DAYS_WINDOW: int = 15
     TMDB_DAILY_SYNC_POP_THRESHOLD: float = 10.0
     TMDB_INGEST_PRIORITY: str = "popular_first"  # "popular_first" o "toprated_first"
+    TMDB_REVIEWS_PER_TITLE_LIMIT: int = 20
 
     AI_PROVIDER_API_KEY: str = ""
 
