@@ -41,11 +41,17 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 
 ## 3. Integración Externa y Procesos en Background
 
-1. **TMDB API:**
-   - Consumo vía `httpx` asíncrono con control de rate limits.
-   - Sincronización masiva inicial estructurada como script modular (`python -m app.jobs.sync_tmdb`).
-   - Sincronización diaria: refresco de popularidad/percentiles, actualización de `status`/`next_episode_to_air` y absorción incremental de nuevas reseñas hasta el tope configurado.
-   - Sincronización reactiva: al momento del login del usuario, transición automática de series en `Vista` hacia `Siguiendo` si se detecta nueva temporada confirmada.
+1. **TMDB API y Motor de Sincronización:**
+   - **Cliente HTTP Asíncrono (`TMDBClient`):** Basado en `httpx.AsyncClient` con cabecera `Authorization: Bearer <TMDB_API_KEY>` (formato v4) y soporte para api_key v3. Implementa limitación de concurrencia mediante `asyncio.Semaphore(10)` y reintentos automáticos con retroceso exponencial ante errores 429 o de conectividad.
+   - **Ingesta Inicial Parametrizable:** Sincronización de cuotas configurables (`TMDB_INGEST_MOVIES_TARGET`, `TMDB_INGEST_SERIES_TARGET`, 1000 títulos cada una) con switch de estrategia (`TMDB_INGEST_PRIORITY: "popular_first" | "toprated_first"`):
+     - `popular_first`: Asegura primero las tendencias actuales (500 títulos) y completa el cupo restante con clásicos de alto puntaje (`vote_count >= 100`).
+     - `toprated_first`: Prioriza las obras maestras mejor calificadas históricamente y completa la cuota restante con títulos populares.
+   - **Enriquecimiento de Metadatos y Elenco:** Deduplicación de directores, concatenación de hasta 3 guionistas (`TMDB_CREW_WRITERS_LIMIT = 3`) y limitación de elenco a los 15 actores principales (`TMDB_CAST_LIMIT = 15`) ordenados por importancia crediticia, vinculados en la tabla asociativa `titulos_elenco`.
+   - **Sincronización Diaria (`run_daily_sync`):**
+     - Detecta series en seguimiento (`siguiendo`) por cualquier usuario para refrescar su estado (`Ended`, `Canceled`) e insertar atómicamente nuevos episodios o temporadas recién estrenadas.
+     - Ingesta automáticamente nuevos estrenos cinematográficos en una ventana móvil de 15 días con umbral de popularidad calibrado (`popularity >= 10.0`).
+   - **Importación Manual por JSON con Búsqueda Inteligente:** Carga modular (`--import-json <path>`) usando plantillas en `docs/templates/`. Si no se especifica `id_tmdb`, busca en TMDB por título y año para resolver el identificador canónico y vincularlo a las sincronizaciones futuras; si no se encuentra coincidencia en TMDB, el registro es rechazado con error explícito para evitar títulos huérfanos sin posibilidad de actualización.
+   - **Recálculo de Percentiles de Popularidad:** Función analítica `PERCENT_RANK() OVER (ORDER BY popularidad ASC)` con fallback algorítmico en memoria para normalizar la popularidad de todos los títulos entre 0.0 y 1.0, permitiendo consultas estadísticas estables en el catálogo y recomendador.
 2. **Recomendador de IA Embebido:**
    - Desacoplado de los hubs del entorno de desarrollo.
    - **Versión Mínima:** Recomendador simple sin function calling (implementado como última pieza del flujo núcleo según `spec.md`). Conexión vía API a modelo gratuito/eficiente (Google Gemini API / Groq API) con un prompt directo estructurado que combina el texto del usuario con sus preferencias de perfil (favoritos, vistos, reseñas) y puntajes de comunidad.

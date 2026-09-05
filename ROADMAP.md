@@ -15,11 +15,12 @@
   - Registro y login con hash `bcrypt` y tokens JWT con `AUTH_SECRET_KEY`.
   - Lógica de estados: Favorito independiente, transiciones Watchlist/Siguiendo/Vista/Abandonar.
   - Suite de tests unitarios exhaustivos para auth y máquina de estados en verde (16 tests totales).
-- [ ] **Fase 4: Integración TMDB y Sincronización**
-  - Cliente asíncrono con `httpx` y control de cuota.
-  - Importación inicial de catálogo acotado (~200 títulos variados).
+- [x] **Fase 4: Integración TMDB y Sincronización**
+  - Cliente asíncrono con `httpx` (Bearer auth, semáforo y reintentos).
+  - Ingesta inicial parametrizable (populares y top-rated con switch de prioridad).
+  - Sincronización periódica/diaria e importación manual por JSON con plantillas y búsqueda inteligente.
   - Cálculo de percentiles de popularidad (`PERCENT_RANK`).
-  - Mocks de TMDB para tests sin consumo de cuota real.
+  - Mocks y suite automatizada de tests de integración con cero consumo de cuota (23 tests pasando).
 - [ ] **Fase 5: Frontend UI (Consumo de API Real)**
   - Home con secciones (Trending, Estrenos, Clásicos, Recomendados, Géneros) y toggle Películas/Series/Todos.
   - Detalle de Película y Serie con temporadas, episodios y selector interactivo de estados.

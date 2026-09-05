@@ -40,6 +40,27 @@ pytest
 uvicorn app.main:app --reload --port 8000
 ```
 
+#### Comandos de Ingesta y Sincronización TMDB
+```powershell
+# Sincronizar catálogo de géneros
+python -m app.jobs.sync_tmdb --genres
+
+# Ingesta inicial de catálogo (opciones: --priority popular_first | toprated_first)
+python -m app.jobs.sync_tmdb --initial --priority popular_first
+
+# Sincronización diaria (series en seguimiento + nuevos estrenos)
+python -m app.jobs.sync_tmdb --daily
+
+# Recalcular percentiles de popularidad
+python -m app.jobs.sync_tmdb --percentiles
+
+# Carga manual mediante archivo JSON (ver docs/templates/ para formato)
+python -m app.jobs.sync_tmdb --import-json docs/templates/template_pelicula.json
+
+# Importar título individual por ID de TMDB
+python -m app.jobs.sync_tmdb --import-tmdb-id 157336 --type movie
+```
+
 ### Frontend
 ```powershell
 cd frontend

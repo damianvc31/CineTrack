@@ -4,17 +4,25 @@
 
 - [x] **Fase 1:** Scaffolding inicial y smoke tests en verde (v0.1.0).
 - [x] **Fase 2:** Persistencia y modelos relacionales completos en SQLAlchemy 2.0 (v0.2.0).
-- [x] **Fase 3: Autenticación y Motor de Estados de Título (v0.3.0):**
-  - [x] **Paso 3.1:** Actualizar `backend/requirements.txt` con `bcrypt>=4.1.0` y `pyjwt>=2.8.0` e instalar dependencias.
-  - [x] **Paso 3.2:** Crear `backend/app/core/security.py` con funciones de hashing (`bcrypt`) y tokens JWT usando estrictamente `AUTH_SECRET_KEY`.
-  - [x] **Paso 3.3:** Crear esquemas Pydantic v2 en `backend/app/schemas/auth.py` y `backend/app/schemas/state.py`.
-  - [x] **Paso 3.4:** Implementar servicio de autenticación `backend/app/services/auth_service.py`, dependencia `get_current_user` y endpoints en `backend/app/api/v1/auth.py`.
-  - [x] **Paso 3.5:** Consultar a `qwen2.5-coder:7b` vía MCP para refinar la implementación transaccional del servicio de estados.
-  - [x] **Paso 3.6:** Implementar `backend/app/services/state_service.py` con el motor completo de transiciones (películas y series, marcas temporales y reseteo de fechas).
-  - [x] **Paso 3.7:** Implementar router `backend/app/api/v1/states.py` y unificar los endpoints en `backend/app/api/v1/api.py`.
-  - [x] **Paso 3.8:** Implementar suite de pruebas exhaustivas en `backend/tests/test_auth.py` y `backend/tests/test_state_machine.py`.
-  - [x] **Paso 3.9:** Ejecutar `pytest` y verificar que la suite completa pase en verde (16/16 tests passed).
-  - [x] **Paso 3.10:** Actualizar documentación viva (`CHANGELOG.md`, `ROADMAP.md`), commit, tag `v0.3.0` y push a GitHub.
+- [x] **Fase 3: Autenticación JWT y Motor de Estados (v0.3.0)**
+  - [x] Modelo de seguridad con HS256 y expiración configurable.
+  - [x] Endpoints `/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/me`.
+  - [x] Endpoints `/api/v1/titulos/{id}/estado`, `/api/v1/series/{id}/temporadas/{t}/episodios/{e}/visto`.
+  - [x] Transiciones de estado estrictas y seguimiento atómico de episodios.
+  - [x] Suite de 16 tests automatizados con `pytest` pasando.
+  - [x] Tag `v0.3.0` generado y pusheado a GitHub.
+
+- [x] **Fase 4: Integración TMDB y Sincronización (v0.4.0)**
+  - [x] Paso 4.1: Plantillas JSON de referencia en `docs/templates/` (`template_pelicula.json`, `template_serie.json`).
+  - [x] Paso 4.2: Parámetros de configuración en `backend/app/core/config.py` (cuotas, límites, prioridad de ingesta).
+  - [x] Paso 4.3: Esquemas Pydantic de validación para importación manual en `backend/app/schemas/import_export.py`.
+  - [x] Paso 4.4: Cliente HTTP asíncrono `TMDBClient` en `backend/app/services/tmdb_client.py` con semáforo de concurrencia y reintentos.
+  - [x] Paso 4.5: Servicio `TMDBSyncService` en `backend/app/services/tmdb_sync_service.py` (ingesta inicial popular/top-rated, enriquecimiento de créditos, temporadas/episodios, sync diaria, recálculo de percentiles y carga manual con búsqueda inteligente).
+  - [x] Paso 4.6: Script CLI `backend/app/jobs/sync_tmdb.py` para ejecución modular de tareas.
+  - [x] Paso 4.7: Fixtures sintéticas de TMDB y suite de pruebas unitarias/integración con mocks en `backend/tests/test_tmdb_sync.py` (Zero-Waste).
+  - [x] Paso 4.8: Verificación de tests (23/23 backend tests pasando sin llamadas externas reales).
+  - [x] Paso 4.9: Actualización de documentación viva (`ARCHITECTURE.md`, `ROADMAP.md`, `CHANGELOG.md`, `README.md`).
+  - [x] Paso 4.10: Commit y tag `v0.4.0`.
 
 ---
 

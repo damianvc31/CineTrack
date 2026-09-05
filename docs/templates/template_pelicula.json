@@ -1,0 +1,36 @@
+[
+  {
+    "_comentario": "id_tmdb es opcional. Si no se provee, el sistema buscara por titulo y anio_estreno en TMDB.",
+    "id_tmdb": 157336,
+    "titulo": "Interstellar",
+    "tipo": "movie",
+    "sinopsis": "Un grupo de cientificos viaja a traves de un agujero de gusano para salvar a la humanidad.",
+    "poster_path": "/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg",
+    "backdrop_path": "/rAiYTggYH3n2X2mJ07k7i0nwhZc.jpg",
+    "fecha_estreno": "2014-11-05",
+    "duracion_min": 169,
+    "director": "Christopher Nolan",
+    "guionista": "Jonathan Nolan, Christopher Nolan",
+    "pais_origen": "US",
+    "popularidad": 45.2,
+    "promedio_votos": 8.4,
+    "cantidad_votos": 34500,
+    "generos": [
+      "Aventura",
+      "Drama",
+      "Ciencia ficcion"
+    ],
+    "elenco": [
+      {
+        "nombre": "Matthew McConaughey",
+        "personaje": "Joseph Cooper",
+        "foto_path": "/e9MywrSplZ7WTYATHEiSTV7MAZI.jpg"
+      },
+      {
+        "nombre": "Anne Hathaway",
+        "personaje": "Dr. Amelia Brand",
+        "foto_path": "/tLel4hkYrikXcELM5mSUx5Wk56n.jpg"
+      }
+    ]
+  }
+]
