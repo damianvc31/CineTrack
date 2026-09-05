@@ -22,9 +22,9 @@ cp .env.example .env
 
 Variables clave requeridas:
 - `DATABASE_URL`: Cadena de conexión PostgreSQL (ej. `postgresql+asyncpg://usuario:password@localhost:5432/cinetrack`)
-- `SECRET_KEY`: Clave secreta para firma de tokens JWT
-- `TMDB_API_KEY`: API Key de The Movie Database (TMDB)
-- `AI_API_KEY`: API Key para el servicio de IA del recomendador (Google Gemini o Groq)
+- `AUTH_SECRET_KEY`: Clave secreta para firma de sesiones/tokens del login
+- `TMDB_API_KEY`: Read Access Token o API Key de The Movie Database (TMDB)
+- `AI_PROVIDER_API_KEY`: API Key para el servicio de IA del recomendador (Google Gemini o Groq)
 
 ---
 

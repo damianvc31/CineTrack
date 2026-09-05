@@ -48,7 +48,8 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
    - Sincronización reactiva: al momento del login del usuario, transición automática de series en `Vista` hacia `Siguiendo` si se detecta nueva temporada confirmada.
 2. **Recomendador de IA Embebido:**
    - Desacoplado de los hubs del entorno de desarrollo.
-   - Conexión vía API a modelo gratuito/eficiente (Google Gemini API / Groq API) con function calling para consultas estructuradas o búsqueda por filtros.
+   - **Versión Mínima:** Recomendador simple sin function calling (implementado como última pieza del flujo núcleo según `spec.md`). Conexión vía API a modelo gratuito/eficiente (Google Gemini API / Groq API) con un prompt directo estructurado que combina el texto del usuario con sus preferencias de perfil (favoritos, vistos, reseñas) y puntajes de comunidad.
+   - **Versión Superior:** Evolución planificada a *function calling* estructurado (herramientas de búsqueda exacta + similitud semántica con embeddings vectoriales), con la arquitectura de FastAPI ya preparada para soportar ambas modalidades.
 
 ---
 
