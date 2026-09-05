@@ -227,7 +227,7 @@ Incluir en el detalle de película y serie (secciones 5 y 6) dónde se puede ver
 
 ## Objetivos: Versión Mínima vs. Versión Superior
 
-Dado el plazo del curso (~1 mes y medio), las funcionalidades de arriba se dividen en dos niveles. La arquitectura base (3 capas, el favorito + 3 estados de título con recálculo automático por sincronización, y el uso de IA embebida) se mantiene en ambos niveles — lo que cambia es la sofisticación y la cantidad de funcionalidades secundarias.
+Dado el plazo del curso (~3 semanas — más ajustado de lo que se asumió al principio del proyecto), las funcionalidades de arriba se dividen en dos niveles. La arquitectura base (3 capas, el favorito + 3 estados de título con recálculo automático por sincronización, y el uso de IA embebida) se mantiene en ambos niveles — lo que cambia es la sofisticación y la cantidad de funcionalidades secundarias. **Con este plazo, la disciplina de alcance importa más, no menos** — el orden del "Flujo núcleo" de abajo no es solo una sugerencia de secuencia, es la línea de corte real si el tiempo no alcanza para todo: lo que quede sin implementar debería ser lo último de esa lista (el recomendador), no algo de en medio.
 
 ### Flujo núcleo (lo que hace que valga la pena construir esto)
 
@@ -257,15 +257,13 @@ Usuario se registra → explora el catálogo → marca Favorito/Watchlist/Vista 
 - Selector de idioma — sitio y contenido (punto 11)
 - Ampliar el catálogo inicial de TMDB más allá del recorte por popularidad
 
-## Sugerencias de Arquitectura y Despliegue (no vinculantes)
-
-Como punto de partida para la discusión, Render (backend) y Vercel (frontend) son una combinación razonable para este tipo de proyecto — pero no es una decisión cerrada, la propuesta de Fase 1 puede proponer algo distinto si tiene mejor fundamento. Lo que sí es innegociable, independientemente de la plataforma elegida: usar variables de entorno (`.env`) para las credenciales de la base de datos y las API keys de TMDB y de los hubs IA, garantizando que no se suban datos sensibles a GitHub, con el `.gitignore` correctamente configurado desde el inicio.
-
 ## Fase 1: Propuesta Arquitectónica (No programar aún)
 
-Todo lo anterior son los requerimientos funcionales, no una arquitectura ya decidida. Actuá como el Arquitecto de Software Principal: analizá los requerimientos y generá **tu propia propuesta**, que después vamos a discutir y ajustar juntos antes de aprobar nada — no es un molde a completar, es tu mejor recomendación fundamentada:
+Ya existe un borrador de arquitectura en `architecture.md` (raíz del repo) — es una **hipótesis de partida, no una decisión cerrada**. Evaluala con sentido crítico: confirmá lo que tenga fundamento sólido, y proponé algo distinto donde tengas mejor criterio. No la tomes como dato ya resuelto solo porque está escrita.
 
-1. **Selección de Tecnologías:** proponé un stack (backend, frontend, persistencia) ideal para las plataformas de despliegue seleccionadas, explicado en lenguaje coloquial. El lenguaje/framework de cada capa no está impuesto de antemano — elegí el más adecuado por capa (ver criterio de lenguajes en `AGENTS.md`).
+Actuá como el Arquitecto de Software Principal: analizá los requerimientos (y el borrador existente) y generá **tu propia propuesta**, que después vamos a discutir y ajustar juntos antes de aprobar nada:
+
+1. **Selección de Tecnologías:** confirmá o ajustá el stack propuesto en `architecture.md` (backend, frontend, persistencia), explicado en lenguaje coloquial. El lenguaje/framework de cada capa no está impuesto de antemano — elegí el más adecuado por capa (ver criterio de lenguajes en `AGENTS.md`).
 2. **Diseño de Base de Datos:** el modelo de datos debe soportar los siguientes requisitos — la cantidad de tablas, sus nombres y su estructura exacta **no están decididos de antemano**, son una propuesta tuya a hacer, no una lista a completar tal cual:
    - Usuarios, con contraseñas almacenadas con hash.
    - Títulos (películas y series), con sus datos técnicos (ver Fase 1, sección de Carga de Datos).
@@ -273,7 +271,7 @@ Todo lo anterior son los requerimientos funcionales, no una arquitectura ya deci
    - El favorito y los 3 estados de título por usuario (punto 4) y su historial de episodios vistos.
    - Reseñas propias de la app y de la comunidad de TMDB, distinguibles entre sí, idealmente sin duplicar la lógica de consulta entre ambos orígenes. **Confirmado: TMDB sí devuelve el nombre de quien escribió cada reseña** (campo `author`) — no hace falta inventar nombres genéricos ni dejarlo vacío para las importadas. Se guarda en un campo propio (`autorTMDB`, texto), separado de la FK hacia `Usuario` — **son mutuamente excluyentes**: si la reseña es de un usuario de la app, la FK está poblada y `autorTMDB` queda nulo; si es importada de TMDB, es al revés. Al mostrar una reseña, se lee el que no esté nulo, aclarando el origen TMDB cuando corresponda. El puntaje de una reseña **es opcional en ambos orígenes** — un usuario de la app puede reseñar sin puntuar, y una reseña de TMDB puede no traerlo; en ambos casos, simplemente no se muestra ningún puntaje para esa reseña puntual.
    - Resolvé explícitamente el mecanismo de recálculo automático por sincronización con TMDB (punto 4.1).
-3. **Hoja de ruta (Artifact):** pasos lógicos para la construcción del software, y criterios de éxito/pruebas automáticas para asegurar que funcione sin errores.
+3. **Hoja de ruta (Artifact):** pasos lógicos para la construcción del software, y criterios de éxito/pruebas automáticas para asegurar que funcione sin errores. Incluí el scaffolding inicial ejecutable (comando de creación del framework elegido, instalación del runner de tests, y un test básico que valide que la suite corre) como parte de los primeros pasos, no como algo a resolver por separado.
 
 ## Instrucción de Control (Human-in-the-Loop)
 
