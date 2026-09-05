@@ -33,6 +33,7 @@ def mock_tmdb_client():
     client.get_details.side_effect = lambda m, id_: MOCK_MOVIE_DETAILS if m == "movie" else MOCK_SERIES_DETAILS
     client.get_season_details.return_value = MOCK_SEASON_1_DETAILS
     client.get_reviews.return_value = MOCK_REVIEWS_DATA
+    client.get_changes.return_value = {"results": []}
     client.search.return_value = {"results": [{"id": 157336, "title": "Interstellar"}]}
     return client
 
@@ -226,4 +227,37 @@ async def test_sync_reviews_caps_at_limit(db_session, mock_tmdb_client):
     # Si volvemos a correr la sincronización de reseñas, no agrega ninguna porque ya llegó a 20
     added_second = await service.sync_reviews_for_title(movie)
     assert added_second == 0
+
+
+@pytest.mark.asyncio
+async def test_daily_sync_updates_untracked_titles_from_changes(db_session, mock_tmdb_client):
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    await service.sync_genres()
+
+    # 1. Crear una serie en la BD que NADIE sigue
+    series = Titulo(tmdb_id=1396, tipo="tv", nombre="Breaking Bad Viejo", popularidad=50.0)
+    # 2. Crear una película en la BD
+    movie = Titulo(tmdb_id=157336, tipo="movie", nombre="Interstellar Viejo", popularidad=80.0)
+    db_session.add_all([series, movie])
+    await db_session.commit()
+
+    # Simular que TMDB reporta que cambiaron la serie 1396 y la película 157336 en /changes
+    def mock_changes(media_type, start_date=None, end_date=None, page=1):
+        if media_type == "tv":
+            return {"results": [{"id": 1396}]}
+        elif media_type == "movie":
+            return {"results": [{"id": 157336}]}
+        return {"results": []}
+
+    mock_tmdb_client.get_changes.side_effect = mock_changes
+    mock_tmdb_client.discover.return_value = {"results": []}
+
+    res_sync = await service.run_daily_sync()
+
+    # La serie se actualizó porque estaba en /tv/changes aunque nadie la siguiera
+    assert res_sync["updated_series"] == 1
+
+    # Verificar que el nombre de la película se refrescó con MOCK_MOVIE_DETAILS
+    refreshed_movie = await db_session.execute(select(Titulo).where(Titulo.tmdb_id == 157336))
+    assert refreshed_movie.scalar_one().nombre == "Interstellar"
 

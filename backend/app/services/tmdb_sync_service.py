@@ -544,38 +544,83 @@ class TMDBSyncService:
         return newly_added
 
     # -------------------------------------------------------------------------
-    # SINCRONIZACIÓN DIARIA
+    # SINCRONIZACIÓN DIARIA (CON /CHANGES Y SEGUIMIENTO)
     # -------------------------------------------------------------------------
     async def run_daily_sync(self) -> Dict[str, int]:
+        """
+        Sincronización diaria:
+        1. Consulta TMDB /tv/changes (últimas 24-48h) y cruza con nuestra BD local para detectar
+           series con nuevos episodios o cambio de estado, aun si nadie las sigue todavía.
+        2. Garantiza la actualización de cualquier serie activamente seguida por usuarios (siguiendo).
+        3. Consulta TMDB /movie/changes para actualizar ratings/metadatos de películas de nuestro catálogo.
+        4. Ingesta estrenos recientes en cartelera (ventana de 15 días, popularidad >= 10.0).
+        5. Recalcula percentiles de popularidad.
+        """
         logger.info("Iniciando Sincronización Diaria...")
         today = date.today()
+        yesterday = (today - timedelta(days=2)).strftime("%Y-%m-%d")  # 48h de cobertura
+        date_end = today.strftime("%Y-%m-%d")
         window_days = settings.TMDB_DAILY_SYNC_DAYS_WINDOW
         pop_threshold = settings.TMDB_DAILY_SYNC_POP_THRESHOLD
         date_start = (today - timedelta(days=window_days)).strftime("%Y-%m-%d")
-        date_end = today.strftime("%Y-%m-%d")
 
-        # 1. Actualizar series en seguimiento
-        active_series_q = select(Titulo).distinct().join(
+        # 1. Obtener IDs cambiados en TMDB para TV
+        changed_tv_ids: Set[int] = set()
+        try:
+            tv_changes = await self.client.get_changes("tv", start_date=yesterday, end_date=date_end)
+            for item in tv_changes.get("results", []):
+                changed_tv_ids.add(item["id"])
+        except Exception as e:
+            logger.warning(f"No se pudo consultar TMDB /tv/changes: {e}")
+
+        # 2. Obtener series de nuestra BD que cambiaron en TMDB O que tienen usuarios en 'siguiendo'
+        active_series_q = select(Titulo.tmdb_id).distinct().join(
             EstadoUsuarioTitulo, EstadoUsuarioTitulo.titulo_id == Titulo.id
         ).where(
             Titulo.tipo == "tv",
             EstadoUsuarioTitulo.estado == "siguiendo"
         )
         res_active = await self.db.execute(active_series_q)
-        active_series = res_active.scalars().all()
+        tracked_tmdb_ids = set(res_active.scalars().all())
+
+        # Si tenemos series locales que coinciden con los cambios de TMDB
+        local_tv_q = select(Titulo.tmdb_id).where(Titulo.tipo == "tv")
+        res_local_tv = await self.db.execute(local_tv_q)
+        local_tv_ids = set(res_local_tv.scalars().all())
+
+        # Unión: Series seguidas + Series locales que tuvieron cambios en TMDB
+        tv_to_update = tracked_tmdb_ids.union(local_tv_ids.intersection(changed_tv_ids))
 
         updated_series_count = 0
-        for serie in active_series:
-            if serie.tmdb_id:
+        for tmdb_id in tv_to_update:
+            if tmdb_id:
                 try:
-                    await self.upsert_series(serie.tmdb_id, fetch_episodes=True)
+                    await self.upsert_series(tmdb_id, fetch_episodes=True)
                     updated_series_count += 1
                     await self.db.commit()
                 except Exception as e:
-                    logger.error(f"Error actualizando serie en seguimiento id {serie.tmdb_id}: {e}")
+                    logger.error(f"Error actualizando serie id {tmdb_id}: {e}")
                     await self.db.rollback()
 
-        # 2. Ingestar nuevos estrenos calificados
+        # 3. Consultar /movie/changes y refrescar películas locales modificadas
+        try:
+            movie_changes = await self.client.get_changes("movie", start_date=yesterday, end_date=date_end)
+            changed_movie_ids = {item["id"] for item in movie_changes.get("results", [])}
+            local_movie_q = select(Titulo.tmdb_id).where(Titulo.tipo == "movie")
+            res_local_movies = await self.db.execute(local_movie_q)
+            local_movie_ids = set(res_local_movies.scalars().all())
+            movies_to_update = local_movie_ids.intersection(changed_movie_ids)
+            for m_id in movies_to_update:
+                try:
+                    await self.upsert_movie(m_id)
+                    await self.db.commit()
+                except Exception as e:
+                    logger.error(f"Error actualizando película cambiada id {m_id}: {e}")
+                    await self.db.rollback()
+        except Exception as e:
+            logger.warning(f"No se pudo sincronizar /movie/changes: {e}")
+
+        # 4. Ingestar nuevos estrenos calificados
         new_movies_count = 0
         page = 1
         while page <= 5:
@@ -603,7 +648,7 @@ class TMDBSyncService:
                             await self.db.rollback()
             page += 1
 
-        # Recalcular percentiles con los nuevos títulos
+        # 5. Recalcular percentiles con los nuevos títulos
         await self.recalculate_percentiles()
 
         logger.info(f"Sincronización diaria terminada: {updated_series_count} series actualizadas, {new_movies_count} nuevos estrenos.")

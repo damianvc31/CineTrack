@@ -64,6 +64,14 @@ python -m app.jobs.sync_tmdb --import-json docs/templates/template_pelicula.json
 python -m app.jobs.sync_tmdb --import-tmdb-id 157336 --type movie
 ```
 
+#### Calificación Unificada y Política de Reseñas
+CineTrack no divide de forma confusa el puntaje entre "TMDB" y "CineTrack", sino que presenta un **puntaje promedio ponderado unificado**:
+
+$$\text{Rating} = \frac{(\text{vote\_average\_tmdb} \times \text{vote\_count\_tmdb}) + \sum_{i=1}^{N} \text{puntaje\_usuario}_i}{\text{vote\_count\_tmdb} + N}$$
+
+- **Reseñas de TMDB:** Se sincronizan hasta un tope configurable (`TMDB_REVIEWS_PER_TITLE_LIMIT = 20`) exclusivamente para dar contexto enriquecido y opiniones al catálogo inicial. No alteran el cálculo ponderado porque los votos de TMDB ya están reflejados en `vote_average_tmdb`.
+- **Reseñas de CineTrack:** No tienen límite por título y cada reseña con puntaje emitida por un usuario registrado impacta dinámicamente en el rating consolidado.
+
 #### Tareas Programadas en Producción (Cron)
 Para mantener actualizado el catálogo automáticamente en un servidor o contenedor, se programa la ejecución diaria del comando `--daily` mediante cron:
 ```bash

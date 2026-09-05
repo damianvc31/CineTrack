@@ -156,11 +156,14 @@ class TMDBClient:
         self,
         media_type: str,
         start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         page: int = 1,
     ) -> Dict[str, Any]:
         endpoint = f"/{media_type}/changes"
         params: Dict[str, Any] = {"page": page}
         if start_date:
             params["start_date"] = start_date
+        if end_date:
+            params["end_date"] = end_date
         return await self._request("GET", endpoint, params=params)
 
