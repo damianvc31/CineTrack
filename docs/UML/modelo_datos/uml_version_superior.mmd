@@ -17,14 +17,19 @@ classDiagram
     +popularidadPercentil
     +voteAverageTMDB
     +voteCountTMDB
-    +/promedioPuntaje
-    +/cantidadVotos
+    +ratingUnificado
   }
 
   class Actor {
     +nombre
   }
-  Titulo "*" --> "*" Actor : reparto
+
+  class TituloElenco {
+    +personaje
+    +orden
+  }
+  Titulo "1" --> "*" TituloElenco : tiene elenco
+  Actor "1" --> "*" TituloElenco : participa en
 
   class Genero {
     +nombre
@@ -54,6 +59,7 @@ classDiagram
     +descripcion
     +fechaRegistro
     +avatarUrl
+    +esAdmin
   }
 
   class EstadoUsuarioTitulo {

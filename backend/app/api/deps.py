@@ -1,13 +1,16 @@
-from fastapi import Depends, HTTPException, status
+from typing import Optional
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.usuario import Usuario
 from app.services.auth_service import get_user_by_id
 
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
@@ -51,3 +54,42 @@ async def get_current_user(
         )
 
     return user
+
+
+async def get_current_admin(
+    x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[Usuario]:
+    """
+    Verifica que la petición provenga de un administrador.
+    Valida vía:
+    1. Header 'X-Admin-Key' con la clave configurada en settings.ADMIN_API_KEY.
+    2. O Token JWT de un usuario registrado con es_admin=True.
+    """
+    # 1. Validación vía Admin API Key
+    if x_admin_key and x_admin_key == settings.ADMIN_API_KEY:
+        return None
+
+    # 2. Validación vía Token JWT
+    if credentials:
+        payload = decode_access_token(credentials.credentials)
+        if payload and payload.get("sub"):
+            try:
+                user_id = int(payload["sub"])
+                user = await get_user_by_id(db, user_id=user_id)
+                if user and user.es_admin:
+                    return user
+                elif user:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Acceso denegado: se requieren privilegios de administrador."
+                    )
+            except ValueError:
+                pass
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Credenciales administrativas requeridas (Token de admin o header X-Admin-Key válido).",
+        headers={"WWW-Authenticate": "Bearer"},
+    )

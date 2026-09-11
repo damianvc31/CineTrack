@@ -21,8 +21,12 @@ async def main():
     parser.add_argument("--genres", action="store_true", help="Sincronizar catálogo de géneros")
     parser.add_argument("--initial", action="store_true", help="Ejecutar ingesta inicial de títulos")
     parser.add_argument("--priority", choices=["popular_first", "toprated_first"], default=None, help="Prioridad de ingesta inicial")
+    parser.add_argument("--movies-target", type=int, default=None, help="Cantidad objetivo de películas para ingesta inicial")
+    parser.add_argument("--series-target", type=int, default=None, help="Cantidad objetivo de series para ingesta inicial")
     parser.add_argument("--daily", action="store_true", help="Ejecutar sincronización diaria")
+    parser.add_argument("--hours-window", type=int, default=None, help="Ventana de horas para consultar cambios de TMDB en sync diaria")
     parser.add_argument("--percentiles", action="store_true", help="Recalcular percentiles de popularidad")
+    parser.add_argument("--ratings", action="store_true", help="Recalcular rating unificado para todos los títulos")
     parser.add_argument("--reviews", action="store_true", help="Sincronizar reseñas de TMDB para todos los títulos hasta el tope (20)")
     parser.add_argument("--import-json", type=str, help="Ruta al archivo JSON con títulos a importar")
     parser.add_argument("--import-tmdb-id", type=int, help="Importar un título específico por su ID de TMDB")
@@ -43,18 +47,28 @@ async def main():
 
             elif args.initial:
                 logger.info(f"-> Ejecutando ingesta inicial (prioridad: {args.priority or 'default'})...")
-                res = await service.run_initial_ingest(priority=args.priority)
+                res = await service.run_initial_ingest(
+                    priority=args.priority,
+                    movies_target=args.movies_target,
+                    series_target=args.series_target
+                )
                 logger.info(f"Resultado de ingesta inicial: {res}")
 
             elif args.daily:
                 logger.info("-> Ejecutando sincronización diaria...")
-                res = await service.run_daily_sync()
+                res = await service.run_daily_sync(hours_window=args.hours_window)
                 logger.info(f"Resultado sincronización diaria: {res}")
 
             elif args.percentiles:
-                logger.info("-> Recalculando percentiles de popularidad...")
+                logger.info("-> Recalculando percentiles de popularidad y ratings unificados...")
                 await service.recalculate_percentiles()
-                logger.info("Percentiles recalculados exitosamente.")
+                await service.recalculate_unified_ratings()
+                logger.info("Métricas recalculadas exitosamente.")
+
+            elif args.ratings:
+                logger.info("-> Recalculando rating unificado para todos los títulos...")
+                total = await service.recalculate_unified_ratings()
+                logger.info(f"Rating unificado recalculado para {total} títulos.")
 
             elif args.reviews:
                 logger.info("-> Sincronizando reseñas de TMDB para todos los títulos...")

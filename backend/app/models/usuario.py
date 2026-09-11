@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import DateTime, LargeBinary, String, Text, func
+from sqlalchemy import Boolean, DateTime, LargeBinary, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -23,6 +23,7 @@ class Usuario(Base):
     fecha_registro: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     avatar_binario: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    es_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relaciones
     estados: Mapped[list["EstadoUsuarioTitulo"]] = relationship(back_populates="usuario", cascade="all, delete-orphan")

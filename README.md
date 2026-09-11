@@ -72,11 +72,26 @@ $$\text{Rating} = \frac{(\text{vote\_average\_tmdb} \times \text{vote\_count\_tm
 - **Reseñas de TMDB:** Se sincronizan hasta un tope configurable (`TMDB_REVIEWS_PER_TITLE_LIMIT = 20`) exclusivamente para dar contexto enriquecido y opiniones al catálogo inicial. No alteran el cálculo ponderado porque los votos de TMDB ya están reflejados en `vote_average_tmdb`.
 - **Reseñas de CineTrack:** No tienen límite por título y cada reseña con puntaje emitida por un usuario registrado impacta dinámicamente en el rating consolidado.
 
+#### Endpoints Administrativos (API HTTP)
+Todos los jobs de sincronización pueden dispararse también vía HTTP (`HTTP 202 Accepted` con ejecución asíncrona mediante `BackgroundTasks`):
+- `POST /api/v1/admin/sync/genres`: Sincronización de géneros.
+- `POST /api/v1/admin/sync/initial`: Ingesta inicial (`priority`, `movies_target`, `series_target`).
+- `POST /api/v1/admin/sync/daily`: Sync diaria (`hours_window`).
+- `POST /api/v1/admin/sync/percentiles`: Recálculo de percentiles y rating unificado.
+- `POST /api/v1/admin/sync/reviews`: Sincronización de reseñas TMDB (`limit_per_title`).
+- `POST /api/v1/admin/sync/import-tmdb`: Importar título por TMDB ID (`tmdb_id`, `type`).
+- `POST /api/v1/admin/sync/import-json`: Carga masiva desde lista JSON según plantillas.
+
+*Autenticación requerida:* Enviar cabecera `Authorization: Bearer <token_admin>` (usuario con `es_admin=True`) o cabecera `X-Admin-Key: <ADMIN_API_KEY>`.
+
 #### Tareas Programadas en Producción (Cron)
-Para mantener actualizado el catálogo automáticamente en un servidor o contenedor, se programa la ejecución diaria del comando `--daily` mediante cron:
+Para mantener actualizado el catálogo automáticamente en un servidor o contenedor, se programa la ejecución diaria del comando `--daily` mediante cron (o invocando el endpoint `/daily` con curl y la API Key):
 ```bash
-# Ejemplo: ejecutar todos los días a las 03:00 AM
+# Ejemplo CLI: ejecutar todos los días a las 03:00 AM
 0 3 * * * cd /app/backend && /app/backend/.venv/bin/python -m app.jobs.sync_tmdb --daily >> /var/log/cinetrack_sync.log 2>&1
+
+# Ejemplo HTTP: invocar endpoint administrativo con curl
+0 3 * * * curl -X POST http://localhost:8000/api/v1/admin/sync/daily -H "X-Admin-Key: cinetrack-dev-admin-secret-key" -H "Content-Type: application/json" -d "{}"
 ```
 
 ### Frontend

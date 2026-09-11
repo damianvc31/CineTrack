@@ -12,7 +12,7 @@
   - [x] Suite de 16 tests automatizados con `pytest` pasando.
   - [x] Tag `v0.3.0` generado y pusheado a GitHub.
 
-- [x] **Fase 4: Integración TMDB y Sincronización (v0.4.0)**
+- [x] **Fase 4: Integración TMDB y Sincronización (v0.4.0 - v0.4.2)**
   - [x] Paso 4.1: Plantillas JSON de referencia en `docs/templates/` (`template_pelicula.json`, `template_serie.json`).
   - [x] Paso 4.2: Parámetros de configuración en `backend/app/core/config.py` (cuotas, límites, prioridad de ingesta).
   - [x] Paso 4.3: Esquemas Pydantic de validación para importación manual en `backend/app/schemas/import_export.py`.
@@ -23,6 +23,17 @@
   - [x] Paso 4.8: Verificación de tests (23/23 backend tests pasando sin llamadas externas reales).
   - [x] Paso 4.9: Actualización de documentación viva (`ARCHITECTURE.md`, `ROADMAP.md`, `CHANGELOG.md`, `README.md`).
   - [x] Paso 4.10: Commit y tag `v0.4.0`.
+  - [x] Paso 4.11: Sincronización de reseñas TMDB (`--reviews`) y fórmula de rating unificado (v0.4.1).
+  - [x] Paso 4.12: Integración de `/tv/changes` y `/movie/changes` en sync diaria (v0.4.2).
+
+- [x] **Ajustes Técnicos Previos a Fase 5 (v0.4.3)**
+  - [x] Parametrización de `TMDB_CHANGES_HOURS_WINDOW` (default 48 horas) en `backend/app/core/config.py` y `run_daily_sync`.
+  - [x] Persistencia de columna indexada `rating_unificado` en modelo `Titulo` y método `recalculate_unified_ratings` ponderando TMDB + usuarios locales.
+  - [x] Enriquecimiento de `titulos_elenco` con columnas `personaje` y `orden` para elenco jerarquizado y detallado.
+  - [x] Flag `es_admin` en modelo `Usuario` y clave `ADMIN_API_KEY` para autenticación administrativa.
+  - [x] Router de administración `backend/app/api/v1/admin.py` con `BackgroundTasks` para invocar todos los jobs vía API HTTP (`HTTP 202 Accepted`) con soporte completo de parámetros.
+  - [x] Migración Alembic `0002_technical_adjustments.py`.
+  - [x] Suite de tests ampliada a 32 tests (100% pasando en verde).
 
 ---
 

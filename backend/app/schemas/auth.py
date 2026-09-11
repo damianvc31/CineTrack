@@ -23,6 +23,7 @@ class UserResponse(BaseModel):
     ciudad: str | None = None
     descripcion: str | None = None
     avatar_url: str | None = None
+    es_admin: bool = False
     fecha_registro: datetime
 
     model_config = ConfigDict(from_attributes=True)

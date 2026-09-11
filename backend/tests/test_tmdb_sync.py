@@ -72,12 +72,15 @@ async def test_upsert_movie_enriches_credits_and_cast_limit(db_session, mock_tmd
     assert "Jonathan Nolan" in guionistas
     assert "Christopher Nolan" in guionistas
 
-    # Elenco limitado a 15 actores
+    # Elenco limitado a 15 actores con personaje y orden
     res_cast = await db_session.execute(
-        select(titulos_elenco).where(titulos_elenco.c.titulo_id == movie.id)
+        select(titulos_elenco).where(titulos_elenco.c.titulo_id == movie.id).order_by(titulos_elenco.c.orden.asc())
     )
     cast_rows = res_cast.all()
     assert len(cast_rows) == 15
+    assert cast_rows[0].personaje == "Personaje 0"
+    assert cast_rows[0].orden == 0
+    assert movie.rating_unificado == 8.4
 
 
 @pytest.mark.asyncio
@@ -260,4 +263,61 @@ async def test_daily_sync_updates_untracked_titles_from_changes(db_session, mock
     # Verificar que el nombre de la película se refrescó con MOCK_MOVIE_DETAILS
     refreshed_movie = await db_session.execute(select(Titulo).where(Titulo.tmdb_id == 157336))
     assert refreshed_movie.scalar_one().nombre == "Interstellar"
+
+
+@pytest.mark.asyncio
+async def test_recalculate_unified_ratings_formula(db_session, mock_tmdb_client):
+    """Verifica que el cálculo del rating unificado pondere correctamente TMDB + reseñas locales."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+
+    # Crear usuario y título
+    user1 = Usuario(nombre_usuario="user1", password_hash="hash")
+    user2 = Usuario(nombre_usuario="user2", password_hash="hash")
+    # Título con 10 votos y promedio 8.0 de TMDB
+    titulo = Titulo(
+        tmdb_id=999,
+        tipo="movie",
+        nombre="Test Film",
+        vote_average_tmdb=8.0,
+        vote_count_tmdb=10,
+        rating_unificado=8.0
+    )
+    db_session.add_all([user1, user2, titulo])
+    await db_session.commit()
+
+    # Agregar dos reseñas de usuarios locales: 10.0 y 6.0 (Suma = 16.0, N = 2)
+    # Fórmula esperada: [(8.0 * 10) + 16.0] / [10 + 2] = 96.0 / 12 = 8.0
+    res1 = Resena(titulo=titulo, usuario=user1, puntaje=10.0, texto="Excelente")
+    res2 = Resena(titulo=titulo, usuario=user2, puntaje=6.0, texto="Regular")
+    db_session.add_all([res1, res2])
+    await db_session.commit()
+
+    await service.recalculate_unified_ratings(titulo.id)
+    await db_session.refresh(titulo)
+    assert titulo.rating_unificado == 8.0
+
+    # Agregar una tercera reseña con 10.0: [(80) + 26.0] / 13 = 106.0 / 13 = 8.15
+    user3 = Usuario(nombre_usuario="user3", password_hash="hash")
+    db_session.add(user3)
+    await db_session.commit()
+
+    res3 = Resena(titulo=titulo, usuario=user3, puntaje=10.0, texto="Muy buena")
+    db_session.add(res3)
+    await db_session.commit()
+
+    await service.recalculate_unified_ratings(titulo.id)
+    await db_session.refresh(titulo)
+    assert titulo.rating_unificado == 8.15
+
+
+@pytest.mark.asyncio
+async def test_daily_sync_with_custom_hours_window(db_session, mock_tmdb_client):
+    """Verifica que run_daily_sync acepte una ventana personalizada en horas sin errores."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    mock_tmdb_client.get_changes.return_value = {"results": []}
+    mock_tmdb_client.discover.return_value = {"results": []}
+
+    res = await service.run_daily_sync(hours_window=72)
+    assert "updated_series" in res
+    assert "new_movies" in res
 

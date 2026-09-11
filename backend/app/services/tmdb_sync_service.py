@@ -86,6 +86,8 @@ class TMDBSyncService:
                 elenco_list.append({
                     "tmdb_id": member.get("id"),
                     "nombre": member["name"],
+                    "personaje": member.get("character"),
+                    "orden": member.get("order", 0)
                 })
 
         return director, guionista, elenco_list
@@ -103,13 +105,15 @@ class TMDBSyncService:
                 )
 
     async def _attach_cast(self, titulo: Titulo, elenco_list: List[Dict[str, Any]]):
-        """Asocia actores al título en titulos_elenco."""
+        """Asocia actores al título en titulos_elenco con personaje y orden."""
         # Limpiar elenco previo si ya existía
         await self.db.execute(titulos_elenco.delete().where(titulos_elenco.c.titulo_id == titulo.id))
 
         for actor_dict in elenco_list:
             nombre = actor_dict["nombre"]
             tmdb_id = actor_dict.get("tmdb_id")
+            personaje = actor_dict.get("personaje")
+            orden = actor_dict.get("orden", 0)
 
             # Buscar o crear actor
             if tmdb_id:
@@ -130,6 +134,8 @@ class TMDBSyncService:
                 titulos_elenco.insert().values(
                     titulo_id=titulo.id,
                     actor_id=actor.id,
+                    personaje=personaje,
+                    orden=orden,
                 )
             )
 
@@ -249,6 +255,9 @@ class TMDBSyncService:
 
         portada = f"https://image.tmdb.org/t/p/w500{details['poster_path']}" if details.get("poster_path") else None
         pais = details.get("origin_country", [""])[0] if details.get("origin_country") else None
+        vote_avg = details.get("vote_average", 0.0)
+        vote_cnt = details.get("vote_count", 0)
+        rating_unif = vote_avg if vote_cnt > 0 else 0.0
 
         if not titulo:
             titulo = Titulo(
@@ -264,8 +273,9 @@ class TMDBSyncService:
                 pais=pais,
                 idioma_original=details.get("original_language"),
                 popularidad=details.get("popularity", 0.0),
-                vote_average_tmdb=details.get("vote_average", 0.0),
-                vote_count_tmdb=details.get("vote_count", 0),
+                vote_average_tmdb=vote_avg,
+                vote_count_tmdb=vote_cnt,
+                rating_unificado=rating_unif,
                 status_tmdb=details.get("status"),
             )
             self.db.add(titulo)
@@ -281,8 +291,9 @@ class TMDBSyncService:
             titulo.pais = pais or titulo.pais
             titulo.idioma_original = details.get("original_language", titulo.idioma_original)
             titulo.popularidad = details.get("popularity", titulo.popularidad)
-            titulo.vote_average_tmdb = details.get("vote_average", titulo.vote_average_tmdb)
-            titulo.vote_count_tmdb = details.get("vote_count", titulo.vote_count_tmdb)
+            titulo.vote_average_tmdb = vote_avg
+            titulo.vote_count_tmdb = vote_cnt
+            titulo.rating_unificado = rating_unif
             titulo.status_tmdb = details.get("status", titulo.status_tmdb)
 
         # Géneros
@@ -345,6 +356,9 @@ class TMDBSyncService:
 
         portada = f"https://image.tmdb.org/t/p/w500{details['poster_path']}" if details.get("poster_path") else None
         pais = details.get("origin_country", [""])[0] if details.get("origin_country") else None
+        vote_avg = details.get("vote_average", 0.0)
+        vote_cnt = details.get("vote_count", 0)
+        rating_unif = vote_avg if vote_cnt > 0 else 0.0
 
         if not titulo:
             titulo = Titulo(
@@ -361,8 +375,9 @@ class TMDBSyncService:
                 pais=pais,
                 idioma_original=details.get("original_language"),
                 popularidad=details.get("popularity", 0.0),
-                vote_average_tmdb=details.get("vote_average", 0.0),
-                vote_count_tmdb=details.get("vote_count", 0),
+                vote_average_tmdb=vote_avg,
+                vote_count_tmdb=vote_cnt,
+                rating_unificado=rating_unif,
                 status_tmdb=status,
                 proximo_episodio_fecha=fecha_prox_ep,
             )
@@ -379,8 +394,9 @@ class TMDBSyncService:
             titulo.pais = pais or titulo.pais
             titulo.idioma_original = details.get("original_language", titulo.idioma_original)
             titulo.popularidad = details.get("popularity", titulo.popularidad)
-            titulo.vote_average_tmdb = details.get("vote_average", titulo.vote_average_tmdb)
-            titulo.vote_count_tmdb = details.get("vote_count", titulo.vote_count_tmdb)
+            titulo.vote_average_tmdb = vote_avg
+            titulo.vote_count_tmdb = vote_cnt
+            titulo.rating_unificado = rating_unif
             titulo.status_tmdb = details.get("status", titulo.status_tmdb)
             titulo.proximo_episodio_fecha = fecha_prox_ep
 
@@ -466,21 +482,27 @@ class TMDBSyncService:
     # -------------------------------------------------------------------------
     # INGESTA INICIAL
     # -------------------------------------------------------------------------
-    async def run_initial_ingest(self, priority: Optional[str] = None) -> Dict[str, int]:
+    async def run_initial_ingest(
+        self,
+        priority: Optional[str] = None,
+        movies_target: Optional[int] = None,
+        series_target: Optional[int] = None
+    ) -> Dict[str, int]:
         prio = priority or settings.TMDB_INGEST_PRIORITY
         logger.info(f"Iniciando Ingesta Inicial con prioridad: {prio}")
 
         # Sincronizar géneros primero
         await self.sync_genres()
 
-        movie_target = settings.TMDB_INGEST_MOVIES_TARGET
-        series_target = settings.TMDB_INGEST_SERIES_TARGET
+        movie_target = movies_target or settings.TMDB_INGEST_MOVIES_TARGET
+        series_target = series_target or settings.TMDB_INGEST_SERIES_TARGET
         min_votes = settings.TMDB_MIN_VOTE_COUNT
 
         movies_added = await self._ingest_media_pool("movie", movie_target, prio, min_votes)
         series_added = await self._ingest_media_pool("tv", series_target, prio, min_votes)
 
         await self.recalculate_percentiles()
+        await self.recalculate_unified_ratings()
         logger.info(f"Ingesta inicial completada: {movies_added} películas, {series_added} series.")
         return {"movies_added": movies_added, "series_added": series_added}
 
@@ -546,19 +568,21 @@ class TMDBSyncService:
     # -------------------------------------------------------------------------
     # SINCRONIZACIÓN DIARIA (CON /CHANGES Y SEGUIMIENTO)
     # -------------------------------------------------------------------------
-    async def run_daily_sync(self) -> Dict[str, int]:
+    async def run_daily_sync(self, hours_window: Optional[int] = None) -> Dict[str, int]:
         """
         Sincronización diaria:
-        1. Consulta TMDB /tv/changes (últimas 24-48h) y cruza con nuestra BD local para detectar
+        1. Consulta TMDB /tv/changes (últimas horas_window o config) y cruza con nuestra BD local para detectar
            series con nuevos episodios o cambio de estado, aun si nadie las sigue todavía.
         2. Garantiza la actualización de cualquier serie activamente seguida por usuarios (siguiendo).
         3. Consulta TMDB /movie/changes para actualizar ratings/metadatos de películas de nuestro catálogo.
         4. Ingesta estrenos recientes en cartelera (ventana de 15 días, popularidad >= 10.0).
-        5. Recalcula percentiles de popularidad.
+        5. Recalcula percentiles de popularidad y ratings unificados.
         """
         logger.info("Iniciando Sincronización Diaria...")
         today = date.today()
-        yesterday = (today - timedelta(days=2)).strftime("%Y-%m-%d")  # 48h de cobertura
+        h_window = hours_window or settings.TMDB_CHANGES_HOURS_WINDOW
+        days_back = max(1, (h_window + 23) // 24)
+        yesterday = (today - timedelta(days=days_back)).strftime("%Y-%m-%d")
         date_end = today.strftime("%Y-%m-%d")
         window_days = settings.TMDB_DAILY_SYNC_DAYS_WINDOW
         pop_threshold = settings.TMDB_DAILY_SYNC_POP_THRESHOLD
@@ -648,8 +672,9 @@ class TMDBSyncService:
                             await self.db.rollback()
             page += 1
 
-        # 5. Recalcular percentiles con los nuevos títulos
+        # 5. Recalcular percentiles y ratings unificados con los nuevos títulos
         await self.recalculate_percentiles()
+        await self.recalculate_unified_ratings()
 
         logger.info(f"Sincronización diaria terminada: {updated_series_count} series actualizadas, {new_movies_count} nuevos estrenos.")
         return {"updated_series": updated_series_count, "new_movies": new_movies_count}
@@ -698,6 +723,7 @@ class TMDBSyncService:
 
         if imported_count > 0:
             await self.recalculate_percentiles()
+            await self.recalculate_unified_ratings()
         return {"imported": imported_count, "errors": errors}
 
     # -------------------------------------------------------------------------
@@ -731,4 +757,41 @@ class TMDBSyncService:
                     pct = rank / (n - 1)
                     await self.db.execute(update(Titulo).where(Titulo.id == tid).values(popularidad_percentil=pct))
                 await self.db.commit()
+
+    # -------------------------------------------------------------------------
+    # RECÁLCULO DE RATING UNIFICADO
+    # -------------------------------------------------------------------------
+    async def recalculate_unified_ratings(self, titulo_id: Optional[int] = None) -> int:
+        """
+        Recalcula el Rating Unificado ponderado:
+        [(vote_average_tmdb * vote_count_tmdb) + sum(puntajes_usuarios)] / [vote_count_tmdb + N]
+        donde N es el total de reseñas locales de usuarios con puntaje.
+        """
+        logger.info("Recalculando rating unificado...")
+        query = select(Titulo)
+        if titulo_id:
+            query = query.where(Titulo.id == titulo_id)
+        res = await self.db.execute(query)
+        titulos = res.scalars().all()
+
+        for tit in titulos:
+            q_res = select(
+                func.coalesce(func.sum(Resena.puntaje), 0.0),
+                func.count(Resena.id)
+            ).where(
+                Resena.titulo_id == tit.id,
+                Resena.usuario_id.isnot(None),
+                Resena.puntaje.isnot(None)
+            )
+            r = await self.db.execute(q_res)
+            sum_users, count_users = r.one()
+            total_votes = tit.vote_count_tmdb + count_users
+            if total_votes > 0:
+                tit.rating_unificado = round(((tit.vote_average_tmdb * tit.vote_count_tmdb) + float(sum_users)) / total_votes, 2)
+            else:
+                tit.rating_unificado = 0.0
+
+        await self.db.commit()
+        logger.info(f"Rating unificado recalculado para {len(titulos)} títulos.")
+        return len(titulos)
 

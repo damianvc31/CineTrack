@@ -8,7 +8,7 @@ from app.models.actor import titulos_elenco
 from app.models.genero import titulos_generos
 
 if TYPE_CHECKING:
-    from app.models.actor import Actor
+    from app.models.actor import Actor, TituloElenco
     from app.models.estado import EstadoUsuarioTitulo
     from app.models.genero import Genero
     from app.models.resena import Resena
@@ -35,6 +35,7 @@ class Titulo(Base):
     popularidad_percentil: Mapped[float] = mapped_column(Float, default=0.0, index=True, nullable=False)
     vote_average_tmdb: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     vote_count_tmdb: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    rating_unificado: Mapped[float] = mapped_column(Float, default=0.0, index=True, nullable=False)
     status_tmdb: Mapped[str | None] = mapped_column(String(50), nullable=True)  # Ended, Returning Series, Canceled
     proximo_episodio_fecha: Mapped[date | None] = mapped_column(Date, nullable=True)
 
@@ -45,7 +46,14 @@ class Titulo(Base):
     )
     actores: Mapped[list["Actor"]] = relationship(
         secondary=titulos_elenco,
-        back_populates="titulos"
+        back_populates="titulos",
+        overlaps="elenco,participaciones,titulo,actor"
+    )
+    elenco: Mapped[list["TituloElenco"]] = relationship(
+        back_populates="titulo",
+        cascade="all, delete-orphan",
+        order_by="TituloElenco.orden",
+        overlaps="actores,titulos"
     )
 
     # Relaciones Uno a Muchos

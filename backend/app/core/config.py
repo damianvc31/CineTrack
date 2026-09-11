@@ -33,9 +33,13 @@ class Settings(BaseSettings):
     TMDB_CAST_LIMIT: int = 15
     TMDB_CREW_WRITERS_LIMIT: int = 3
     TMDB_DAILY_SYNC_DAYS_WINDOW: int = 15
+    TMDB_CHANGES_HOURS_WINDOW: int = 48
     TMDB_DAILY_SYNC_POP_THRESHOLD: float = 10.0
     TMDB_INGEST_PRIORITY: str = "popular_first"  # "popular_first" o "toprated_first"
     TMDB_REVIEWS_PER_TITLE_LIMIT: int = 20
+
+    # Admin Key para endpoints administrativos y automatizaciones
+    ADMIN_API_KEY: str = "cinetrack-dev-admin-secret-key"
 
     AI_PROVIDER_API_KEY: str = ""
 

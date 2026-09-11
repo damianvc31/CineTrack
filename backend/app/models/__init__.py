@@ -1,5 +1,5 @@
 from app.db.base import Base
-from app.models.actor import Actor, titulos_elenco
+from app.models.actor import Actor, TituloElenco, titulos_elenco
 from app.models.episodio import Episodio
 from app.models.episodio_visto import EpisodioVisto
 from app.models.estado import EstadoUsuarioTitulo
@@ -16,6 +16,7 @@ __all__ = [
     "Genero",
     "titulos_generos",
     "Actor",
+    "TituloElenco",
     "titulos_elenco",
     "Temporada",
     "Episodio",
