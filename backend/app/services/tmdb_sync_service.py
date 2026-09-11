@@ -209,8 +209,13 @@ class TMDBSyncService:
 
         return added
 
-    async def sync_all_missing_reviews(self, limit_per_title: Optional[int] = None) -> Dict[str, int]:
+    async def sync_all_missing_reviews(
+        self,
+        limit_per_title: Optional[int] = None,
+        limit: Optional[int] = None
+    ) -> Dict[str, int]:
         """Recorre todos los títulos de la base de datos y absorbe reseñas de TMDB hasta completar el tope."""
+        effective_limit = limit_per_title if limit_per_title is not None else limit
         logger.info("Iniciando sincronización masiva de reseñas para todos los títulos...")
         res = await self.db.execute(select(Titulo).where(Titulo.tmdb_id.isnot(None)))
         titulos = res.scalars().all()
@@ -218,7 +223,7 @@ class TMDBSyncService:
         total_added = 0
         titles_updated = 0
         for titulo in titulos:
-            added = await self.sync_reviews_for_title(titulo, limit=limit_per_title)
+            added = await self.sync_reviews_for_title(titulo, limit=effective_limit)
             if added > 0:
                 total_added += added
                 titles_updated += 1

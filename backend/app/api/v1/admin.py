@@ -112,7 +112,7 @@ async def _run_job_reviews(limit_per_title: Optional[int]):
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
-            await service.sync_all_missing_reviews(limit=limit_per_title)
+            await service.sync_all_missing_reviews(limit_per_title=limit_per_title)
     except Exception as e:
         logger.error(f"[Job Background] Error sincronizando reseñas: {e}")
     finally:

@@ -114,3 +114,44 @@ async def test_admin_sync_jobs_with_parameters(async_client: AsyncClient):
     )
     assert resp_json.status_code == 202
     assert resp_json.json()["job"] == "import_json"
+
+
+@pytest.mark.asyncio
+async def test_admin_background_workers_execution(monkeypatch):
+    """Verifica que todas las funciones wrapper de BackgroundTasks se ejecuten sin errores de firma o invocación."""
+    from unittest.mock import AsyncMock
+    from app.api.v1 import admin
+
+    mock_client = AsyncMock()
+    mock_client.close = AsyncMock()
+    monkeypatch.setattr("app.api.v1.admin.TMDBClient", lambda: mock_client)
+
+    # Mock de TMDBSyncService para verificar que todas las llamadas de los wrappers correspondan exactamente a los métodos del servicio
+    mock_service = AsyncMock()
+    monkeypatch.setattr("app.api.v1.admin.TMDBSyncService", lambda db, client: mock_service)
+
+    await admin._run_job_genres()
+    assert mock_service.sync_genres.called
+
+    await admin._run_job_initial(priority="popular_first", movies_target=10, series_target=10)
+    assert mock_service.run_initial_ingest.called
+
+    await admin._run_job_daily(hours_window=48)
+    assert mock_service.run_daily_sync.called
+
+    await admin._run_job_percentiles()
+    assert mock_service.recalculate_percentiles.called
+    assert mock_service.recalculate_unified_ratings.called
+
+    # Aquí se verifica especialmente _run_job_reviews(limit_per_title)
+    await admin._run_job_reviews(limit_per_title=15)
+    assert mock_service.sync_all_missing_reviews.called
+
+    await admin._run_job_import_tmdb(tmdb_id=123, media_type="movie")
+    assert mock_service.upsert_movie.called
+
+    await admin._run_job_import_tmdb(tmdb_id=456, media_type="tv")
+    assert mock_service.upsert_series.called
+
+    await admin._run_job_import_json(items=[{"tipo": "pelicula", "titulo": "Avatar"}])
+    assert mock_service.import_from_json_data.called
