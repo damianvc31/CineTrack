@@ -226,3 +226,92 @@ async def test_block_future_episodes(async_client: AsyncClient, db_session: Asyn
     res = await async_client.post(f"/api/v1/episodes/{ep_futuro.id}/watch", headers=headers)
     assert res.status_code == 400
     assert "fecha de estreno futura" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_watch_episode_by_season_and_episode_numbers(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica el marcado de episodio por números semánticos (season_number y episode_number)."""
+    serie = Titulo(tmdb_id=6001, tipo="tv", nombre="Fargo")
+    temp1 = Temporada(titulo=serie, numero=1)
+    temp2 = Temporada(titulo=serie, numero=2)
+    ep1_1 = Episodio(temporada=temp1, numero=1, nombre="S01E01")
+    ep2_3 = Episodio(temporada=temp2, numero=3, nombre="S02E03")
+
+    db_session.add_all([serie, temp1, temp2, ep1_1, ep2_3])
+    await db_session.commit()
+    await db_session.refresh(serie)
+
+    token = await create_user_and_get_token(async_client, "user_semantic_ep")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Marcar S01E01
+    res1 = await async_client.post(
+        f"/api/v1/titles/{serie.id}/seasons/1/episodes/1/watch",
+        headers=headers
+    )
+    assert res1.status_code == 200
+    data1 = res1.json()
+    assert data1["visto"] is True
+    assert data1["nuevo_estado_serie"] == "siguiendo"
+    assert data1["episodios_vistos_serie"] == 1
+
+    # 2. Intentar marcar episodio inexistente -> 404
+    res_not_found = await async_client.post(
+        f"/api/v1/titles/{serie.id}/seasons/1/episodes/99/watch",
+        headers=headers
+    )
+    assert res_not_found.status_code == 404
+
+    # 3. Desmarcar S01E01
+    res_unwatch = await async_client.post(
+        f"/api/v1/titles/{serie.id}/seasons/1/episodes/1/watch",
+        headers=headers
+    )
+    assert res_unwatch.status_code == 200
+    assert res_unwatch.json()["visto"] is False
+    assert res_unwatch.json()["episodios_vistos_serie"] == 0
+
+
+@pytest.mark.asyncio
+async def test_toggle_season_watch(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica marcar y desmarcar temporadas completas (por id y por número)."""
+    serie = Titulo(tmdb_id=7001, tipo="tv", nombre="True Detective")
+    temp1 = Temporada(titulo=serie, numero=1)
+    temp2 = Temporada(titulo=serie, numero=2)
+    # Temporada 1: 3 episodios
+    eps_t1 = [Episodio(temporada=temp1, numero=i, nombre=f"T1E{i}") for i in range(1, 4)]
+    # Temporada 2: 2 episodios
+    eps_t2 = [Episodio(temporada=temp2, numero=i, nombre=f"T2E{i}") for i in range(1, 3)]
+
+    db_session.add_all([serie, temp1, temp2, *eps_t1, *eps_t2])
+    await db_session.commit()
+    await db_session.refresh(serie)
+    await db_session.refresh(temp1)
+
+    token = await create_user_and_get_token(async_client, "user_season_watcher")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Marcar temporada 1 completa por número semántico -> debe marcar 3 episodios
+    res1 = await async_client.post(
+        f"/api/v1/titles/{serie.id}/seasons/1/watch",
+        headers=headers
+    )
+    assert res1.status_code == 200
+    data1 = res1.json()
+    assert data1["temporada_vista"] is True
+    assert data1["episodios_afectados"] == 3
+    assert data1["episodios_vistos_serie"] == 3
+    assert data1["total_episodios_serie"] == 5
+    assert data1["nuevo_estado_serie"] == "siguiendo"
+
+    # 2. Desmarcar temporada 1 por ID directo -> debe desmarcar 3 episodios
+    res_unwatch = await async_client.post(
+        f"/api/v1/seasons/{temp1.id}/watch",
+        headers=headers
+    )
+    assert res_unwatch.status_code == 200
+    data_unwatch = res_unwatch.json()
+    assert data_unwatch["temporada_vista"] is False
+    assert data_unwatch["episodios_afectados"] == 3
+    assert data_unwatch["episodios_vistos_serie"] == 0
+    assert data_unwatch["nuevo_estado_serie"] is None

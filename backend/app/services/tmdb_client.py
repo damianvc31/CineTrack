@@ -49,7 +49,7 @@ class TMDBClient:
         if self.api_key and len(self.api_key) <= 40:
             req_params["api_key"] = self.api_key
         
-        req_params.setdefault("language", "es-ES")
+        req_params.setdefault("language", settings.TMDB_LANGUAGE)
 
         retries = 3
         backoff = 1.0

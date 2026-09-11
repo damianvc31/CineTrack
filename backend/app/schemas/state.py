@@ -27,6 +27,18 @@ class EpisodeWatchResponse(BaseModel):
     porcentaje_progreso: float
 
 
+class SeasonWatchResponse(BaseModel):
+    temporada_id: int
+    titulo_id: int
+    numero_temporada: int
+    temporada_vista: bool
+    episodios_afectados: int
+    nuevo_estado_serie: str | None = None
+    episodios_vistos_serie: int
+    total_episodios_serie: int
+    porcentaje_progreso: float
+
+
 class FavoriteToggleResponse(BaseModel):
     titulo_id: int
     favorito: bool

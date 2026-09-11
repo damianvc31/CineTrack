@@ -17,8 +17,11 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
-        if isinstance(v, str) and v.startswith("postgresql://"):
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if isinstance(v, str):
+            if v.startswith("postgresql://"):
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            elif v.startswith("sqlite://") and not v.startswith("sqlite+aiosqlite://"):
+                return v.replace("sqlite://", "sqlite+aiosqlite://", 1)
         return v
 
     # Auth
@@ -27,6 +30,7 @@ class Settings(BaseSettings):
     # External APIs
     TMDB_API_KEY: str = ""
     TMDB_BASE_URL: str = "https://api.themoviedb.org/3"
+    TMDB_LANGUAGE: str = "en-US"
     TMDB_INGEST_MOVIES_TARGET: int = 1000
     TMDB_INGEST_SERIES_TARGET: int = 1000
     TMDB_MIN_VOTE_COUNT: int = 100

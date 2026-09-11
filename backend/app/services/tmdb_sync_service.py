@@ -97,7 +97,7 @@ class TMDBSyncService:
         if not genre_ids:
             return
         await self.db.execute(titulos_generos.delete().where(titulos_generos.c.titulo_id == titulo.id))
-        for gid in genre_ids:
+        for gid in set(genre_ids):
             res = await self.db.execute(select(Genero.id).where(Genero.id == gid))
             if res.scalar_one_or_none():
                 await self.db.execute(
@@ -105,10 +105,11 @@ class TMDBSyncService:
                 )
 
     async def _attach_cast(self, titulo: Titulo, elenco_list: List[Dict[str, Any]]):
-        """Asocia actores al título en titulos_elenco con personaje y orden."""
+        """Asocia actores al título en titulos_elenco con personaje y orden, evitando duplicados."""
         # Limpiar elenco previo si ya existía
         await self.db.execute(titulos_elenco.delete().where(titulos_elenco.c.titulo_id == titulo.id))
 
+        attached_actor_ids: set[int] = set()
         for actor_dict in elenco_list:
             nombre = actor_dict["nombre"]
             tmdb_id = actor_dict.get("tmdb_id")
@@ -130,6 +131,11 @@ class TMDBSyncService:
                 self.db.add(actor)
                 await self.db.flush()
 
+            # Evitar insertar dos veces el mismo par (titulo_id, actor_id)
+            if actor.id in attached_actor_ids:
+                continue
+
+            attached_actor_ids.add(actor.id)
             await self.db.execute(
                 titulos_elenco.insert().values(
                     titulo_id=titulo.id,
@@ -538,22 +544,27 @@ class TMDBSyncService:
                     break
 
                 for item in results:
+                    if len(collected_ids) - initial_count >= limit:
+                        break
+
                     tmdb_id = item["id"]
                     if tmdb_id not in collected_ids:
                         try:
                             if media_type == "movie":
-                                await self.upsert_movie(tmdb_id)
+                                t = await self.upsert_movie(tmdb_id)
                             else:
-                                await self.upsert_series(tmdb_id, fetch_episodes=True)
+                                t = await self.upsert_series(tmdb_id, fetch_episodes=True)
                             collected_ids.add(tmdb_id)
                             newly_added += 1
                             await self.db.commit()
+                            title_name = t.nombre if t else str(tmdb_id)
+                            logger.info(f"[{media_type.upper()}] Importado #{newly_added}/{limit}: '{title_name}' (TMDB ID: {tmdb_id})")
                         except Exception as e:
                             logger.error(f"Error importando {media_type} id {tmdb_id}: {e}")
                             await self.db.rollback()
 
-                        if len(collected_ids) - initial_count >= limit:
-                            break
+                if len(collected_ids) - initial_count >= limit:
+                    break
 
                 page += 1
 

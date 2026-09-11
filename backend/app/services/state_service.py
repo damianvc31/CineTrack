@@ -383,3 +383,179 @@ async def get_title_user_state(
         episodios_vistos=episodios_vistos,
         porcentaje_progreso=porcentaje
     )
+
+
+async def toggle_episode_by_number(
+    db: AsyncSession,
+    usuario_id: int,
+    titulo_id: int,
+    season_number: int,
+    episode_number: int
+) -> EpisodeWatchResponse:
+    """Busca el episodio por número de temporada y episodio del título, y alterna su estado visto."""
+    ep_query = (
+        select(Episodio.id)
+        .join(Temporada, Episodio.temporada_id == Temporada.id)
+        .where(
+            Temporada.titulo_id == titulo_id,
+            Temporada.numero == season_number,
+            Episodio.numero == episode_number
+        )
+    )
+    res = await db.execute(ep_query)
+    episodio_id = res.scalar_one_or_none()
+    if not episodio_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró el episodio S{season_number:02d}E{episode_number:02d} para el título {titulo_id}."
+        )
+
+    return await toggle_episode_watched(db, usuario_id=usuario_id, episodio_id=episodio_id)
+
+
+async def toggle_season_watched(
+    db: AsyncSession,
+    usuario_id: int,
+    temporada_id: int
+) -> SeasonWatchResponse:
+    """
+    Marca o desmarca una temporada entera como vista:
+    - Si todos los episodios emitidos de la temporada ya están vistos: los desmarca todos (temporada pasa a no vista).
+    - Si falta al menos un episodio por ver: marca todos los episodios emitidos de la temporada como vistos.
+    Recalcula automáticamente el estado de la serie (siguiendo, vista, etc.).
+    """
+    from app.schemas.state import SeasonWatchResponse
+
+    temp_res = await db.execute(
+        select(Temporada).where(Temporada.id == temporada_id)
+    )
+    temporada = temp_res.scalar_one_or_none()
+    if not temporada:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Temporada no encontrada.")
+
+    titulo_id = temporada.titulo_id
+
+    # Obtener episodios de la temporada (excluyendo episodios futuros no emitidos)
+    ep_query = (
+        select(Episodio.id)
+        .where(
+            Episodio.temporada_id == temporada_id,
+            (Episodio.fecha_estreno.is_(None) | (Episodio.fecha_estreno <= date.today()))
+        )
+    )
+    ep_res = await db.execute(ep_query)
+    season_ep_ids = [row[0] for row in ep_res.all()]
+
+    if not season_ep_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La temporada no contiene episodios emitidos disponibles para marcar."
+        )
+
+    # Ver cuáles de estos ya están vistos
+    vistos_query = select(EpisodioVisto.episodio_id).where(
+        EpisodioVisto.usuario_id == usuario_id,
+        EpisodioVisto.episodio_id.in_(season_ep_ids)
+    )
+    vistos_res = await db.execute(vistos_query)
+    already_watched = {row[0] for row in vistos_res.all()}
+
+    all_watched = len(already_watched) == len(season_ep_ids)
+
+    if all_watched:
+        # Desmarcar todos los episodios de esta temporada
+        await db.execute(
+            delete(EpisodioVisto).where(
+                EpisodioVisto.usuario_id == usuario_id,
+                EpisodioVisto.episodio_id.in_(season_ep_ids)
+            )
+        )
+        season_is_watched = False
+        episodios_afectados = len(season_ep_ids)
+    else:
+        # Marcar los faltantes como vistos
+        missing_ids = [eid for eid in season_ep_ids if eid not in already_watched]
+        now_ts = _now()
+        new_vistos = [
+            EpisodioVisto(usuario_id=usuario_id, episodio_id=eid, fecha_visto=now_ts)
+            for eid in missing_ids
+        ]
+        db.add_all(new_vistos)
+        season_is_watched = True
+        episodios_afectados = len(missing_ids)
+
+    await db.flush()
+
+    # Recalcular el progreso general de la serie
+    total_query = (
+        select(func.count(Episodio.id))
+        .join(Temporada, Episodio.temporada_id == Temporada.id)
+        .where(Temporada.titulo_id == titulo_id)
+    )
+    tot_res = await db.execute(total_query)
+    total_episodios = tot_res.scalar() or 0
+
+    watched_query = (
+        select(func.count(EpisodioVisto.id))
+        .join(Episodio, EpisodioVisto.episodio_id == Episodio.id)
+        .join(Temporada, Episodio.temporada_id == Temporada.id)
+        .where(
+            Temporada.titulo_id == titulo_id,
+            EpisodioVisto.usuario_id == usuario_id
+        )
+    )
+    watched_res = await db.execute(watched_query)
+    episodios_vistos = watched_res.scalar() or 0
+
+    estado_obj = await get_or_create_title_state(db, usuario_id, titulo_id)
+
+    if total_episodios > 0 and episodios_vistos == total_episodios:
+        estado_obj.estado = "vista"
+        estado_obj.fecha_estado = _now()
+    elif episodios_vistos > 0:
+        if estado_obj.estado in (None, "watchlist", "vista"):
+            estado_obj.estado = "siguiendo"
+            estado_obj.fecha_estado = _now()
+    else:
+        if estado_obj.estado == "siguiendo":
+            estado_obj.estado = None
+            estado_obj.fecha_estado = None
+
+    await db.commit()
+
+    porcentaje = round((episodios_vistos / total_episodios * 100), 1) if total_episodios > 0 else 0.0
+
+    return SeasonWatchResponse(
+        temporada_id=temporada_id,
+        titulo_id=titulo_id,
+        numero_temporada=temporada.numero,
+        temporada_vista=season_is_watched,
+        episodios_afectados=episodios_afectados,
+        nuevo_estado_serie=estado_obj.estado,
+        episodios_vistos_serie=episodios_vistos,
+        total_episodios_serie=total_episodios,
+        porcentaje_progreso=porcentaje
+    )
+
+
+async def toggle_season_by_number(
+    db: AsyncSession,
+    usuario_id: int,
+    titulo_id: int,
+    season_number: int
+) -> SeasonWatchResponse:
+    """Busca la temporada por número y título, y alterna su marcado completo como visto."""
+    res = await db.execute(
+        select(Temporada.id).where(
+            Temporada.titulo_id == titulo_id,
+            Temporada.numero == season_number
+        )
+    )
+    temporada_id = res.scalar_one_or_none()
+    if not temporada_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró la temporada {season_number} para el título {titulo_id}."
+        )
+
+    return await toggle_season_watched(db, usuario_id=usuario_id, temporada_id=temporada_id)

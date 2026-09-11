@@ -7,6 +7,7 @@ from app.models.usuario import Usuario
 from app.schemas.state import (
     EpisodeWatchResponse,
     FavoriteToggleResponse,
+    SeasonWatchResponse,
     StateChangeResponse,
     TitleUserStateResponse,
 )
@@ -71,5 +72,49 @@ async def toggle_episode_watched(
     current_user: Usuario = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> EpisodeWatchResponse:
-    """Marca o desmarca un episodio individual como visto y recalcula el estado de la serie."""
+    """Marca o desmarca un episodio individual como visto por ID directo y recalcula el estado de la serie."""
     return await state_service.toggle_episode_watched(db, usuario_id=current_user.id, episodio_id=episode_id)
+
+
+@router.post("/titles/{title_id}/seasons/{season_number}/episodes/{episode_number}/watch", response_model=EpisodeWatchResponse)
+async def toggle_episode_by_season_episode(
+    title_id: int,
+    season_number: int,
+    episode_number: int,
+    current_user: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> EpisodeWatchResponse:
+    """Marca o desmarca un episodio como visto usando números semánticos de temporada y episodio (ej. S01E02)."""
+    return await state_service.toggle_episode_by_number(
+        db,
+        usuario_id=current_user.id,
+        titulo_id=title_id,
+        season_number=season_number,
+        episode_number=episode_number
+    )
+
+
+@router.post("/seasons/{season_id}/watch", response_model=SeasonWatchResponse)
+async def toggle_season_watched_by_id(
+    season_id: int,
+    current_user: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> SeasonWatchResponse:
+    """Marca o desmarca una temporada completa como vista por ID directo."""
+    return await state_service.toggle_season_watched(db, usuario_id=current_user.id, temporada_id=season_id)
+
+
+@router.post("/titles/{title_id}/seasons/{season_number}/watch", response_model=SeasonWatchResponse)
+async def toggle_season_watched_by_number(
+    title_id: int,
+    season_number: int,
+    current_user: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> SeasonWatchResponse:
+    """Marca o desmarca una temporada completa como vista usando el título y número de temporada (ej. Temporada 1)."""
+    return await state_service.toggle_season_by_number(
+        db,
+        usuario_id=current_user.id,
+        titulo_id=title_id,
+        season_number=season_number
+    )
