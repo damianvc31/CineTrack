@@ -49,6 +49,12 @@
   - [x] Vaciado de catálogo administrativo `DELETE /api/v1/admin/catalog` y CLI `--clear` (v0.5.2).
   - [x] Restricción de unicidad compuesta `UNIQUE (tmdb_id, tipo)` y migración Alembic `0004_composite_tmdb_id_tipo.py` para permitir colisiones de IDs TMDB entre películas y series (v0.5.3).
   - [x] Suite de tests ampliada a 45 tests (100% pasando en verde en < 5s).
+  - [x] Refinamiento de API de catálogo y consultas (v0.5.4):
+    - [x] Exposición de `popularidad_percentil` en `TitleCardResponse` para badge visual de tendencia (🔥 xx%).
+    - [x] Separación de `section` (`new_releases`, `trending`, `classics`, `top_rated`, `others`), `sort_by` y `order` (`asc`/`desc`).
+    - [x] Filtros por nombres en texto para `genero` y `actor`, y búsqueda abierta `q` ampliada al elenco.
+    - [x] Cálculo de Trending con fecha del último episodio real emitido (`MAX(Episodio.fecha_estreno)`).
+    - [x] Persistencia de `fecha_estreno` en temporadas, omisión de temporadas vacías (0 episodios) en `upsert_series` y depuración en base de datos.
 
 ---
 

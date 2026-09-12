@@ -1,7 +1,7 @@
 import random
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Set
-from sqlalchemy import delete, desc, func, or_, select
+from sqlalchemy import and_, delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -62,6 +62,7 @@ def _build_title_card(
         anio_fin=titulo.anio_fin,
         duracion=titulo.duracion,
         popularidad=titulo.popularidad,
+        popularidad_percentil=titulo.popularidad_percentil or 0.0,
         vote_average_tmdb=titulo.vote_average_tmdb,
         vote_count_tmdb=titulo.vote_count_tmdb,
         rating_unificado=titulo.rating_unificado,
@@ -88,8 +89,13 @@ async def get_titles(
     db: AsyncSession,
     tipo: Optional[str] = None,
     genero_id: Optional[int] = None,
+    genero: Optional[str] = None,
+    actor_id: Optional[int] = None,
+    actor: Optional[str] = None,
+    section: Optional[str] = None,
     q: Optional[str] = None,
-    sort_by: str = "popularity",  # 'popularity', 'rating', 'newest', 'classics'
+    sort_by: str = "popularity",  # 'popularity', 'rating', 'release_date' (o 'newest'), 'title'
+    order: str = "desc",          # 'desc' (default) o 'asc'
     page: int = 1,
     page_size: int = 20,
     usuario_id: Optional[int] = None,
@@ -107,13 +113,42 @@ async def get_titles(
         query = query.join(titulos_generos, titulos_generos.c.titulo_id == Titulo.id).where(
             titulos_generos.c.genero_id == genero_id
         )
+    elif genero:
+        query = (
+            query.join(titulos_generos, titulos_generos.c.titulo_id == Titulo.id)
+            .join(Genero, Genero.id == titulos_generos.c.genero_id)
+            .where(Genero.nombre.ilike(f"%{genero.strip()}%"))
+        )
+
+    if actor_id:
+        actor_title_subq = (
+            select(titulos_elenco.c.titulo_id)
+            .where(titulos_elenco.c.actor_id == actor_id)
+            .scalar_subquery()
+        )
+        query = query.where(Titulo.id.in_(actor_title_subq))
+    elif actor:
+        actor_name_subq = (
+            select(titulos_elenco.c.titulo_id)
+            .join(Actor, Actor.id == titulos_elenco.c.actor_id)
+            .where(Actor.nombre.ilike(f"%{actor.strip()}%"))
+            .scalar_subquery()
+        )
+        query = query.where(Titulo.id.in_(actor_name_subq))
 
     if q:
         search_pattern = f"%{q.strip()}%"
+        actor_subq = (
+            select(titulos_elenco.c.titulo_id)
+            .join(Actor, Actor.id == titulos_elenco.c.actor_id)
+            .where(Actor.nombre.ilike(search_pattern))
+            .scalar_subquery()
+        )
         query = query.where(
             (Titulo.nombre.ilike(search_pattern)) |
             (Titulo.director.ilike(search_pattern)) |
-            (Titulo.guionista.ilike(search_pattern))
+            (Titulo.guionista.ilike(search_pattern)) |
+            (Titulo.id.in_(actor_subq))
         )
 
     if exclude_watched and usuario_id:
@@ -127,26 +162,98 @@ async def get_titles(
         )
         query = query.where(Titulo.id.not_in(watched_subq))
 
-    # Ordenamiento
-    if sort_by == "popularity":
-        query = query.order_by(desc(Titulo.popularidad), desc(Titulo.id))
-    elif sort_by in ("rating", "top_rated"):
-        query = query.where(Titulo.vote_count_tmdb >= settings.HOME_TOP_RATED_MIN_VOTES).order_by(
-            desc(Titulo.rating_unificado), desc(Titulo.vote_count_tmdb)
+    # 1. Filtro por sección curada (collection / section)
+    # Soporta tanto el nuevo parámetro 'section' como valores legacy pasados en 'sort_by'
+    active_section = section
+    effective_sort = sort_by
+    if not active_section and sort_by in ("classics", "top_rated", "others", "new_releases", "trending"):
+        active_section = sort_by
+        if sort_by == "top_rated":
+            effective_sort = "rating"
+        elif sort_by == "new_releases":
+            effective_sort = "newest"
+        else:
+            effective_sort = "popularity"
+
+    today = date.today()
+    if active_section == "new_releases":
+        nr_cutoff = today - timedelta(days=settings.HOME_NEW_RELEASES_DAYS)
+        query = query.where(
+            Titulo.fecha_estreno.isnot(None),
+            Titulo.fecha_estreno >= nr_cutoff,
+            Titulo.fecha_estreno <= today
         )
-    elif sort_by == "newest":
-        query = query.order_by(desc(Titulo.fecha_estreno), desc(Titulo.popularidad))
-    elif sort_by == "classics":
-        current_year = date.today().year
+    elif active_section == "trending":
+        tr_cutoff = today - timedelta(days=settings.HOME_TRENDING_DAYS)
+        latest_ep_subq = (
+            select(func.max(Episodio.fecha_estreno))
+            .join(Temporada, Episodio.temporada_id == Temporada.id)
+            .where(Temporada.titulo_id == Titulo.id)
+            .scalar_subquery()
+        )
+        tv_date_expr = func.coalesce(latest_ep_subq, Titulo.fecha_estreno)
+        query = query.where(
+            or_(
+                and_(Titulo.tipo == "movie", Titulo.fecha_estreno >= tr_cutoff, Titulo.fecha_estreno <= today),
+                and_(Titulo.tipo == "tv", tv_date_expr >= tr_cutoff, tv_date_expr <= today)
+            )
+        )
+    elif active_section == "classics":
+        current_year = today.year
         cutoff_date = date(current_year - settings.HOME_CLASSICS_MIN_YEARS, 12, 31)
         query = query.where(
             Titulo.tipo == "movie",
+            Titulo.fecha_estreno.isnot(None),
             Titulo.fecha_estreno <= cutoff_date,
             Titulo.rating_unificado >= settings.HOME_CLASSICS_MIN_RATING,
-            Titulo.vote_count_tmdb >= settings.HOME_CLASSICS_MIN_VOTES,
-        ).order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad))
-    else:
-        query = query.order_by(desc(Titulo.popularidad))
+            Titulo.vote_count_tmdb >= settings.HOME_CLASSICS_MIN_VOTES
+        )
+    elif active_section == "top_rated":
+        query = query.where(Titulo.vote_count_tmdb >= settings.HOME_TOP_RATED_MIN_VOTES)
+    elif active_section == "others":
+        minor_subq = (
+            select(titulos_generos.c.genero_id)
+            .group_by(titulos_generos.c.genero_id)
+            .having(func.count(titulos_generos.c.titulo_id) < settings.HOME_GENRE_MIN_TITLES_FOR_CAROUSEL)
+            .scalar_subquery()
+        )
+        titles_in_minor = (
+            select(titulos_generos.c.titulo_id)
+            .where(titulos_generos.c.genero_id.in_(minor_subq))
+            .scalar_subquery()
+        )
+        query = query.where(Titulo.id.in_(titles_in_minor))
+
+    # 2. Ordenamiento puro (criterio + dirección)
+    is_asc = order.lower() == "asc"
+    norm_sort = effective_sort.lower()
+    if norm_sort == "newest":
+        norm_sort = "release_date"
+        is_asc = False
+    elif norm_sort == "oldest":
+        norm_sort = "release_date"
+        is_asc = True
+
+    if norm_sort in ("rating", "top_rated"):
+        if is_asc:
+            query = query.order_by(Titulo.rating_unificado.asc(), Titulo.vote_count_tmdb.asc())
+        else:
+            query = query.order_by(desc(Titulo.rating_unificado), desc(Titulo.vote_count_tmdb))
+    elif norm_sort in ("release_date", "date"):
+        if is_asc:
+            query = query.order_by(Titulo.fecha_estreno.asc(), Titulo.popularidad.asc())
+        else:
+            query = query.order_by(desc(Titulo.fecha_estreno), desc(Titulo.popularidad))
+    elif norm_sort == "title":
+        if is_asc:
+            query = query.order_by(Titulo.nombre.asc())
+        else:
+            query = query.order_by(Titulo.nombre.desc())
+    else:  # 'popularity'
+        if is_asc:
+            query = query.order_by(Titulo.popularidad.asc(), Titulo.id.asc())
+        else:
+            query = query.order_by(desc(Titulo.popularidad), desc(Titulo.id))
 
     # Paginación
     count_query = select(func.count()).select_from(query.subquery())
@@ -224,12 +331,13 @@ async def get_home_sections(
     # Series entran si su fecha de estreno o la de su última temporada entra en la ventana.
     # -------------------------------------------------------------------------
     tr_cutoff = today - timedelta(days=settings.HOME_TRENDING_DAYS)
-    latest_season_subq = (
-        select(func.max(Temporada.fecha_estreno))
+    latest_ep_subq = (
+        select(func.max(Episodio.fecha_estreno))
+        .join(Temporada, Episodio.temporada_id == Temporada.id)
         .where(Temporada.titulo_id == Titulo.id)
         .scalar_subquery()
     )
-    tv_date_expr = func.coalesce(latest_season_subq, Titulo.fecha_estreno)
+    tv_date_expr = func.coalesce(latest_ep_subq, Titulo.fecha_estreno)
 
     tr_query = (
         select(Titulo)

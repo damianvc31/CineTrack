@@ -10,12 +10,12 @@ La pantalla principal (`GET /api/v1/home`) presenta colecciones curadas para des
 
 | Sección | Filtro / Ventana Temporal | Criterios de Calificación y Votos | Pool de Selección | Muestra en Home | Ordenamiento | Extensión "Ver más" |
 |---|---|---|---|---|---|---|
-| **New Releases** | Últimos 60 días (`fecha_estreno >= hoy - 60d`) | Sin mínimo | N/A (directo) | Top 10 | `fecha_estreno DESC, popularidad DESC` | Sí (`/titles?sort_by=newest`) |
-| **Trending** | Últimos 90 días (`fecha_estreno` o última temporada) | Sin mínimo | N/A (directo) | Top 10 | `popularidad DESC` | No (fijo top 10) |
-| **Classics** | Antigüedad > 20 años (`fecha_estreno <= año_actual - 20`) | `rating >= 7.5` y $\ge 500$ votos | Top 50 más populares | Muestra aleatoria de 10 | `popularidad DESC` (en pool) | Sí (`/titles?sort_by=classics`) |
-| **Top Rated** | Todo el catálogo histórico | Votos $\ge 100$ | Top 100 con mayor rating | Muestra aleatoria de 10 | `rating_unificado DESC, votos DESC` | Sí (`/titles?sort_by=rating`) |
-| **By Genre** | Por cada género con $\ge 10$ títulos | Sin restricción | Top 100 del género | Muestra aleatoria de 10 por género | `popularidad DESC` | Sí (`/titles?genero_id=X`) |
-| **Others** | Consolidado de géneros con $< 10$ títulos | Sin restricción | Top 100 géneros minoritarios | Muestra aleatoria de 10 | `popularidad DESC` | Sí |
+| **New Releases** | Últimos 60 días (`fecha_estreno >= hoy - 60d`) | Sin mínimo | N/A (directo) | Top 10 | `fecha_estreno DESC, popularidad DESC` | Sí (`/titles?section=new_releases`) |
+| **Trending** | Últimos 90 días (`fecha_estreno` o último episodio) | Sin mínimo | N/A (directo) | Top 10 | `popularidad DESC` | Sí (`/titles?section=trending`) |
+| **Classics** | Antigüedad > 20 años (`fecha_estreno <= año_actual - 20`) | `rating >= 7.5` y $\ge 500$ votos | Top 50 más populares | Muestra aleatoria de 10 | `popularidad DESC` (en pool) | Sí (`/titles?section=classics`) |
+| **Top Rated** | Todo el catálogo histórico | Votos $\ge 100$ | Top 100 con mayor rating | Muestra aleatoria de 10 | `rating_unificado DESC, votos DESC` | Sí (`/titles?section=top_rated`) |
+| **By Genre** | Por cada género con $\ge 10$ títulos | Sin restricción | Top 100 del género | Muestra aleatoria de 10 por género | `popularidad DESC` | Sí (`/titles?genero=Nombre` o `genero_id=X`) |
+| **Others** | Consolidado de géneros con $< 10$ títulos | Sin restricción | Top 100 géneros minoritarios | Muestra aleatoria de 10 | `popularidad DESC` | Sí (`/titles?section=others`) |
 
 ### 1.1. Reglas Específicas por Sección
 
@@ -24,7 +24,7 @@ La pantalla principal (`GET /api/v1/home`) presenta colecciones curadas para des
    - Para series, solo ingresan aquellas cuyo estreno de la **primera temporada** ocurrió dentro de la ventana (no ingresan por estrenar nueva temporada).
 2. **Trending:**
    - Considera producciones con movimiento reciente en una ventana de 90 días (`HOME_TRENDING_DAYS = 90`).
-   - Para series, ingresan si la fecha de estreno de la serie o la fecha de emisión de su **última temporada** entra en la ventana de 90 días.
+   - Para series, ingresan si la fecha de estreno de la serie o la fecha de emisión de su **último episodio emitido** entra en la ventana de 90 días. Se ignora cualquier temporada placeholder que carezca de episodios.
 3. **Classics:**
    - **Exclusivo de películas:** Si el usuario selecciona el toggle `tipo=tv`, la sección devuelve una lista vacía `[]`.
    - Requiere superar un umbral exigente de consagración: rating unificado $\ge 7.5$ (`HOME_CLASSICS_MIN_RATING`) y al menos 500 votos registrados (`HOME_CLASSICS_MIN_VOTES`).
@@ -104,6 +104,8 @@ Durante la importación o sincronización de cualquier título, se aplican regla
 - **Elenco Principal Jerarquizado:** Se limita el reparto a los 15 actores principales más relevantes (`TMDB_CAST_LIMIT = 15`), ordenados por la jerarquía crediticia oficial de TMDB (`orden`).
 - **Atributos de Personaje:** En la relación N:M (`titulos_elenco`) se persiste explícitamente el nombre del papel interpretado (`personaje`) y su número de orden para renderizar fichas de reparto fidedignas en la UI.
 - **Jerarquía Episódica:** En series de televisión se importan todas las temporadas y episodios regulares, persistiendo números de episodio, fecha de emisión exacta (`air_date`) y sinopsis individual.
+- **Omisión de Temporadas Vacías:** Únicamente se persisten temporadas que contengan al menos un episodio emitido o programado. Las temporadas placeholder de TMDB con 0 episodios son omitidas automáticamente para evitar ruido visual en la UI, acordeones vacíos e inflación artificial del conteo de temporadas de la serie.
+- **Persistencia de Fecha de Temporada:** Cada temporada guarda su fecha de estreno oficial o la fecha del primer episodio emitido, alimentando con exactitud los cálculos cronológicos.
 
 ---
 
@@ -114,4 +116,26 @@ El catálogo permite la incorporación manual de obras mediante archivos JSON es
 - **Plantillas Estándar:** La estructura de entrada sigue los contratos definidos en `docs/templates/template_pelicula.json` y `template_serie.json`.
 - **Resolución Inteligente de Identificador:** Si el registro JSON omite el `id_tmdb`, el importador ejecuta una búsqueda por título y año en TMDB para descubrir y vincular el ID canónico oficial.
 - **Rechazo de Obras Huérfanas:** Si un título no cuenta con `id_tmdb` y no puede ser resuelto en TMDB, se rechaza con un error explícito. Esto previene la existencia de registros huérfanos que no puedan beneficiarse de la sincronización diaria, imágenes o metadatos de episodios.
+
+---
+
+## 8. Explorador de Catálogo y Parámetros de Consulta (`GET /api/v1/titles`)
+
+El endpoint de listado paginado separa de forma ortogonal el filtro de colección, los filtros de metadatos y el criterio de ordenamiento:
+
+| Parámetro | Tipo | Descripción | Opciones / Ejemplos |
+|---|---|---|---|
+| `section` | string | Filtro por colección curada de la Home | `new_releases`, `trending`, `classics`, `top_rated`, `others` |
+| `tipo` | string | Discriminador de tipo de obra | `movie`, `tv` |
+| `genero` | string | Filtrado por nombre de género (case-insensitive) | `Drama`, `Fantasy`, `Action`, `Comedy` |
+| `genero_id` | int | Filtrado por ID numérico de género | `18`, `14`, `28` |
+| `actor` | string | Filtrado por nombre de actor del elenco | `DiCaprio`, `Tom Cruise`, `Bryan Cranston` |
+| `actor_id` | int | Filtrado por ID numérico de actor | `1`, `150` |
+| `q` | string | Búsqueda abierta por texto | Coincidencias en título, director, guionista y elenco |
+| `sort_by` | string | Criterio puro de ordenamiento | `popularity` *(default)*, `rating`, `release_date`, `title` |
+| `order` | string | Dirección del orden | `desc` *(default)*, `asc` |
+| `page` / `page_size` | int | Paginación estándar | Default `page=1`, `page_size=20` (máx 100) |
+
+- **Badge de Popularidad:** Todas las respuestas de tarjetas (`TitleCardResponse`) exponen el campo `popularidad_percentil: float` (0.0 a 1.0) para que la interfaz pueda renderizar directamente el indicador visual de tendencia (🔥 xx%).
+
 

@@ -34,22 +34,32 @@ async def get_home(
 @router.get("/titles", response_model=TitleListResponse)
 async def list_titles(
     tipo: Optional[str] = Query(default=None, description="Filtrar por tipo: 'movie' o 'tv'"),
-    genero_id: Optional[int] = Query(default=None, description="Filtrar por ID de género"),
-    q: Optional[str] = Query(default=None, description="Buscar por nombre, director o guionista"),
-    sort_by: str = Query(default="popularity", description="Orden: 'popularity', 'rating', 'newest', 'classics'"),
+    genero_id: Optional[int] = Query(default=None, description="Filtrar por ID numérico de género"),
+    genero: Optional[str] = Query(default=None, description="Filtrar por nombre de género (ej: 'Drama', 'Fantasy', 'Comedy')"),
+    actor_id: Optional[int] = Query(default=None, description="Filtrar por ID numérico de actor"),
+    actor: Optional[str] = Query(default=None, description="Filtrar por nombre de actor (ej: 'DiCaprio', 'Tom Cruise')"),
+    section: Optional[str] = Query(default=None, description="Filtrar por sección curada: 'new_releases', 'trending', 'classics', 'top_rated', 'others'"),
+    q: Optional[str] = Query(default=None, description="Buscar por nombre, director, guionista o actor del elenco"),
+    sort_by: str = Query(default="popularity", description="Criterio de orden: 'popularity', 'rating', 'release_date', 'title'"),
+    order: str = Query(default="desc", pattern="^(asc|desc)$", description="Dirección del orden: 'desc' o 'asc'"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     current_user: Optional[Usuario] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> TitleListResponse:
-    """Búsqueda y listado paginado de títulos con filtros."""
+    """Búsqueda y listado paginado de títulos con filtros y secciones."""
     user_id = current_user.id if current_user else None
     return await catalog_service.get_titles(
         db,
         tipo=tipo,
         genero_id=genero_id,
+        genero=genero,
+        actor_id=actor_id,
+        actor=actor,
+        section=section,
         q=q,
         sort_by=sort_by,
+        order=order,
         page=page,
         page_size=page_size,
         usuario_id=user_id

@@ -432,6 +432,28 @@ class TMDBSyncService:
                     logger.warning(f"No se pudo obtener temporada {s_num} de serie {tmdb_id}: {e}")
                     continue
 
+                episodes_list = s_details.get("episodes", [])
+                if not episodes_list:
+                    # Omitir temporadas vacías sin episodios emitidos o cargados
+                    continue
+
+                s_air_date = None
+                s_ad_str = s_details.get("air_date")
+                if s_ad_str:
+                    try:
+                        s_air_date = datetime.strptime(s_ad_str, "%Y-%m-%d").date()
+                    except ValueError:
+                        pass
+                if not s_air_date:
+                    for ep_item in s_details.get("episodes", []):
+                        ep_item_ad = ep_item.get("air_date")
+                        if ep_item_ad:
+                            try:
+                                s_air_date = datetime.strptime(ep_item_ad, "%Y-%m-%d").date()
+                                break
+                            except ValueError:
+                                pass
+
                 res_temp = await self.db.execute(
                     select(Temporada).where(
                         Temporada.titulo_id == titulo.id,
@@ -444,11 +466,14 @@ class TMDBSyncService:
                         titulo_id=titulo.id,
                         numero=s_num,
                         sinopsis=s_details.get("overview"),
+                        fecha_estreno=s_air_date,
                     )
                     self.db.add(temporada)
                     await self.db.flush()
                 else:
                     temporada.sinopsis = s_details.get("overview", temporada.sinopsis)
+                    if s_air_date:
+                        temporada.fecha_estreno = s_air_date
 
                 # Episodios de la temporada
                 for ep_data in s_details.get("episodes", []):

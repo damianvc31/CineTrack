@@ -62,6 +62,7 @@ class TitleCardResponse(BaseModel):
     anio_fin: int | None = None
     duracion: int | None = None
     popularidad: float = 0.0
+    popularidad_percentil: float = 0.0
     vote_average_tmdb: float = 0.0
     vote_count_tmdb: int = 0
     rating_unificado: float = 0.0

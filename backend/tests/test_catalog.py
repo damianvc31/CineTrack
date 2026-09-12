@@ -126,8 +126,57 @@ async def test_list_titles_with_filters_and_search(async_client: AsyncClient, sa
     data_q = res_q.json()
     assert data_q["total"] == 1
     assert data_q["items"][0]["nombre"] == "Breaking Bad"
+    assert "popularidad_percentil" in data_q["items"][0]
 
-    # 3. Listar géneros
+    # 3. Búsqueda por nombre de actor "Cranston"
+    res_actor_q = await async_client.get("/api/v1/titles?q=Cranston")
+    assert res_actor_q.status_code == 200
+    data_actor_q = res_actor_q.json()
+    assert data_actor_q["total"] == 1
+    assert data_actor_q["items"][0]["nombre"] == "Breaking Bad"
+
+    # 4. Filtro por actor_id=1 (Tom Cruise -> Top Gun)
+    res_act_id = await async_client.get("/api/v1/titles?actor_id=1")
+    assert res_act_id.status_code == 200
+    data_act_id = res_act_id.json()
+    assert data_act_id["total"] == 1
+    assert data_act_id["items"][0]["nombre"] == "Top Gun"
+
+    # 5. Filtro por nombre de género en string (genero=Action)
+    res_gen_str = await async_client.get("/api/v1/titles?genero=Action")
+    assert res_gen_str.status_code == 200
+    data_gen_str = res_gen_str.json()
+    assert data_gen_str["total"] == 1
+    assert data_gen_str["items"][0]["nombre"] == "Top Gun"
+
+    # 6. Filtro por nombre de actor en string (actor=Cruise)
+    res_act_str = await async_client.get("/api/v1/titles?actor=Cruise")
+    assert res_act_str.status_code == 200
+    data_act_str = res_act_str.json()
+    assert data_act_str["total"] == 1
+    assert data_act_str["items"][0]["nombre"] == "Top Gun"
+
+    # 7. Filtro por sección (section=top_rated)
+    res_sec_tr = await async_client.get("/api/v1/titles?section=top_rated")
+    assert res_sec_tr.status_code == 200
+    data_sec_tr = res_sec_tr.json()
+    assert data_sec_tr["total"] >= 1
+
+    # 8. Filtro por sección (section=new_releases) con ordenamiento (sort_by=popularity)
+    res_sec_nr = await async_client.get("/api/v1/titles?section=new_releases&sort_by=popularity")
+    assert res_sec_nr.status_code == 200
+    data_sec_nr = res_sec_nr.json()
+    assert data_sec_nr["total"] >= 1
+
+    # 9. Ordenamiento por fecha ascendente (order=asc)
+    res_ord_asc = await async_client.get("/api/v1/titles?sort_by=release_date&order=asc")
+    assert res_ord_asc.status_code == 200
+    data_ord_asc = res_ord_asc.json()
+    assert data_ord_asc["total"] >= 2
+    # El más antiguo (Breaking Bad, 2008) debe venir antes que Top Gun (2026)
+    assert data_ord_asc["items"][0]["nombre"] == "Breaking Bad"
+
+    # 10. Listar géneros
     res_g = await async_client.get("/api/v1/genres")
     assert res_g.status_code == 200
     assert len(res_g.json()) >= 2
