@@ -1066,15 +1066,18 @@ async def get_user_stats(
 
     # Series vistas (completadas)
     q_series = (
-        select(func.count(Titulo.id))
+        select(Titulo)
         .join(EstadoUsuarioTitulo, EstadoUsuarioTitulo.titulo_id == Titulo.id)
+        .options(selectinload(Titulo.generos))
         .where(
             EstadoUsuarioTitulo.usuario_id == usuario_id,
             EstadoUsuarioTitulo.estado == "vista",
             Titulo.tipo == "tv"
         )
     )
-    series_count = (await db.execute(q_series)).scalar() or 0
+    res_s = await db.execute(q_series)
+    watched_series = res_s.scalars().all()
+    series_count = len(watched_series)
 
     movie_hours = round(movie_minutes / 60.0, 1)
     tv_hours = round(tv_minutes / 60.0, 1)
@@ -1113,17 +1116,20 @@ async def get_user_stats(
         if aired_eps and all(ep.id in user_ep_ids for ep in aired_eps):
             seasons_completed_count += 1
 
-    # 3. Distribución de géneros vistos
-    genres_dist = {}
-    for m in watched_movies:
-        for g in m.generos:
-            genres_dist[g.nombre] = genres_dist.get(g.nombre, 0) + 1
+    # 3. Distribución de géneros vistos (1 por cada título único consumido, no por episodio)
+    watched_titles_dict = {m.id: m for m in watched_movies}
     for _, t in watched_ep_rows:
+        watched_titles_dict[t.id] = t
+    for s in watched_series:
+        watched_titles_dict[s.id] = s
+
+    genres_dist = {}
+    for t in watched_titles_dict.values():
         for g in t.generos:
             genres_dist[g.nombre] = genres_dist.get(g.nombre, 0) + 1
 
     # 4. Top 5 por Popularidad (de los títulos vistos)
-    all_watched_title_ids = {m.id for m in watched_movies}.union({t.id for _, t in watched_ep_rows})
+    all_watched_title_ids = set(watched_titles_dict.keys())
     top_pop = []
     top_community = []
     if all_watched_title_ids:

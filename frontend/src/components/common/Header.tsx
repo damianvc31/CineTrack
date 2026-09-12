@@ -35,9 +35,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
   return (
     <header className="sticky top-0 z-50 bg-[#0d0d0d]/95 backdrop-blur-md border-b border-[#262626] transition-all">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
+        <div className="relative flex items-center justify-between h-16 gap-4">
           {/* Logo CineTrack + Atribución TMDB */}
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 z-10">
             <Link to="/" className="flex items-center gap-2.5 group">
               <img src={cinetrackLogo} alt="CineTrack" className="w-8 h-8 rounded-lg group-hover:scale-105 transition-transform" />
               <span className="font-bold text-xl tracking-tight text-white">
@@ -51,52 +51,50 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
               target="_blank"
               rel="noopener noreferrer"
               title="Data provided by The Movie Database"
-              className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#171717] border border-[#262626] hover:border-[#333333] transition-colors text-[10px] text-gray-400 hover:text-gray-200"
+              className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#171717] border border-[#262626] hover:border-[#333333] transition-colors text-[10px] text-gray-400 hover:text-gray-200"
             >
               <span>Powered by</span>
               <img src={tmdbLogo} alt="TMDB" className="h-2.5 w-auto object-contain" />
             </a>
           </div>
 
-          {/* Área Central: Botón Explore (si no estamos en /catalog) + Barra de Búsqueda */}
-          <div className="flex-1 max-w-xl hidden sm:flex items-center justify-center gap-3">
-            {!isCatalog && (
-              <>
-                {/* Botón Explore Catálogo */}
-                <Link
-                  to="/catalog"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#171717] hover:bg-[#222222] border border-[#262626] text-gray-300 hover:text-white transition-all shrink-0"
-                >
-                  <Compass className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{t('catalog')}</span>
-                </Link>
+          {/* Área Central: Botón Explore + Barra de Búsqueda (Fija al centro, oculta en /catalog) */}
+          {!isCatalog && (
+            <div className="hidden md:flex items-center justify-center gap-3 absolute left-1/2 -translate-x-1/2 w-full max-w-sm md:max-w-md lg:max-w-lg pointer-events-auto z-10">
+              {/* Botón Explore Catálogo */}
+              <Link
+                to="/catalog"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#171717] hover:bg-[#222222] border border-[#262626] text-gray-300 hover:text-white transition-all shrink-0"
+              >
+                <Compass className="w-3.5 h-3.5 text-amber-500" />
+                <span>{t('catalog')}</span>
+              </Link>
 
-                {/* Barra de Búsqueda con X de limpieza */}
-                <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={t('searchPlaceholder')}
-                    className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#171717] border border-[#262626] rounded-full text-gray-200 placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-0.5"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </form>
-              </>
-            )}
-          </div>
+              {/* Barra de Búsqueda con X de limpieza */}
+              <form onSubmit={handleSearchSubmit} className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t('searchPlaceholder')}
+                  className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#171717] border border-[#262626] rounded-full text-gray-200 placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </form>
+            </div>
+          )}
 
           {/* Acciones de Usuario a la derecha */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0 z-10 ml-auto">
             {user ? (
               // En Home con usuario logueado: el header queda limpio a la derecha (el menú está en la columna derecha de Home)
               // En otras pantallas: muestra avatar + campanita + dropdown
@@ -247,7 +245,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search movies, series, cast..."
+                placeholder={t('searchPlaceholder')}
                 className="w-full pl-9 pr-8 py-2 text-sm bg-[#171717] border border-[#262626] rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:border-amber-500"
               />
               {searchQuery && (

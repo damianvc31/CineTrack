@@ -2,6 +2,15 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.8.2] - 2026-09-12
+### Corregido & Mejorado
+- **Cálculo de Distribución de Géneros por Título Único (`catalog_service.py`):**
+  - Se corrigió el cálculo de `genres_distribution` en estadísticas de usuario (`/users/me/stats`) para que compute **1 conteo por cada título único consumido** (películas vistas y series con episodios vistos o marcadas como vistas), en lugar de iterar por cada episodio individual de una serie. Esto evita que series de muchos episodios inflen artificialmente sus géneros en el gráfico Donut del perfil.
+- **Alineación y Anclaje Central Fijo de Explorar y Búsqueda (`Header.tsx`):**
+  - Se implementó un contenedor anclado al centro geométrico del header (`absolute left-1/2 -translate-x-1/2`) en desktop/tablet, fijando el botón *"Explore / Explorar"* y la barra de búsqueda exactamente en la misma coordenada horizontal en todas las rutas en que se muestran, eliminando los desplazamientos causados por las variaciones de ancho de los bloques laterales (logo TMDB a la izquierda y avatar/autenticación a la derecha).
+  - Se mantiene la exclusión limpia del botón Explorar y del campo de búsqueda en la ruta `/catalog` (tanto en desktop como en mobile), permitiendo que la navegación en el catálogo opere sin redundancias con sus propios controles dedicados de filtrado y búsqueda.
+  - En la vista móvil, el formulario de búsqueda ahora cuenta con su texto de sugerencia (*placeholder*) completamente traducido con internacionalización reactiva.
+
 ## [v0.8.1] - 2026-09-12
 ### Corregido & Mejorado
 - **Restricción de Reseñas para Títulos No Vistos (`TitleDetailPage`):**

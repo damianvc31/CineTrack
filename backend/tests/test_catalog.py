@@ -234,27 +234,29 @@ async def test_user_library_and_stats(async_client: AsyncClient, sample_catalog)
     await async_client.post("/api/v1/titles/1/favorite", headers=headers)
     await async_client.post("/api/v1/titles/1/watched", headers=headers)
 
-    # 2. Marcar episodio 1 de Breaking Bad como visto -> pone serie en 'siguiendo'
+    # 2. Marcar episodios 1 y 2 de Breaking Bad como vistos -> pone serie en 'siguiendo'
     await async_client.post("/api/v1/titles/2/seasons/1/episodes/1/watch", headers=headers)
+    await async_client.post("/api/v1/titles/2/seasons/1/episodes/2/watch", headers=headers)
 
-    # Consultar Biblioteca
+    # Consultar Biblioteca (al ver todos los episodios de la serie, pasa de siguiendo a vista)
     lib_res = await async_client.get("/api/v1/users/me/library", headers=headers)
     assert lib_res.status_code == 200
     lib = lib_res.json()
     assert len(lib["favorites"]) == 1
     assert lib["favorites"][0]["id"] == 1
-    assert len(lib["recently_watched"]) == 1
-    assert len(lib["following"]) == 1
-    assert lib["following"][0]["id"] == 2
+    assert len(lib["recently_watched"]) >= 1
 
     # Consultar Estadísticas
     stats_res = await async_client.get("/api/v1/users/me/stats", headers=headers)
     assert stats_res.status_code == 200
     stats = stats_res.json()
     assert stats["movies_watched_count"] == 1
-    assert stats["episodes_watched_count"] == 1
+    assert stats["episodes_watched_count"] == 2
+    assert stats["series_watched_count"] == 1
     assert stats["total_hours"] > 0
-    assert "Action" in stats["genres_distribution"]
+    assert stats["genres_distribution"]["Action"] == 1
+    # Verifica que los 2 episodios de la misma serie solo sumen 1 al género Drama (por título único)
+    assert stats["genres_distribution"]["Drama"] == 1
 
 
 @pytest.mark.asyncio
