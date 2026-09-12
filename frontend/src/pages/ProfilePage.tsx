@@ -23,6 +23,8 @@ import { EditProfileModal } from '@/components/profile/EditProfileModal'
 import { SeasonProgressBar } from '@/components/profile/SeasonProgressBar'
 import { DonutGenreChart } from '@/components/profile/DonutGenreChart'
 
+import { getAvatarUrl } from '@/utils/avatarUtils'
+
 export const ProfilePage: React.FC = () => {
   const { user } = useAuth()
   const { t, language } = useLanguage()
@@ -33,6 +35,7 @@ export const ProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [avatarImgError, setAvatarImgError] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
@@ -93,14 +96,12 @@ export const ProfilePage: React.FC = () => {
         <aside className="lg:col-span-4 bg-[#141414] border border-[#262626] rounded-2xl p-6 sm:p-8 space-y-6 text-center lg:text-left relative shadow-xl">
           {/* Avatar Container */}
           <div className="relative mx-auto lg:mx-0 w-32 h-32 sm:w-36 sm:h-36 rounded-full overflow-hidden border-2 border-amber-500/50 bg-[#181818] shadow-2xl flex items-center justify-center group">
-            {user.avatar_url ? (
+            {getAvatarUrl(user.avatar_url) && !avatarImgError ? (
               <img
-                src={user.avatar_url}
+                src={getAvatarUrl(user.avatar_url)!}
                 alt={user.nombre_usuario}
                 className="w-full h-full object-cover"
-                onError={(e) => {
-                  ;(e.target as HTMLElement).style.display = 'none'
-                }}
+                onError={() => setAvatarImgError(true)}
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-black text-4xl sm:text-5xl font-black">

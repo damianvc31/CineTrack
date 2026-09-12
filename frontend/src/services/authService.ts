@@ -28,6 +28,10 @@ export const authService = {
     return api.post<User>('/users/me/avatar', { image_base64: imageBase64 })
   },
 
+  deleteAvatar: (): Promise<User> => {
+    return api.delete<User>('/users/me/avatar')
+  },
+
   changePassword: (currentPassword: string, newPassword: string): Promise<{ message: string }> => {
     return api.post<{ message: string }>('/users/me/change-password', {
       current_password: currentPassword,

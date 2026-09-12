@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
 import tmdbLogo from '@/assets/branding/tmdb-logo.svg'
 import cinetrackLogo from '@/assets/branding/cinetrack-logo.svg'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface HeaderProps {
   onOpenAuth?: (mode?: 'login' | 'register') => void
@@ -115,9 +116,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                       className="flex items-center gap-2.5 p-0.5 rounded-full hover:bg-[#171717] transition-colors focus:outline-none"
                     >
                       <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-amber-500/50 bg-[#181818] flex items-center justify-center text-black text-sm font-bold shadow-md shrink-0">
-                        {user.avatar_url ? (
+                        {getAvatarUrl(user.avatar_url) ? (
                           <img
-                            src={user.avatar_url}
+                            src={getAvatarUrl(user.avatar_url)!}
                             alt={user.nombre_usuario}
                             className="w-full h-full object-cover"
                             onError={(e) => {

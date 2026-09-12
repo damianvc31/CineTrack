@@ -34,15 +34,17 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
   - Notificaciones toast en inglés estricto en `ReviewsPage` y simplificación de etiqueta a "Favorites" en el panel lateral de Home.
 - **Encuadre y Centrado Interactivo de Avatar desde la PC:**
   - Selector de archivo local desde la PC en `EditProfileModal` con soporte para formatos PNG, JPG y WebP.
-  - Visor circular interactivo (200×200 px con aro dorado) con **arrastre con el mouse/touch** para posicionar el rostro/detalle y **slider de zoom (1.0x a 3.0x)**.
-  - Renderizado automático en `<canvas>` a miniatura cuadrada optimizada de 256×256 px (~20 KB en JPEG de alta calidad).
-  - Nuevo endpoint `POST /api/v1/users/me/avatar` para almacenar el contenido binario directamente en `Usuario.avatar_binario` y asignar la ruta canónica `Usuario.avatar_url = /api/v1/users/{id}/avatar`.
-  - Endpoint público `GET /api/v1/users/{id}/avatar` para servir la imagen con cabeceras `Cache-Control` de alto rendimiento.
+  - Visor circular interactivo (200×200 px con aro dorado) con **arrastre con el mouse/touch**, escala de ajuste automático inicial (*contain*) y **slider de zoom-out y zoom-in (0.2x a 3.0x)** para alejar o acercar la toma con total libertad.
+  - Botones de ajuste instantáneo: *"Ajustar Completa (1.0x)"*, *"Llenar Círculo"* y *"Centrar"*.
+  - Renderizado en `<canvas>` a miniatura cuadrada de 256×256 px con fondo oscuro de respaldo (`#141414`), garantizando fidelidad matemática exacta al visor.
+  - Botón y endpoint para **restablecer al avatar por defecto** (`DELETE /api/v1/users/me/avatar`), limpiando la foto personalizada y retornando al gradiente ámbar con la inicial del usuario.
+  - Resolución canónica de avatares mediante `getAvatarUrl()` y proxy en `vite.config.ts`, previniendo que los avatares relativos generen círculos negros o errores 404. Fallback automático a la inicial ante cualquier fallo de carga.
 - **Incorporación de Fotos de Actores y Sección Top Cast:**
   - Nueva columna `foto_url` en la tabla `actores` y schema `CastMemberResponse`.
   - Captura del `profile_path` oficial de TMDB (`https://image.tmdb.org/t/p/w185...`) en el servicio de sincronización (`tmdb_sync_service.py`).
   - Nuevo job asíncrono CLI `backend/app/jobs/populate_actor_photos.py` para consultar y enriquecer en lotes las fotos de los actores del catálogo local.
-  - Sección visual **"Top Cast / Reparto Principal"** en `TitleDetailPage` con avatares circulares de actores, fotos oficiales, nombres, personajes y enlaces de filtrado por actor hacia el catálogo. Eliminación de la sección duplicada anterior de texto plano.
+  - Sección visual **"Top Cast / Reparto Principal"** en `TitleDetailPage` con avatares circulares de actores, fotos oficiales, nombres, personajes y enlaces de filtrado hacia el catálogo.
+  - **Reubicación:** El Reparto Principal se posiciona estratégicamente por encima de las Temporadas y Episodios en series, brindando acceso inmediato a los intérpretes antes de la lista detallada de entregas.
 - **Localización Completa del Catálogo y Navegación "Explore / Explorar":**
   - Internacionalización reactiva de `CatalogPage` (`t()` y `translateGenreName()`): títulos, buscador, filtros por tipo, géneros dinámicos, secciones temáticas, opciones de ordenamiento, estado vacío y paginador.
   - Renombrado del botón y enlaces de navegación en cabecera desktop, móvil y páginas secundarias de "Catalog / Catálogo" a **"Explore / Explorar"**.

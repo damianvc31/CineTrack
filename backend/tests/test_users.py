@@ -116,3 +116,13 @@ async def test_upload_and_get_avatar(async_client: AsyncClient):
     assert get_avatar_resp.status_code == 200
     assert get_avatar_resp.headers["content-type"] == "image/jpeg"
     assert len(get_avatar_resp.content) > 0
+
+    # Eliminar avatar y restablecer a default
+    del_resp = await async_client.delete("/api/v1/users/me/avatar", headers=headers)
+    assert del_resp.status_code == 200
+    del_data = del_resp.json()
+    assert del_data["avatar_url"] is None
+
+    # Verificar que el endpoint de avatar ahora retorna 404
+    get_after_del = await async_client.get(f"/api/v1/users/{user_data['id']}/avatar")
+    assert get_after_del.status_code == 404

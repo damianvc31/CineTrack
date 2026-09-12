@@ -12,10 +12,12 @@ import {
   Move,
   Check,
   RotateCcw,
+  Trash2,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
 import { authService } from '@/services/authService'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface EditProfileModalProps {
   isOpen: boolean
@@ -37,12 +39,15 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [imgError, setImgError] = useState(false)
 
   // Cropper / Centering interactive state
   const [cropMode, setCropMode] = useState(false)
   const [imageToCrop, setImageToCrop] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1.0)
   const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [baseDimensions, setBaseDimensions] = useState({ w: 200, h: 200 })
+  const [naturalSize, setNaturalSize] = useState({ w: 0, h: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -56,19 +61,82 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     if (!file) return
 
     if (!file.type.startsWith('image/')) {
-      setError(language === 'es' ? 'Por favor selecciona un archivo de imagen válido.' : 'Please select a valid image file.')
+      setError(
+        language === 'es'
+          ? 'Por favor selecciona un archivo de imagen válido.'
+          : 'Please select a valid image file.'
+      )
       return
     }
 
     const reader = new FileReader()
     reader.onload = () => {
-      setImageToCrop(reader.result as string)
+      const dataUri = reader.result as string
+      const tempImg = new Image()
+      tempImg.onload = () => {
+        const nw = tempImg.naturalWidth || 200
+        const nh = tempImg.naturalHeight || 200
+        setNaturalSize({ w: nw, h: nh })
+
+        // Escala base: la imagen completa entra holgadamente en el círculo de 200px con zoom = 1.0
+        const baseScale = 200 / Math.max(nw, nh)
+        setBaseDimensions({
+          w: Math.max(1, nw * baseScale),
+          h: Math.max(1, nh * baseScale),
+        })
+        setZoom(1.0)
+        setPan({ x: 0, y: 0 })
+        setImageToCrop(dataUri)
+        setCropMode(true)
+        setError(null)
+      }
+      tempImg.src = dataUri
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // Re-encuadrar imagen existente
+  const handleRecenter = (url: string) => {
+    const canonical = getAvatarUrl(url) || url
+    const tempImg = new Image()
+    tempImg.crossOrigin = 'anonymous'
+    tempImg.onload = () => {
+      const nw = tempImg.naturalWidth || 200
+      const nh = tempImg.naturalHeight || 200
+      setNaturalSize({ w: nw, h: nh })
+      const baseScale = 200 / Math.max(nw, nh)
+      setBaseDimensions({
+        w: Math.max(1, nw * baseScale),
+        h: Math.max(1, nh * baseScale),
+      })
       setZoom(1.0)
       setPan({ x: 0, y: 0 })
+      setImageToCrop(canonical)
       setCropMode(true)
       setError(null)
     }
-    reader.readAsDataURL(file)
+    tempImg.onerror = () => {
+      setError(language === 'es' ? 'No se pudo cargar la imagen para re-encuadrar.' : 'Could not load image to re-center.')
+    }
+    tempImg.src = canonical
+  }
+
+  // Restablecer al avatar por defecto
+  const handleResetToDefault = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const updated = await authService.deleteAvatar()
+      updateUser(updated)
+      setAvatarUrl('')
+      setImageToCrop(null)
+      setCropMode(false)
+      setImgError(false)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al restablecer el avatar.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Mouse / Touch Dragging handlers
@@ -120,15 +188,18 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
       if (!ctx) throw new Error('Could not initialize canvas context')
 
-      const viewportSize = 200
-      const baseScale = Math.max(viewportSize / img.naturalWidth, viewportSize / img.naturalHeight)
-      const renderW = img.naturalWidth * baseScale * zoom
-      const renderH = img.naturalHeight * baseScale * zoom
-      const renderX = viewportSize / 2 + pan.x - renderW / 2
-      const renderY = viewportSize / 2 + pan.y - renderH / 2
+      // Relleno oscuro de respaldo para márgenes en caso de zoom out
+      ctx.fillStyle = '#141414'
+      ctx.fillRect(0, 0, 256, 256)
 
-      const ratio = 256 / viewportSize
-      ctx.drawImage(img, renderX * ratio, renderY * ratio, renderW * ratio, renderH * ratio)
+      // Relación exacta entre viewport (200x200) y canvas (256x256)
+      const factor = 256 / 200
+      const renderW = baseDimensions.w * zoom * factor
+      const renderH = baseDimensions.h * zoom * factor
+      const renderX = 128 + pan.x * factor - renderW / 2
+      const renderY = 128 + pan.y * factor - renderH / 2
+
+      ctx.drawImage(img, renderX, renderY, renderW, renderH)
 
       const croppedDataUri = canvas.toDataURL('image/jpeg', 0.92)
 
@@ -138,6 +209,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       setAvatarUrl(updated.avatar_url || croppedDataUri)
       setCropMode(false)
       setImageToCrop(null)
+      setImgError(false)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al procesar el avatar.')
     } finally {
@@ -172,6 +244,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     }
   }
 
+  const canonicalCurrentAvatar = getAvatarUrl(avatarUrl)
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
       <div className="relative w-full max-w-lg bg-[#141414] border border-[#262626] rounded-2xl shadow-2xl p-6 sm:p-8 space-y-6">
@@ -205,15 +279,15 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               </h4>
               <p className="text-xs text-gray-400">
                 {language === 'es'
-                  ? 'Arrastra la imagen con el mouse para centrarla y usa el zoom para encuadrar tu foto.'
-                  : 'Drag the image to position and use zoom to frame your avatar perfectly.'}
+                  ? 'Arrastra la imagen para posicionarla y usa el zoom (in/out) para encuadrarla a gusto.'
+                  : 'Drag the image to position and use zoom (in/out) to frame your avatar.'}
               </p>
             </div>
 
-            {/* Viewport circular 200x200 */}
-            <div className="flex justify-center my-4">
+            {/* Viewport circular 200x200 con imagen escalada exactamente */}
+            <div className="flex justify-center my-3">
               <div
-                className="relative w-[200px] h-[200px] rounded-full overflow-hidden border-4 border-amber-500 shadow-2xl bg-[#0a0a0a] cursor-grab active:cursor-grabbing select-none"
+                className="relative w-[200px] h-[200px] rounded-full overflow-hidden border-4 border-amber-500 shadow-2xl bg-[#0a0a0a] cursor-grab active:cursor-grabbing select-none shrink-0"
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
@@ -227,11 +301,13 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   src={imageToCrop}
                   alt="Crop preview"
                   draggable={false}
-                  className="absolute max-w-none pointer-events-none transition-transform duration-75"
+                  className="absolute max-w-none pointer-events-none select-none"
                   style={{
+                    width: `${baseDimensions.w * zoom}px`,
+                    height: `${baseDimensions.h * zoom}px`,
                     left: '50%',
                     top: '50%',
-                    transform: `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                    transform: `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px)`,
                   }}
                 />
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center border border-white/10 rounded-full">
@@ -240,22 +316,73 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               </div>
             </div>
 
-            {/* Zoom Slider */}
-            <div className="flex items-center justify-center gap-3 px-5 py-2.5 bg-[#0d0d0d] border border-[#262626] rounded-xl max-w-xs mx-auto">
-              <ZoomOut className="w-4 h-4 text-gray-400 shrink-0" />
-              <input
-                type="range"
-                min="1.0"
-                max="3.0"
-                step="0.05"
-                value={zoom}
-                onChange={(e) => setZoom(parseFloat(e.target.value))}
-                className="flex-1 accent-amber-500 cursor-pointer h-1.5 bg-[#262626] rounded-lg"
-              />
-              <ZoomIn className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="text-[11px] font-mono font-bold text-gray-300 w-9 text-right">
-                {zoom.toFixed(1)}x
-              </span>
+            {/* Zoom Slider and Quick Presets */}
+            <div className="space-y-2.5 max-w-sm mx-auto">
+              <div className="flex items-center justify-center gap-3 px-4 py-2 bg-[#0d0d0d] border border-[#262626] rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setZoom(Math.max(0.2, +(zoom - 0.15).toFixed(2)))}
+                  className="text-gray-400 hover:text-white p-1 transition-colors"
+                  title="Zoom out"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+                <input
+                  type="range"
+                  min="0.2"
+                  max="3.0"
+                  step="0.05"
+                  value={zoom}
+                  onChange={(e) => setZoom(parseFloat(e.target.value))}
+                  className="flex-1 accent-amber-500 cursor-pointer h-1.5 bg-[#262626] rounded-lg"
+                />
+                <button
+                  type="button"
+                  onClick={() => setZoom(Math.min(3.0, +(zoom + 0.15).toFixed(2)))}
+                  className="text-gray-400 hover:text-white p-1 transition-colors"
+                  title="Zoom in"
+                >
+                  <ZoomIn className="w-4 h-4 text-amber-400" />
+                </button>
+                <span className="text-[11px] font-mono font-bold text-gray-300 w-10 text-right">
+                  {zoom.toFixed(1)}x
+                </span>
+              </div>
+
+              {/* Botones de ajuste rápido: Ajustar completa, Llenar círculo, Centrar */}
+              <div className="flex items-center justify-center gap-2 flex-wrap text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setZoom(1.0)
+                    setPan({ x: 0, y: 0 })
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] hover:bg-[#262626] text-gray-300 border border-[#333] text-[11px] font-medium transition-colors"
+                >
+                  {language === 'es' ? 'Ajustar Completa (1.0x)' : 'Fit Entire Image'}
+                </button>
+                {naturalSize.w > 0 && naturalSize.h > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const fillScale = 200 / Math.min(naturalSize.w, naturalSize.h)
+                      const baseScale = 200 / Math.max(naturalSize.w, naturalSize.h)
+                      setZoom(+(fillScale / baseScale).toFixed(2))
+                      setPan({ x: 0, y: 0 })
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] hover:bg-[#262626] text-gray-300 border border-[#333] text-[11px] font-medium transition-colors"
+                  >
+                    {language === 'es' ? 'Llenar Círculo' : 'Fill Circle'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPan({ x: 0, y: 0 })}
+                  className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] hover:bg-[#262626] text-gray-400 hover:text-gray-200 border border-[#2b2b2b] text-[11px] transition-colors"
+                >
+                  {language === 'es' ? 'Centrar' : 'Center'}
+                </button>
+              </div>
             </div>
 
             {/* Actions */}
@@ -298,19 +425,17 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             <div className="p-3.5 rounded-xl bg-[#0d0d0d] border border-[#262626] space-y-3">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-amber-500/50 bg-[#1f1f1f] flex items-center justify-center shrink-0 shadow-lg">
-                  {avatarUrl ? (
+                  {canonicalCurrentAvatar && !imgError ? (
                     <img
-                      src={avatarUrl}
+                      src={canonicalCurrentAvatar}
                       alt="Avatar preview"
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        ;(e.target as HTMLElement).style.display = 'none'
-                      }}
+                      onError={() => setImgError(true)}
                     />
                   ) : (
-                    <span className="text-xl font-extrabold text-amber-400">
+                    <div className="w-full h-full bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-black text-xl font-extrabold">
                       {user.nombre_usuario.charAt(0).toUpperCase()}
-                    </span>
+                    </div>
                   )}
                 </div>
 
@@ -332,19 +457,27 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     </button>
 
                     {avatarUrl && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setImageToCrop(avatarUrl)
-                          setZoom(1.0)
-                          setPan({ x: 0, y: 0 })
-                          setCropMode(true)
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-[#2a2a2a] text-gray-300 hover:text-white border border-[#333333] text-xs font-semibold transition-all"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>{language === 'es' ? 'Re-encuadrar' : 'Re-center'}</span>
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleRecenter(avatarUrl)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-[#2a2a2a] text-gray-300 hover:text-white border border-[#333333] text-xs font-semibold transition-all"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>{language === 'es' ? 'Re-encuadrar' : 'Re-center'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={handleResetToDefault}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-300 hover:text-red-200 border border-red-800/40 text-xs font-semibold transition-all disabled:opacity-50"
+                          title={language === 'es' ? 'Eliminar avatar y volver al predeterminado' : 'Remove avatar and use default'}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>{language === 'es' ? 'Volver a Default' : 'Default Avatar'}</span>
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

@@ -34,6 +34,7 @@ import { useLanguage } from '@/context/LanguageContext'
 import { catalogService } from '@/services/catalogService'
 import type { HomeSections } from '@/types/catalog'
 import { CarouselRow } from '@/components/common/CarouselRow'
+import { getAvatarUrl } from '@/utils/avatarUtils'
 
 interface OutletContextType {
   openAuth: (mode?: 'login' | 'register') => void
@@ -342,9 +343,9 @@ export const HomePage: React.FC = () => {
               <div className="flex items-center justify-between pb-4 border-b border-[#262626]">
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-amber-500/40 bg-[#181818] flex items-center justify-center text-black font-bold shadow-md shrink-0">
-                    {user.avatar_url ? (
+                    {getAvatarUrl(user.avatar_url) ? (
                       <img
-                        src={user.avatar_url}
+                        src={getAvatarUrl(user.avatar_url)!}
                         alt={user.nombre_usuario}
                         className="w-full h-full object-cover"
                         onError={(e) => {

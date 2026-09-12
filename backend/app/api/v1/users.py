@@ -85,7 +85,10 @@ async def update_my_profile(
     if payload.descripcion is not None:
         current_user.descripcion = payload.descripcion.strip() or None
     if payload.avatar_url is not None:
-        current_user.avatar_url = payload.avatar_url.strip() or None
+        clean_url = payload.avatar_url.strip() or None
+        current_user.avatar_url = clean_url
+        if clean_url is None:
+            current_user.avatar_binario = None
 
     await db.commit()
     await db.refresh(current_user)
@@ -143,20 +146,41 @@ async def upload_my_avatar(
     return current_user
 
 
+@router.delete("/me/avatar", response_model=UserResponse)
+async def delete_my_avatar(
+    current_user: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> UserResponse:
+    """Elimina el avatar personalizado del usuario, restableciendo el avatar por defecto."""
+    current_user.avatar_url = None
+    current_user.avatar_binario = None
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
 @router.get("/{user_id}/avatar")
 async def get_user_avatar(
     user_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    """Retorna la imagen binaria del avatar del usuario."""
+    """Retorna la imagen binaria del avatar del usuario con detección de formato."""
     user = await db.get(Usuario, user_id)
     if not user or not user.avatar_binario:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Avatar no encontrado."
         )
+
+    content = user.avatar_binario
+    media_type = "image/jpeg"
+    if content.startswith(b"\x89PNG"):
+        media_type = "image/png"
+    elif content.startswith(b"RIFF") and b"WEBP" in content[:12]:
+        media_type = "image/webp"
+
     return Response(
-        content=user.avatar_binario,
-        media_type="image/jpeg",
+        content=content,
+        media_type=media_type,
         headers={"Cache-Control": "max-age=86400, public"}
     )

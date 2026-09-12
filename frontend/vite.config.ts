@@ -7,6 +7,14 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   envDir: '../',
   plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
