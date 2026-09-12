@@ -39,9 +39,9 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 > *Las especificaciones funcionales y de dominio —incluyendo los criterios de curación de la Home, ventanas temporales, pools dinámicos, máquina de estados por episodios, fórmula de calificación unificada, políticas de ingesta inicial, sincronización diaria y reglas de créditos de elenco— están formalmente desacopladas en [docs/CATALOG_SPECS.md](docs/CATALOG_SPECS.md).*
 
 ### 2.4. Almacenamiento de Avatares y Encuadre Interactivo
-- **Encuadre/Centrado Interactivo (Cropper):** En `EditProfileModal`, el usuario puede cargar cualquier imagen local (`.png`, `.jpg`, `.webp`), arrastrarla con el mouse para centrarla en un visor circular y aplicar zoom (1.0x a 3.0x).
-- **Persistencia Binaria:** Al aplicar, se renderiza el área encuadrada a un `<canvas>` 256×256 px en formato JPEG (~20 KB), enviado a `POST /api/v1/users/me/avatar` que almacena los bytes en `Usuario.avatar_binario` y establece `Usuario.avatar_url = /api/v1/users/{id}/avatar`.
-- **Servicio Público:** El endpoint `GET /api/v1/users/{user_id}/avatar` sirve la imagen con cabeceras `Cache-Control` públicas, permitiendo además usar URLs remotas estándar como alternativa.
+- **Encuadre/Centrado Interactivo (Cropper):** En `EditProfileModal`, el usuario puede cargar cualquier imagen local (`.png`, `.jpg`, `.webp`), arrastrarla libremente para posicionarla en un visor circular y regular un zoom continuo (0.2x a 3.0x con presets rápidos *"Ajustar Completa"*, *"Llenar Círculo"* y *"Centrar"*).
+- **Persistencia Binaria:** Al aplicar el encuadre, se renderiza la composición a un `<canvas>` 256×256 px en formato JPEG con fondo `#141414` de respaldo, transmitido a `POST /api/v1/users/me/avatar` que almacena los bytes en `Usuario.avatar_binario` y versiona la URL con timestamp (`/api/v1/users/{id}/avatar?v={timestamp}`).
+- **Prevención de Tainted Canvas y CORS:** Para re-encuadrar avatares ya guardados en el servidor, `handleRecenter` descarga la imagen vía `fetch` y la convierte a un `Data URL` local, garantizando que el `<canvas>` nunca sea marcado como contaminado por el navegador. El endpoint `GET /api/v1/users/{user_id}/avatar` incluye cabeceras explícitas `Access-Control-Allow-Origin: *` y directivas `Cache-Control: no-cache, no-store, must-revalidate` para forzar refrescos inmediatos sin retener imágenes desactualizadas en la memoria caché del navegador.
 
 ---
 

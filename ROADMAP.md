@@ -30,12 +30,16 @@
   - Motor Integral de Reseñas: 1 reseña por usuario con edición y borrado in-place, validación de saltos de 0.5, calificación opcional, visualización unificada (TMDB + local) y pantalla dedicada `/reviews`.
   - Mi Biblioteca (`/library`) y Perfil de usuario (`/profile`).
   - Suite de 49 tests en backend y pruebas en Vitest (100% pasando).
-- [x] **Fase 3 Complementaria: Progreso de Siguiendo, Orden Cronológico, Perfil y Settings (v0.8.0)**
+- [x] **Fase 3 & 5 Complementarias: Progreso, Perfil, Fotos de Actores, Reseñas y Localización (v0.8.0 - v0.8.1)**
   - Barra segmentada por temporada en Siguiendo (`SeasonProgressBar`) calculada sobre episodios estrenados y regla de regresión a la temporada incompleta más temprana.
   - Orden cronológico estricto (`fecha_favorito DESC`, `fecha_estado DESC`) en biblioteca y actualización de `fecha_estado` en episodios.
-  - Perfil de usuario completo fiel a `user-profile.png`: edición in-place con lápiz (bio, país, ciudad, avatar URL), métricas clave (total horas, promedio semanal cine, temporadas completadas), Top 5 con formato `Nombre · N seasons | AAAA-AAAA`, puntaje personal verificado (`⭐ X.X`), y gráfico Donut SVG de géneros.
-  - Pantalla dedicada de Configuración (`/settings`): cambio de contraseña seguro y selector de idioma de interfaz con traducción de géneros en frontend.
-  - Suite de 53 tests en backend y pruebas en Vitest (100% pasando).
+  - Perfil de usuario completo: edición con lápiz (bio, país, ciudad, avatar), métricas clave (total horas, promedio semanal cine, temporadas completadas), Top 5 con percentil normalizado, y gráfico Donut SVG de géneros con animaciones y tooltips interactivos.
+  - Encuadre interactivo de avatar desde la PC: zoom-out/in (0.2x a 3.0x), arrastre, canvas 256×256 px, persistencia binaria con cache-busting, prevención de *tainted canvas* vía conversión a Data URL local, botón para restablecer a default y soporte para URLs externas sin validaciones bloqueantes.
+  - Ingesta de fotos oficiales de actores y sección Top Cast en detalle de títulos, ubicada por encima de las temporadas en series.
+  - Restricción de reseñas para títulos no vistos (con preservación de edición para reseñas existentes).
+  - Localización reactiva completa al español en toda la interfaz (menú, catálogo "Explore", detalle de títulos, temporadas, reseñas y configuración).
+  - Pantalla dedicada de Configuración (`/settings`): cambio de contraseña seguro y selector de idioma de interfaz.
+  - Suite de 54 tests en backend y pruebas en Vitest (100% pasando).
 - [ ] **Fase 6: Recomendador Inteligente con IA Embebida**
   - Integración de API (Google Gemini / Groq / Ollama) con prompt estructurado y contexto de perfil.
   - Verificación y política de incertidumbre.
@@ -44,10 +48,13 @@
 
 ## Backlog (Pendientes para Versión Superior)
 
+- [ ] Repaso e iconografía personalizada de géneros cinematográficos.
 - [ ] Sistema de notificaciones activas por estrenos de nuevas temporadas.
 - [ ] Badge "Viendo Actualmente" (🔥) en series con episodios recientes.
 - [x] Panel de estadísticas avanzadas en el perfil (tiempo total, distribución de géneros, gráfico Donut SVG) *(Completado en v0.8.0)*.
-- [x] Selector de idioma de interfaz y diccionario de géneros *(Completado en v0.8.0)*.
+- [x] Selector de idioma de interfaz y diccionario de géneros *(Completado en v0.8.0 - v0.8.1)*.
+- [x] Ingesta de fotos de actores y sección Top Cast *(Completado en v0.8.0 - v0.8.1)*.
+- [x] Carga de avatar desde archivo local con centrado y zoom *(Completado en v0.8.0 - v0.8.1)*.
 - [ ] Recomendador avanzado con function calling y búsqueda semántica vectorial (embeddings con pgvector).
 - [ ] Buscador extendido con filtros por director, guionista y actor.
 - [ ] Pantallas de extensión ("Ver más") con paginación para cada sección.
