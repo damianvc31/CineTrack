@@ -75,6 +75,16 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 7. **Ciclo de Vida y Transición de Estados en Series:**
    - **Abandono y Reanudación Fluida:** El abandono (`POST /titles/{id}/unfollow`) quita el estado activo (`estado = None` en base de datos) conservando intactos los registros en `EpisodioVisto`, deduciéndose como "abandonada" en tiempo de lectura e interfaces. El endpoint `POST /titles/{id}/follow` permite reanudarla directamente a `siguiendo` sin forzar la alteración del checklist de episodios.
 
+8. **Motor de Progreso de Temporadas y Regla de Regresión:**
+   - **Cálculo sobre Episodios Estrenados:** El porcentaje de avance en series en seguimiento se calcula estrictamente sobre episodios ya estrenados (`fecha_estreno <= today`), evitando penalizar series en emisión con futuros episodios.
+   - **Regla de Regresión a la Temporada Incompleta más Temprana:** Al evaluar el estado textual (`following_status_text`), se busca la primera temporada cronológica con episodios estrenados sin ver. Si se desmarca un episodio previo, el indicador retrocede a esa entrega (ej. `● S1 in progress`) de forma determinística, reflejando fielmente el punto pendiente.
+   - **Orden Cronológico en Biblioteca:** Ordenamiento por `fecha_favorito DESC` para favoritos y `fecha_estado DESC` para watchlist, siguiendo y vistas recientes, actualizado en tiempo real al registrar avance en episodios.
+
+9. **Endpoints de Usuario y Estadísticas de Perfil:**
+   - `PATCH /api/v1/users/me`: Actualización de biografía, país, ciudad y URL de avatar (nombre de usuario inmutable).
+   - `POST /api/v1/users/me/change-password`: Verificación de contraseña actual y actualización segura con hash `bcrypt`.
+   - `GET /api/v1/users/me/stats`: Incorporación de `avg_movies_per_week` y `seasons_completed_count`, preservando la calificación personal verificada (`Resena.puntaje`) en el Top 5 por calificación.
+
 ---
 
 ## 4. Arquitectura de Frontend (React 19 + Vite 8 + Tailwind CSS v4)
@@ -93,6 +103,11 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 3. **Capa de Comunicación y Estado:**
    - **Cliente API Tipado (`services/api.ts`):** Envoltorio sobre `fetch` nativo con intercepción automática del token JWT almacenado en `localStorage`, manejo tipado de errores (`ApiError`) y soporte para query params serializados.
    - **Autenticación Global (`context/AuthContext.tsx`):** Estado de sesión reactivo con persistencia local, hidratación al arranque vía `/api/v1/auth/me` y modal unificado (`AuthModal`) accesible desde cualquier pantalla sin recarga.
+
+4. **Pantallas de Perfil, Configuración y Localización en Frontend:**
+   - **Perfil de Usuario (`/profile` - `ProfilePage`):** Fiel a `docs/wireframes/user-profile.png` con edición in-place mediante modal (`EditProfileModal`), números dorados en estadísticas, rankings con formato `Nombre · N seasons | AAAA-AAAA`, gráfico Donut SVG de géneros y listas inferiores organizadas en pestañas.
+   - **Configuración (`/settings` - `SettingsPage`):** Cambio seguro de contraseña y selector de idioma de interfaz (English / Español).
+   - **Diccionario de Traducción en Frontend:** Las traducciones de géneros se resuelven exclusivamente en cliente (`genreTranslations.ts`) manteniendo la base de datos canónica y limpia.
 
 ---
 

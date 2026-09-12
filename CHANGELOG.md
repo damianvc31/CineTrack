@@ -2,6 +2,36 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.8.0] - 2026-09-12
+### Agregado & Mejorado
+- **Barra de Progreso Segmentada por Temporada en Siguiendo (`SeasonProgressBar`):**
+  - Segmentos visuales proporcionales por cada temporada con bordes redondeados y códigos de color según avance (`Completada`: dorado oscuro / `En progreso`: ámbar brillante / `Sin empezar`: carbón oscuro).
+  - Regla estricta de cálculo sobre **episodios ya estrenados** (`fecha_estreno <= today`) para no penalizar el porcentaje por episodios futuros.
+  - **Regla de Regresión a la Temporada Incompleta más Temprana:** Si se desmarca un episodio de una temporada previa, el texto de estado semántico retrocede a esa entrega (ej. `● S1 in progress` o `● S1 watchlist`) sin importar que existan temporadas posteriores vistas, garantizando precisión determinística.
+  - Integración en tarjetas `TitleCard` (`LibraryPage` y `ProfilePage`).
+- **Orden Cronológico Estricto en Biblioteca (`get_user_library`):**
+  - Orden descendente por marca de tiempo: `favoritos` ordenados por `fecha_favorito DESC`; `watchlist`, `siguiendo` y `recientemente vistas` ordenados por `fecha_estado DESC`.
+  - Actualización atómica de `fecha_estado` en `toggle_episode_watched` y `toggle_season_watched` para reposicionar la serie al tope de la lista al registrar progreso.
+- **Pantalla Completa de Perfil de Usuario (`ProfilePage`) Fiel a `user-profile.png`:**
+  - **Tarjeta de Identidad:** Avatar prominente (`w-32 h-32`), nombre de usuario, país, ciudad, biografía y botón de edición con lápiz.
+  - **Modal de Edición de Perfil (`EditProfileModal`):** Permite actualizar biografía, país, ciudad y URL de avatar con vista previa instantánea. Nombre de usuario bloqueado (`read-only`).
+  - **Métricas Destacadas (Números Dorados):** Total de horas vistas, promedio semanal de películas (`avg_movies_per_week`) y temporadas de series completadas (`seasons_completed_count`).
+  - **Rankings Top 5:** Top 5 películas y series más vistas (con formato `Nombre · N seasons | AAAA-AAAA`) y Top 5 por calificación propia con puntaje personal verificado (`⭐ X.X`).
+  - **Gráfico Donut SVG de Géneros (`DonutGenreChart`):** Distribución proporcional de los géneros más consumidos con conteo central de títulos y leyenda interactiva.
+  - **Sección Following y Listas Inferiores:** Fila completa dedicada a series en seguimiento con barras de progreso y pestañas inferiores para Favoritos, Watchlist y Vistos recientemente.
+- **Pantalla Dedicada de Configuración (`/settings` - `SettingsPage`):**
+  - Formulario seguro de cambio de contraseña con validación de contraseña actual y repetición de nueva clave (`POST /api/v1/users/me/change-password`).
+  - Selector de preferencia de idioma de interfaz (English / Español) con diccionario local en frontend para nombres de géneros (`genreTranslations.ts`) sin alterar la base de datos.
+- **Armonización Estética y UX Cinemática:**
+  - `AuthModal` adaptado a paleta carbón/dorado con localización íntegra al inglés y campos completos de perfil (país, ciudad, bio, avatar) durante el registro.
+  - Ampliación de avatares en Home (`w-14 h-14` / `w-16 h-16`), Header (`w-10 h-10`) y Perfil (`w-32 h-32`).
+  - Menú desplegable de usuario y menú móvil con acceso directo a las 7 secciones clave de la biblioteca (Profile, Favorites, Watchlist, Watch History, Following, Reviews, Settings).
+  - Notificaciones toast en inglés estricto en `ReviewsPage` y simplificación de etiqueta a "Favorites" en el panel lateral de Home.
+- **Nuevos Endpoints en Backend:**
+  - `PATCH /api/v1/users/me`: Actualización de perfil (`pais`, `ciudad`, `descripcion`, `avatar_url`).
+  - `POST /api/v1/users/me/change-password`: Modificación segura de credenciales.
+- **Suite de Pruebas Automatizadas:** 53 tests en backend pasando (`pytest`) y suite de frontend en Vitest en verde.
+
 ## [v0.7.4] - 2026-09-12
 ### Agregado & Mejorado
 - **Sincronización de Temporadas Confirmadas (con o sin fecha):** `upsert_series` y el nuevo job `repopulate_seasons` ahora persisten temporadas futuras confirmadas en TMDB (incluso si tienen 0 episodios en TMDB al momento). Se procesaron las 1002 series del catálogo incorporando 180 nuevas temporadas confirmadas y actualizando 436 fechas de emisión.

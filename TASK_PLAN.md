@@ -90,11 +90,13 @@
     - [x] Ocultamiento de Watchlist en películas vistas, scroll arriba automático en detalle de título, ajuste tipográfico en tarjetas para rangos de años y colapso rápido de episodios de series (v0.7.1).
     - [x] Modelo de estado `abandonada` deducido (invariante de dominio), endpoint `POST /titles/{id}/follow` (Resume / Follow) para series con progreso previo, ícono distintivo de serie abandonada en `TitleCard`, y actualización de especificaciones de catálogo (v0.7.3).
     - [x] Sincronización de temporadas confirmadas (con o sin fecha), detección de emisión en 6 estados semánticos (Currently Airing, Renewed con fecha, Renewed TBA/In Production, Pending Renewal, Ended, Canceled), filtrado de temporadas sin fecha en detalle y traducción completa de UI al inglés (v0.7.4).
-  - [ ] **Fase 3: Progreso de Siguiendo, Orden Cronológico, Perfil y Settings**
-    - [ ] Barra segmentada por temporada en Siguiendo (episodios estrenados).
-    - [ ] Orden `updated_at DESC` en listas de usuario.
-    - [ ] Pantalla de Perfil fiel a `user-profile.png` con edición de usuario (lápiz).
-    - [ ] Pantalla dedicada de Configuración `/settings`.
+  - [x] **Fase 3: Progreso de Siguiendo, Orden Cronológico, Perfil y Settings (v0.8.0)**
+    - [x] Barra segmentada por temporada en Siguiendo (episodios estrenados) con regla de retroceso a la temporada incompleta más temprana y leyenda semántica (ej. `● S2 in progress`).
+    - [x] Orden cronológico estricto (`fecha_favorito DESC`, `fecha_estado DESC`) en listas de usuario (`get_user_library`) y actualización atómica al registrar avance de episodios.
+    - [x] Pantalla de Perfil fiel a `user-profile.png`: identidad con avatar prominente y edición de usuario por lápiz (bio, país, ciudad, avatar URL), métricas destacadas (total horas, promedio semanal cine, temporadas completadas), rankings Top 5 con formato `Nombre · N seasons | AAAA-AAAA`, puntaje personal verificado en calificación propia, Donut chart SVG de géneros, sección Following en fila completa y trío de listas inferiores.
+    - [x] Pantalla dedicada de Configuración `/settings` con cambio seguro de contraseña y selector de idioma de interfaz (con traducción de géneros en frontend sin alterar la base de datos).
+    - [x] Unificación a paleta dorado/carbón (`#141414`, `#262626`, `#f59e0b`), modal de autenticación (`AuthModal`) localizado a inglés con campos completos de perfil en registro, y avatares ampliados en Home (`w-14 h-14`), Header (`w-10 h-10`) y Perfil (`w-32 h-32`).
+    - [x] Suite de 53 tests en backend (`pytest`) y tests unitarios en Vitest (100% pasando).
 
 ---
 
