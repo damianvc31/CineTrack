@@ -253,7 +253,7 @@ export const ProfilePage: React.FC = () => {
                               </span>
                               <Link
                                 to={`/titles/${item.id}`}
-                                title={item.nombre}
+                                aria-label={item.nombre}
                                 className="font-semibold text-gray-200 hover:text-amber-400 transition-colors truncate"
                               >
                                 {item.nombre}
@@ -318,7 +318,7 @@ export const ProfilePage: React.FC = () => {
                               </span>
                               <Link
                                 to={`/titles/${item.id}`}
-                                title={item.nombre}
+                                aria-label={item.nombre}
                                 className="font-semibold text-gray-200 hover:text-amber-400 transition-colors truncate"
                               >
                                 {item.nombre}
@@ -364,7 +364,7 @@ export const ProfilePage: React.FC = () => {
                               </span>
                               <Link
                                 to={`/titles/${item.id}`}
-                                title={item.nombre}
+                                aria-label={item.nombre}
                                 className="font-semibold text-gray-200 hover:text-amber-400 transition-colors truncate"
                               >
                                 {item.nombre}
@@ -597,7 +597,7 @@ const ProfilePosterCard: React.FC<{ item: TitleCard; showStatusBadge?: boolean }
 
       <div className="relative group/pcard space-y-0.5 min-w-0">
         <h4
-          title={item.nombre}
+          aria-label={item.nombre}
           className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors truncate"
         >
           {item.nombre}

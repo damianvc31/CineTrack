@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { catalogService } from '@/services/catalogService'
 import { useAuth } from '@/context/AuthContext'
+import { useLanguage } from '@/context/LanguageContext'
 import type { UserReviewItem, TitleCard as TitleCardType } from '@/types/catalog'
 import posterFallback from '@/assets/placeholders/poster-empty.svg'
 
@@ -25,6 +26,7 @@ interface OutletContextType {
 
 export const ReviewsPage: React.FC = () => {
   const { user } = useAuth()
+  const { t } = useLanguage()
   const { openAuth } = useOutletContext<OutletContextType>()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -297,7 +299,7 @@ export const ReviewsPage: React.FC = () => {
                   to="/catalog"
                   className="px-4 py-2 rounded-xl bg-[#202020] hover:bg-[#282828] text-white text-xs font-bold border border-[#333] transition-all"
                 >
-                  Explore Catalog
+                  {t('explore')}
                 </Link>
               </div>
             </div>

@@ -177,7 +177,7 @@ export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOp
       <div className="p-2.5 flex flex-col justify-between flex-1 gap-1">
         <div className="relative group/title">
           <h3
-            title={title.nombre}
+            aria-label={title.nombre}
             className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-400 transition-colors line-clamp-1"
           >
             {title.nombre}

@@ -11,7 +11,6 @@ import {
   Tv,
   AlertCircle,
   Calendar,
-  User as UserIcon,
   MessageSquare,
   Send,
   CheckCheck,
@@ -40,7 +39,7 @@ interface OutletContextType {
 export const TitleDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
-  const { language } = useLanguage()
+  const { language, translateGenreName } = useLanguage()
   const { openAuth } = useOutletContext<OutletContextType>()
 
   const [title, setTitle] = useState<TitleDetail | null>(null)
@@ -596,7 +595,9 @@ export const TitleDetailPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <span className="text-gray-500 font-medium">Original Language:</span>{' '}
+                  <span className="text-gray-500 font-medium">
+                    {language === 'es' ? 'Idioma original:' : 'Original Language:'}
+                  </span>{' '}
                   <span className="text-gray-300 font-medium">
                     {getLanguageName(title.idioma_original)}
                   </span>
@@ -614,7 +615,7 @@ export const TitleDetailPage: React.FC = () => {
                         to={`/catalog?genero=${encodeURIComponent(gName)}`}
                         className="px-2.5 py-1 rounded-md bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/60 text-xs text-gray-300 transition-colors"
                       >
-                        {gName}
+                        {translateGenreName(gName)}
                       </Link>
                     )
                   })}
@@ -739,38 +740,12 @@ export const TitleDetailPage: React.FC = () => {
         {/* Synopsis */}
         {title.sinopsis && (
           <section className="space-y-3">
-            <h2 className="text-xl font-bold text-white tracking-tight">Synopsis</h2>
+            <h2 className="text-xl font-bold text-white tracking-tight">
+              {language === 'es' ? 'Sinopsis' : 'Synopsis'}
+            </h2>
             <p className="text-sm sm:text-base text-gray-300 leading-relaxed max-w-4xl">
               {title.sinopsis}
             </p>
-          </section>
-        )}
-
-        {/* Top Cast */}
-        {title.elenco && title.elenco.length > 0 && (
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold text-white tracking-tight">Top Cast</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {title.elenco.slice(0, 12).map((actor) => (
-                <Link
-                  key={actor.actor_id}
-                  to={`/catalog?actor=${encodeURIComponent(actor.nombre)}`}
-                  className="flex flex-col items-center p-3 rounded-xl bg-[#141414] border border-[#262626] hover:border-amber-500/40 transition-colors text-center group"
-                >
-                  <div className="w-16 h-16 rounded-full overflow-hidden mb-2 bg-[#1c1c1c] border border-[#262626] flex items-center justify-center text-gray-500">
-                    <UserIcon className="w-7 h-7" />
-                  </div>
-                  <span className="text-xs font-semibold text-gray-200 group-hover:text-amber-400 transition-colors line-clamp-1">
-                    {actor.nombre}
-                  </span>
-                  {actor.personaje && (
-                    <span className="text-[11px] text-gray-400 line-clamp-1 mt-0.5">
-                      {actor.personaje}
-                    </span>
-                  )}
-                </Link>
-              ))}
-            </div>
           </section>
         )}
 
@@ -779,7 +754,8 @@ export const TitleDetailPage: React.FC = () => {
           <section className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                <Tv className="w-5 h-5 text-amber-400" /> Seasons & Episodes
+                <Tv className="w-5 h-5 text-amber-400" />{' '}
+                {language === 'es' ? 'Temporadas y Episodios' : 'Seasons & Episodes'}
               </h2>
 
               {/* Selector de Temporadas Híbrido: Tabs si <= 5 temporadas, Combobox con stepper si > 5 */}
@@ -797,10 +773,10 @@ export const TitleDetailPage: React.FC = () => {
                             : 'bg-[#141414] text-gray-400 hover:text-white hover:bg-[#202020] border border-[#262626]'
                         }`}
                       >
-                        <span>Season {t.numero}</span>
+                        <span>{language === 'es' ? `Temporada ${t.numero}` : `Season ${t.numero}`}</span>
                         {t.temporada_vista && (
                           <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-500 text-black uppercase font-extrabold">
-                            WATCHED
+                            {language === 'es' ? 'VISTA' : 'WATCHED'}
                           </span>
                         )}
                       </button>
@@ -817,7 +793,10 @@ export const TitleDetailPage: React.FC = () => {
                     >
                       {visibleSeasons.map((t) => (
                         <option key={t.id} value={t.numero} className="bg-[#141414] text-white">
-                          Season {t.numero} {t.temporada_vista ? '— ✓ WATCHED' : `(${t.episodios_vistos || 0}/${t.cantidad_episodios})`}
+                          {language === 'es' ? `Temporada ${t.numero}` : `Season ${t.numero}`}{' '}
+                          {t.temporada_vista
+                            ? (language === 'es' ? '— ✓ VISTA' : '— ✓ WATCHED')
+                            : `(${t.episodios_vistos || 0}/${t.cantidad_episodios})`}
                         </option>
                       ))}
                     </select>
@@ -833,7 +812,7 @@ export const TitleDetailPage: React.FC = () => {
                         if (currIdx > 0) setSelectedSeason(seasons[currIdx - 1])
                       }}
                       disabled={selectedSeason === visibleSeasons[0]?.numero}
-                      title="Previous season"
+                      title={language === 'es' ? 'Temporada anterior' : 'Previous season'}
                       className="p-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-300 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     >
                       <ChevronLeft className="w-4 h-4" />
@@ -845,7 +824,7 @@ export const TitleDetailPage: React.FC = () => {
                         if (currIdx < seasons.length - 1) setSelectedSeason(seasons[currIdx + 1])
                       }}
                       disabled={selectedSeason === visibleSeasons[visibleSeasons.length - 1]?.numero}
-                      title="Next season"
+                      title={language === 'es' ? 'Temporada siguiente' : 'Next season'}
                       className="p-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-300 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -1024,9 +1003,10 @@ export const TitleDetailPage: React.FC = () => {
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
               {title.elenco.slice(0, 12).map((actor) => (
-                <div
+                <Link
                   key={`${actor.actor_id}-${actor.orden}`}
-                  className="p-3 rounded-2xl bg-[#141414] border border-[#262626] hover:border-amber-500/40 transition-all flex flex-col items-center text-center space-y-2.5 group shadow-sm"
+                  to={`/catalog?actor=${encodeURIComponent(actor.nombre)}`}
+                  className="p-3 rounded-2xl bg-[#141414] border border-[#262626] hover:border-amber-500/40 transition-all flex flex-col items-center text-center space-y-2.5 group shadow-sm block"
                 >
                   {/* Foto de perfil del actor con fallback */}
                   <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-[#2b2b2b] group-hover:border-amber-500/50 bg-[#1c1c1c] flex items-center justify-center shrink-0 shadow-md transition-all">
@@ -1049,21 +1029,19 @@ export const TitleDetailPage: React.FC = () => {
 
                   <div className="min-w-0 w-full space-y-0.5">
                     <h4
-                      title={actor.nombre}
                       className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors truncate"
                     >
                       {actor.nombre}
                     </h4>
                     {actor.personaje && (
                       <p
-                        title={actor.personaje}
                         className="text-[11px] text-gray-400 truncate"
                       >
                         {actor.personaje}
                       </p>
                     )}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </section>
@@ -1073,14 +1051,19 @@ export const TitleDetailPage: React.FC = () => {
         <section className="space-y-6 pt-6 border-t border-gray-800">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-amber-400" /> Reviews & Opinions
+              <MessageSquare className="w-5 h-5 text-amber-400" />{' '}
+              {language === 'es' ? 'Reseñas y Opiniones' : 'Reviews & Opinions'}
             </h2>
-            <span className="text-xs text-gray-400">{reviews.length} reviews</span>
+            <span className="text-xs text-gray-400">
+              {reviews.length} {language === 'es' ? 'reseñas' : 'reviews'}
+            </span>
           </div>
 
           {reviewSuccess && (
             <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-800/80 text-xs text-emerald-300">
-              Your review was published successfully and unified rating has been updated!
+              {language === 'es'
+                ? '¡Tu reseña se publicó exitosamente y la calificación unificada ha sido actualizada!'
+                : 'Your review was published successfully and unified rating has been updated!'}
             </div>
           )}
 
@@ -1099,7 +1082,7 @@ export const TitleDetailPage: React.FC = () => {
                         </div>
                         <span className="text-xs font-bold text-white">@{user.nombre_usuario}</span>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 font-semibold">
-                          Your Review
+                          {language === 'es' ? 'Tu Reseña' : 'Your Review'}
                         </span>
                       </div>
 

@@ -42,7 +42,13 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
   - Nueva columna `foto_url` en la tabla `actores` y schema `CastMemberResponse`.
   - Captura del `profile_path` oficial de TMDB (`https://image.tmdb.org/t/p/w185...`) en el servicio de sincronización (`tmdb_sync_service.py`).
   - Nuevo job asíncrono CLI `backend/app/jobs/populate_actor_photos.py` para consultar y enriquecer en lotes las fotos de los actores del catálogo local.
-  - Sección visual **"Top Cast / Reparto Principal"** en `TitleDetailPage` con avatares circulares de actores, fotos oficiales, nombres y personajes.
+  - Sección visual **"Top Cast / Reparto Principal"** en `TitleDetailPage` con avatares circulares de actores, fotos oficiales, nombres, personajes y enlaces de filtrado por actor hacia el catálogo. Eliminación de la sección duplicada anterior de texto plano.
+- **Localización Completa del Catálogo y Navegación "Explore / Explorar":**
+  - Internacionalización reactiva de `CatalogPage` (`t()` y `translateGenreName()`): títulos, buscador, filtros por tipo, géneros dinámicos, secciones temáticas, opciones de ordenamiento, estado vacío y paginador.
+  - Renombrado del botón y enlaces de navegación en cabecera desktop, móvil y páginas secundarias de "Catalog / Catálogo" a **"Explore / Explorar"**.
+  - Localización de títulos de secciones secundarias en `TitleDetailPage` (Sinopsis, Temporadas y Episodios, botones de temporada, reseñas y alertas de éxito).
+- **Supresión de Tooltips Nativos Blancos de Windows/Navegador:**
+  - Sustitución de atributos `title="..."` por `aria-label="..."` en elementos con tooltips personalizados (`TitleCard`, Top 5 de `ProfilePage`, tarjetas de póster y cuadrícula de actores), evitando la superposición del tooltip rectangular blanco del sistema operativo.
   - Actualización del modelo UML de datos (`docs/UML/modelo_datos/uml_version_minima.mmd` y `uml_version_superior.mmd`).
 - **Corrección de Layout y Animaciones en Gráfico Donut de Géneros (`DonutGenreChart`):**
   - Rediseño de la leyenda a una columna vertical limpia con truncado inteligente (`truncate`), evitando que los nombres compuestos en español colisionen o se superpongan con los conteos y porcentajes.

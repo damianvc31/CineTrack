@@ -3,6 +3,7 @@ import { useSearchParams, useOutletContext } from 'react-router-dom'
 import { Filter, Search, ChevronLeft, ChevronRight, Film, Tv, Sparkles, AlertCircle, X } from 'lucide-react'
 import { catalogService, type TitlesResponse } from '@/services/catalogService'
 import { TitleCard } from '@/components/common/TitleCard'
+import { useLanguage } from '@/context/LanguageContext'
 
 interface OutletContextType {
   openAuth: (mode?: 'login' | 'register') => void
@@ -10,6 +11,7 @@ interface OutletContextType {
 
 export const CatalogPage: React.FC = () => {
   const { openAuth } = useOutletContext<OutletContextType>()
+  const { t, translateGenreName } = useLanguage()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [data, setData] = useState<TitlesResponse | null>(null)
@@ -109,18 +111,18 @@ export const CatalogPage: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2.5">
             {tipo === 'movie' ? (
               <>
-                <Film className="w-7 h-7 text-amber-400" /> Movies
+                <Film className="w-7 h-7 text-amber-400" /> {t('movies')}
               </>
             ) : tipo === 'tv' ? (
               <>
-                <Tv className="w-7 h-7 text-amber-400" /> TV Series
+                <Tv className="w-7 h-7 text-amber-400" /> {t('series')}
               </>
             ) : (
-              <>Explore Catalog</>
+              <>{t('exploreCatalogHeading')}</>
             )}
           </h1>
           <p className="text-xs text-gray-400 mt-1">
-            {data ? `${data.total.toLocaleString()} titles found` : 'Filter and discover'}
+            {data ? `${data.total.toLocaleString()} ${t('titlesFound')}` : t('filterAndDiscover')}
           </p>
         </div>
 
@@ -131,7 +133,7 @@ export const CatalogPage: React.FC = () => {
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search titles, actors..."
+            placeholder={t('searchCatalogPlaceholder')}
             className="w-full pl-9 pr-9 py-2 text-sm bg-[#141414] border border-[#262626] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
           />
           {searchInput && (
@@ -142,7 +144,7 @@ export const CatalogPage: React.FC = () => {
                 updateParam('q', undefined)
               }}
               className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-white rounded-full transition-colors"
-              title="Clear search"
+              title={t('clearSearch')}
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -154,7 +156,7 @@ export const CatalogPage: React.FC = () => {
       <div className="flex flex-wrap items-center gap-3 mb-8 p-4 rounded-xl bg-[#141414] border border-[#262626]">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 mr-2">
           <Filter className="w-4 h-4 text-amber-400" />
-          <span>Filters:</span>
+          <span>{t('filtersLabel')}</span>
         </div>
 
         {/* Type Filter */}
@@ -163,9 +165,9 @@ export const CatalogPage: React.FC = () => {
           onChange={(e) => updateParam('tipo', e.target.value || undefined)}
           className="px-3 py-1.5 rounded-lg bg-[#0d0d0d] border border-[#262626] text-xs text-gray-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
         >
-          <option value="">All types</option>
-          <option value="movie">Movies</option>
-          <option value="tv">Series</option>
+          <option value="">{t('allTypes')}</option>
+          <option value="movie">{t('movies')}</option>
+          <option value="tv">{t('series')}</option>
         </select>
 
         {/* Genre Filter */}
@@ -174,10 +176,10 @@ export const CatalogPage: React.FC = () => {
           onChange={(e) => updateParam('genero', e.target.value || undefined)}
           className="px-3 py-1.5 rounded-lg bg-[#0d0d0d] border border-[#262626] text-xs text-gray-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 max-w-[150px] transition-colors"
         >
-          <option value="">All genres</option>
+          <option value="">{t('allGenres')}</option>
           {genres.map((g) => (
             <option key={g} value={g}>
-              {g}
+              {translateGenreName(g)}
             </option>
           ))}
         </select>
@@ -188,12 +190,12 @@ export const CatalogPage: React.FC = () => {
           onChange={(e) => updateParam('section', e.target.value || undefined)}
           className="px-3 py-1.5 rounded-lg bg-[#0d0d0d] border border-[#262626] text-xs text-gray-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
         >
-          <option value="">All sections</option>
-          <option value="trending">🔥 Trending Now</option>
-          <option value="new_releases">🕒 New Releases</option>
-          <option value="classics">💎 Classics</option>
-          <option value="top_rated">⭐ Top Rated</option>
-          <option value="others">More Discoveries</option>
+          <option value="">{t('allSections')}</option>
+          <option value="trending">{t('sectionTrending')}</option>
+          <option value="new_releases">{t('sectionNewReleases')}</option>
+          <option value="classics">{t('sectionClassics')}</option>
+          <option value="top_rated">{t('sectionTopRated')}</option>
+          <option value="others">{t('sectionOthers')}</option>
         </select>
 
         {/* Sorting */}
@@ -203,10 +205,10 @@ export const CatalogPage: React.FC = () => {
             onChange={(e) => updateParam('sort_by', e.target.value)}
             className="px-3 py-1.5 rounded-lg bg-[#0d0d0d] border border-[#262626] text-xs text-gray-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
           >
-            <option value="popularity">Popularity</option>
-            <option value="rating">Rating</option>
-            <option value="release_date">Release Date</option>
-            <option value="title">Title (A-Z)</option>
+            <option value="popularity">{t('sortPopularity')}</option>
+            <option value="rating">{t('sortRating')}</option>
+            <option value="release_date">{t('sortReleaseDate')}</option>
+            <option value="title">{t('sortTitle')}</option>
           </select>
 
           <button
@@ -223,7 +225,7 @@ export const CatalogPage: React.FC = () => {
       {loading ? (
         <div className="flex flex-col items-center justify-center min-h-[40vh] gap-3">
           <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-          <p className="text-xs text-gray-400">Loading results...</p>
+          <p className="text-xs text-gray-400">{t('loadingResults')}</p>
         </div>
       ) : error ? (
         <div className="p-8 text-center bg-[#141414] rounded-2xl border border-[#262626]">
@@ -233,9 +235,9 @@ export const CatalogPage: React.FC = () => {
       ) : !data || data.items.length === 0 ? (
         <div className="p-16 text-center bg-[#141414] rounded-2xl border border-[#262626]">
           <Sparkles className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-white mb-1">No titles found</h3>
+          <h3 className="text-base font-bold text-white mb-1">{t('noTitlesFound')}</h3>
           <p className="text-xs text-gray-400 max-w-sm mx-auto mb-4">
-            No titles match the selected filters. Try resetting filters or searching with another term.
+            {t('noTitlesFilterDesc')}
           </p>
           <button
             onClick={() => {
@@ -244,7 +246,7 @@ export const CatalogPage: React.FC = () => {
             }}
             className="px-4 py-2 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-400 text-black shadow-md transition-colors"
           >
-            Clear filters
+            {t('clearFilters')}
           </button>
         </div>
       ) : (
@@ -266,11 +268,11 @@ export const CatalogPage: React.FC = () => {
                 disabled={page <= 1}
                 className="flex items-center gap-1 px-3.5 py-2 rounded-lg bg-[#141414] border border-[#262626] text-xs font-medium text-gray-300 hover:bg-[#202020] hover:text-white hover:border-amber-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                <ChevronLeft className="w-4 h-4" /> Previous
+                <ChevronLeft className="w-4 h-4" /> {t('previous')}
               </button>
 
               <span className="text-xs text-gray-400 font-medium">
-                Page <strong className="text-white">{page}</strong> of{' '}
+                {t('pageLabel')} <strong className="text-white">{page}</strong> {t('ofLabel')}{' '}
                 {Math.ceil(data.total / data.page_size)}
               </span>
 
@@ -279,7 +281,7 @@ export const CatalogPage: React.FC = () => {
                 disabled={page >= Math.ceil(data.total / data.page_size)}
                 className="flex items-center gap-1 px-3.5 py-2 rounded-lg bg-[#141414] border border-[#262626] text-xs font-medium text-gray-300 hover:bg-[#202020] hover:text-white hover:border-amber-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                Next <ChevronRight className="w-4 h-4" />
+                {t('next')} <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           )}
