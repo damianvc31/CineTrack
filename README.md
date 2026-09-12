@@ -100,7 +100,11 @@ CineTrack no divide de forma confusa el puntaje entre "TMDB" y "CineTrack", sino
 $$\text{Rating} = \frac{(\text{vote\_average\_tmdb} \times \text{vote\_count\_tmdb}) + \sum_{i=1}^{N} \text{puntaje\_usuario}_i}{\text{vote\_count\_tmdb} + N}$$
 
 - **Reseñas de TMDB:** Se sincronizan hasta un tope configurable (`TMDB_REVIEWS_PER_TITLE_LIMIT = 20`) exclusivamente para dar contexto enriquecido y opiniones al catálogo inicial. No alteran el cálculo ponderado porque los votos de TMDB ya están reflejados en `vote_average_tmdb`.
-- **Reseñas de CineTrack:** No tienen límite por título y cada reseña con puntaje emitida por un usuario registrado impacta dinámicamente en el rating consolidado.
+- **Reseñas de CineTrack:** 
+  - **1 reseña por usuario por título:** Se gestiona mediante edición (lápiz) o eliminación (tacho de basura) en lugar de crear duplicados.
+  - **Saltos de 0.5 (0.0 a 10.0):** Restricción exclusiva para calificaciones emitidas en CineTrack (`0.0, 0.5, 1.0, ..., 10.0`). Los puntajes de TMDB se preservan intactos.
+  - **Puntaje opcional:** Si el usuario no marca la opción de calificar, la reseña se guarda como texto de opinión y no impacta ni desvirtúa la media ponderada del `rating_unificado`.
+  - **Pantalla `/reviews`:** Interfaz dedicada con pestañas "My Reviews" (gestión de reseñas propias) y "Pending Reviews" (títulos vistos sin reseñar con redactor rápido in-place).
 
 #### Endpoints Administrativos (API HTTP)
 Todos los jobs de sincronización pueden dispararse también vía HTTP (`HTTP 202 Accepted` con ejecución asíncrona mediante `BackgroundTasks`):
@@ -108,35 +112,38 @@ Todos los jobs de sincronización pueden dispararse también vía HTTP (`HTTP 20
 - `POST /api/v1/admin/sync/initial`: Ingesta inicial (`priority`, `movies_target`, `series_target`).
 - `POST /api/v1/admin/sync/daily`: Sync diaria (`hours_window`).
 - `POST /api/v1/admin/sync/percentiles`: Recálculo de percentiles y rating unificado.
-- `POST /api/v1/admin/sync/reviews`: Sincronización de reseñas TMDB (`limit_per_title`).
-- `POST /api/v1/admin/sync/import-tmdb`: Importar título por TMDB ID (`tmdb_id`, `type`).
-- `POST /api/v1/admin/sync/import-json`: Carga masiva desde lista JSON según plantillas.
-- `DELETE /api/v1/admin/catalog?confirm=true`: Vaciado total del catálogo y entidades dependientes (preserva usuarios y géneros).
+- `POST /api/v1/admin/sync/reviews`: Sincronización de reseñas de TMDB.
+- `POST /api/v1/admin/sync/import-tmdb`: Importación puntual de título por ID TMDB.
+- `POST /api/v1/admin/sync/import-json`: Ingesta por archivo JSON.
+- `DELETE /api/v1/admin/catalog`: Vaciado total de catálogo (preservando usuarios).
 
 *Autenticación requerida:* Enviar cabecera `Authorization: Bearer <token_admin>` (usuario con `es_admin=True`) o cabecera `X-Admin-Key: <ADMIN_API_KEY>`.
 
 #### Endpoints Principales de la Aplicación (API HTTP)
-- **Autenticación:**
+- **Autenticación (JWT):**
   - `POST /api/v1/auth/register`: Registro de usuario.
   - `POST /api/v1/auth/login`: Login y obtención de JWT Bearer Token.
   - `GET /api/v1/auth/me`: Perfil del usuario autenticado.
 - **Catálogo y Exploración:**
-  - `GET /api/v1/home`: Secciones curadas (New Releases, Trending, Classics, Top Rated, By Genre, Others) con exclusión automática de títulos vistos para usuarios logueados. Soporta filtro `?tipo=movie|tv`.
-  - `GET /api/v1/titles`: Listado paginado con filtros (`tipo`, `genero_id`, `q`, `sort_by`: popularity, rating, newest, classics).
+  - `GET /api/v1/home`: Secciones curadas (New Releases, Trending, Classics, Top Rated, By Genre, Others). Soporta filtro `?tipo=movie|tv`.
+  - `GET /api/v1/titles`: Listado paginado con filtros (`section`, `tipo`, `genero`, `actor`, `q`, `sort_by`, `order`).
   - `GET /api/v1/titles/{id}`: Detalle completo de película o serie (elenco jerarquizado, temporadas y episodios con estado `visto`).
   - `GET /api/v1/genres`: Listado maestro de géneros.
 - **Reseñas de Usuarios:**
-  - `GET /api/v1/titles/{id}/reviews`: Reseñas paginadas del título (TMDB y usuarios locales).
-  - `POST /api/v1/titles/{id}/reviews`: Publicar/editar reseña propia con puntaje (recalcula automáticamente el `rating_unificado`).
+  - `GET /api/v1/titles/{id}/reviews`: Reseñas públicas del título (TMDB con badge y comunidad local).
+  - `POST /api/v1/titles/{id}/reviews`: Publicar/editar reseña propia con o sin puntaje (recalcula automáticamente `rating_unificado`).
+  - `DELETE /api/v1/titles/{id}/reviews`: Eliminar reseña propia y recalcular `rating_unificado`.
+  - `GET /api/v1/users/me/reviews`: Listado paginado de todas las reseñas del usuario.
+  - `GET /api/v1/users/me/unreviewed-watched`: Títulos marcados como vistos que aún no tienen reseña del usuario.
 - **Biblioteca y Seguimiento (Estados de Título):**
   - `POST /api/v1/titles/{id}/favorite`: Marcar / desmarcar favorito.
   - `POST /api/v1/titles/{id}/watchlist`: Agregar / quitar de watchlist.
   - `POST /api/v1/titles/{id}/watched`: Marcar película como vista (o desmarcar).
-  - `POST /api/v1/titles/{id}/seasons/{season}/episodes/{episode}/watch`: Marcar / desmarcar episodio visto (transición a `siguiendo` o `vista`).
+  - `POST /api/v1/titles/{id}/seasons/{season}/episodes/{episode}/watch`: Marcar / desmarcar episodio visto.
   - `POST /api/v1/titles/{id}/seasons/{season}/watch`: Marcar / desmarcar temporada completa en lote.
 - **Perfil y Métricas del Usuario:**
   - `GET /api/v1/users/me/library`: Biblioteca del usuario dividida en `following`, `favorites`, `watchlist` y `recently_watched`.
-  - `GET /api/v1/users/me/stats`: Estadísticas de tiempo invertido (horas en cine vs TV), conteos y Top 5 (popularidad, rating comunitario y calificaciones propias).
+  - `GET /api/v1/users/me/stats`: Estadísticas de tiempo invertido (horas en cine vs TV), conteos y Top 5.
 
 
 #### Tareas Programadas en Producción (Cron)
@@ -165,15 +172,16 @@ npm run build
 ```
 
 #### Variables de Entorno del Frontend
-En `frontend/.env` (o `.env.local`):
+Vite está configurado para leer directamente las variables desde el archivo `.env` en la raíz del repositorio (`envDir: '../'`), evitando duplicar archivos de configuración:
 ```env
 VITE_API_URL=http://localhost:8000/api/v1
 ```
 
 #### Pantallas Principales de la Aplicación
-- `/`: **Home** con Hero banner, botón de recomendador IA y carruseles con snap-scroll para móvil y desktop.
+- `/`: **Home** con Hero banner, recomendador IA en columna izquierda y carruseles con snap-scroll.
 - `/catalog`: **Catálogo completo** con filtros multidimensionales (sección, género, actor, tipo, ordenamiento y paginación).
-- `/titles/:id`: **Ficha de Título** con backdrop, sinopsis, reparto con fotos, seguimiento de temporadas/episodios y reseñas.
+- `/titles/:id`: **Ficha de Título** con backdrop, sinopsis, reparto con fotos, seguimiento de temporadas/episodios y motor de reseñas (edición/eliminación in-place, puntaje 0.5 opcional).
+- `/reviews`: **Reseñas y Opiniones** con pestañas "My Reviews" (gestión centralizada) y "Pending Reviews" (títulos vistos sin reseñar).
 - `/library`: **Mi Biblioteca** con pestañas de Favoritos, Watchlist, Siguiendo y Vistas.
 - `/profile`: **Perfil de Usuario** con desglose de estadísticas de tiempo invertido (horas/días) y colecciones.
 - `/recommendations`: **Recomendador Inteligente** por estado de ánimo y preferencias guiadas (previsualización Fase 6).

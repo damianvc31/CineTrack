@@ -31,7 +31,10 @@ from app.schemas.catalog import (
     TitleDetailResponse,
     TitleListResponse,
     TopTitleStat,
+    UnreviewedWatchedResponse,
     UserLibraryResponse,
+    UserReviewItemResponse,
+    UserReviewsListResponse,
     UserStatsResponse,
 )
 
@@ -724,6 +727,102 @@ async def create_user_review(
         texto=r_full.texto,
         fecha=r_full.fecha
     )
+
+
+async def delete_user_review(
+    db: AsyncSession,
+    titulo_id: int,
+    usuario_id: int
+) -> bool:
+    """Elimina la reseña propia del usuario para el título especificado y recalcula ratings."""
+    res = await db.execute(
+        select(Resena).where(Resena.titulo_id == titulo_id, Resena.usuario_id == usuario_id)
+    )
+    review = res.scalar_one_or_none()
+    if not review:
+        return False
+
+    await db.delete(review)
+    await db.commit()
+
+    # Recalcular el rating unificado del título
+    from app.services.tmdb_sync_service import TMDBSyncService
+    sync_svc = TMDBSyncService(db)
+    await sync_svc.recalculate_unified_ratings(titulo_id=titulo_id)
+
+    return True
+
+
+async def get_user_reviews(
+    db: AsyncSession,
+    usuario_id: int,
+    page: int = 1,
+    page_size: int = 20
+) -> UserReviewsListResponse:
+    """Retorna las reseñas escritas por el usuario autenticado con datos del título."""
+    count_q = select(func.count(Resena.id)).where(Resena.usuario_id == usuario_id)
+    total_res = await db.execute(count_q)
+    total = total_res.scalar() or 0
+
+    q = (
+        select(Resena, Titulo)
+        .join(Titulo, Titulo.id == Resena.titulo_id)
+        .where(Resena.usuario_id == usuario_id)
+        .order_by(desc(Resena.fecha))
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    res = await db.execute(q)
+    rows = res.all()
+
+    items = [
+        UserReviewItemResponse(
+            id=r.id,
+            titulo_id=r.titulo_id,
+            titulo_nombre=t.nombre,
+            titulo_tipo=t.tipo,
+            titulo_portada_url=t.portada_url,
+            titulo_fecha_estreno=t.fecha_estreno,
+            puntaje=r.puntaje,
+            texto=r.texto,
+            fecha=r.fecha
+        )
+        for r, t in rows
+    ]
+
+    return UserReviewsListResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size
+    )
+
+
+async def get_user_unreviewed_watched_titles(
+    db: AsyncSession,
+    usuario_id: int,
+    limit: int = 50
+) -> UnreviewedWatchedResponse:
+    """Retorna títulos marcados como 'vista' por el usuario que aún no tienen reseña suya."""
+    reviewed_ids_subq = select(Resena.titulo_id).where(Resena.usuario_id == usuario_id)
+
+    q = (
+        select(Titulo, EstadoUsuarioTitulo)
+        .join(EstadoUsuarioTitulo, EstadoUsuarioTitulo.titulo_id == Titulo.id)
+        .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
+        .where(
+            EstadoUsuarioTitulo.usuario_id == usuario_id,
+            EstadoUsuarioTitulo.estado == "vista",
+            ~Titulo.id.in_(reviewed_ids_subq)
+        )
+        .order_by(desc(EstadoUsuarioTitulo.fecha_estado))
+        .limit(limit)
+    )
+    res = await db.execute(q)
+    rows = res.all()
+
+    items = [_build_title_card(t, st) for t, st in rows]
+    return UnreviewedWatchedResponse(items=items, total=len(items))
 
 
 # -----------------------------------------------------------------------------

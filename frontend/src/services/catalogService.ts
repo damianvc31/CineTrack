@@ -1,5 +1,14 @@
 import { api } from './api'
-import type { HomeSections, TitleCard, TitleDetail, ReviewItem, UserLibrary, UserStats } from '@/types/catalog'
+import type {
+  HomeSections,
+  TitleCard,
+  TitleDetail,
+  ReviewItem,
+  UserLibrary,
+  UserStats,
+  UserReviewsListResponse,
+  UnreviewedWatchedResponse,
+} from '@/types/catalog'
 
 export interface TitleFilters {
   section?: 'new_releases' | 'trending' | 'classics' | 'top_rated' | 'others'
@@ -33,11 +42,14 @@ export const catalogService = {
 
   getGenres: () => api.get<Array<{ id: number; nombre: string }>>('/genres'),
 
-  getReviews: (titleId: number, page: number = 1) =>
-    api.get<{ items: ReviewItem[]; total: number }>(`/titles/${titleId}/reviews`, { page }),
+  getReviews: (titleId: number, page: number = 1, pageSize: number = 20) =>
+    api.get<ReviewItem[]>(`/titles/${titleId}/reviews`, { page, page_size: pageSize }),
 
-  addReview: (titleId: number, texto: string, puntaje?: number) =>
+  addReview: (titleId: number, texto: string, puntaje?: number | null) =>
     api.post<ReviewItem>(`/titles/${titleId}/reviews`, { texto, puntaje }),
+
+  deleteReview: (titleId: number) =>
+    api.delete<{ message: string }>(`/titles/${titleId}/reviews`),
 
   toggleFavorite: (titleId: number) =>
     api.post<{ favorito: boolean; timestamp: string }>(`/titles/${titleId}/favorite`),
@@ -79,4 +91,11 @@ export const catalogService = {
   getLibrary: () => api.get<UserLibrary>('/users/me/library'),
 
   getStats: () => api.get<UserStats>('/users/me/stats'),
+
+  getUserReviews: (page: number = 1, pageSize: number = 20) =>
+    api.get<UserReviewsListResponse>('/users/me/reviews', { page, page_size: pageSize }),
+
+  getUnreviewedWatched: (limit: number = 50) =>
+    api.get<UnreviewedWatchedResponse>('/users/me/unreviewed-watched', { limit }),
 }
+

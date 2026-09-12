@@ -18,6 +18,10 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Pencil,
+  Trash2,
+  Minus,
+  Plus,
 } from 'lucide-react'
 import { catalogService } from '@/services/catalogService'
 import type { TitleDetail, ReviewItem, SeasonItem } from '@/types/catalog'
@@ -44,12 +48,20 @@ export const TitleDetailPage: React.FC = () => {
   const [isFavorite, setIsFavorite] = useState(false)
   const [userEstado, setUserEstado] = useState<string | null>(null)
   const [selectedSeason, setSelectedSeason] = useState<number>(1)
-  const [newReviewText, setNewReviewText] = useState('')
-  const [newReviewRating, setNewReviewRating] = useState<number>(8)
-  const [submittingReview, setSubmittingReview] = useState(false)
-  const [reviewSuccess, setReviewSuccess] = useState(false)
   const [seasonWatchLoading, setSeasonWatchLoading] = useState(false)
   const [episodeNotice, setEpisodeNotice] = useState<string | null>(null)
+
+  // Estado de Reseñas
+  const [reviewText, setReviewText] = useState('')
+  const [reviewScore, setReviewScore] = useState<number>(8.0)
+  const [includeScore, setIncludeScore] = useState<boolean>(true)
+  const [isEditingReview, setIsEditingReview] = useState(false)
+  const [submittingReview, setSubmittingReview] = useState(false)
+  const [deletingReview, setDeletingReview] = useState(false)
+  const [reviewSuccess, setReviewSuccess] = useState(false)
+  const [reviewPage, setReviewPage] = useState(1)
+  const [hasMoreReviews, setHasMoreReviews] = useState(false)
+  const [loadingMoreReviews, setLoadingMoreReviews] = useState(false)
 
   const titleId = parseInt(id || '0', 10)
 
@@ -60,12 +72,15 @@ export const TitleDetailPage: React.FC = () => {
     try {
       const [titleRes, reviewsRes] = await Promise.all([
         catalogService.getTitleDetail(titleId),
-        catalogService.getReviews(titleId).catch(() => ({ items: [], total: 0 })),
+        catalogService.getReviews(titleId, 1, 20).catch(() => [] as ReviewItem[]),
       ])
       setTitle(titleRes)
       setIsFavorite(titleRes.user_favorito ?? false)
       setUserEstado(titleRes.user_estado ?? null)
-      setReviews(reviewsRes.items || [])
+      const list = Array.isArray(reviewsRes) ? reviewsRes : (reviewsRes as any).items || []
+      setReviews(list)
+      setReviewPage(1)
+      setHasMoreReviews(list.length >= 20)
 
       if (titleRes.tipo === 'tv' && titleRes.temporadas && titleRes.temporadas.length > 0) {
         setSelectedSeason((prev) => {
@@ -192,25 +207,101 @@ export const TitleDetailPage: React.FC = () => {
     }
   }
 
+  const handleStartEdit = (rev: ReviewItem) => {
+    setIsEditingReview(true)
+    setReviewText(rev.texto)
+    if (rev.puntaje !== null && rev.puntaje !== undefined) {
+      setIncludeScore(true)
+      setReviewScore(rev.puntaje)
+    } else {
+      setIncludeScore(false)
+      setReviewScore(8.0)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditingReview(false)
+    setReviewText('')
+    setReviewScore(8.0)
+    setIncludeScore(true)
+  }
+
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) {
       openAuth()
       return
     }
-    if (!newReviewText.trim()) return
+    if (!reviewText.trim()) return
 
     setSubmittingReview(true)
     try {
-      const created = await catalogService.addReview(titleId, newReviewText.trim(), newReviewRating)
-      setReviews([created, ...reviews])
-      setNewReviewText('')
+      const finalScore = includeScore ? Math.round(reviewScore * 2) / 2 : null
+      const saved = await catalogService.addReview(titleId, reviewText.trim(), finalScore)
+      setReviews((prev) => {
+        const idx = prev.findIndex((r) => r.usuario_id === user.id)
+        if (idx >= 0) {
+          const updated = [...prev]
+          updated[idx] = saved
+          return updated
+        }
+        return [saved, ...prev]
+      })
+      setIsEditingReview(false)
+      setReviewText('')
       setReviewSuccess(true)
       setTimeout(() => setReviewSuccess(false), 4000)
+
+      // Actualizar información del título para reflejar rating_unificado recalculado
+      const updatedTitle = await catalogService.getTitleDetail(titleId)
+      setTitle(updatedTitle)
     } catch (err) {
-      console.error('Error enviando reseña:', err)
+      console.error('Error guardando reseña:', err)
     } finally {
       setSubmittingReview(false)
+    }
+  }
+
+  const handleDeleteReview = async () => {
+    if (!user) return
+    if (!window.confirm('Are you sure you want to delete your review? / ¿Estás seguro de que deseas eliminar tu reseña?')) {
+      return
+    }
+    setDeletingReview(true)
+    try {
+      await catalogService.deleteReview(titleId)
+      setReviews((prev) => prev.filter((r) => r.usuario_id !== user.id))
+      setIsEditingReview(false)
+      setReviewText('')
+
+      // Actualizar información del título para reflejar rating_unificado recalculado
+      const updatedTitle = await catalogService.getTitleDetail(titleId)
+      setTitle(updatedTitle)
+    } catch (err) {
+      console.error('Error eliminando reseña:', err)
+    } finally {
+      setDeletingReview(false)
+    }
+  }
+
+  const handleLoadMoreReviews = async () => {
+    if (loadingMoreReviews || !hasMoreReviews) return
+    setLoadingMoreReviews(true)
+    try {
+      const nextPage = reviewPage + 1
+      const more = await catalogService.getReviews(titleId, nextPage, 20)
+      const moreList = Array.isArray(more) ? more : (more as any).items || []
+      if (moreList.length > 0) {
+        setReviews((prev) => [...prev, ...moreList])
+        setReviewPage(nextPage)
+        setHasMoreReviews(moreList.length >= 20)
+      } else {
+        setHasMoreReviews(false)
+      }
+    } catch (err) {
+      console.error('Error cargando más reseñas:', err)
+    } finally {
+      setLoadingMoreReviews(false)
     }
   }
 
@@ -749,67 +840,187 @@ export const TitleDetailPage: React.FC = () => {
             <span className="text-xs text-gray-400">{reviews.length} reviews</span>
           </div>
 
-          {/* Formulario de nueva reseña */}
+          {reviewSuccess && (
+            <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-800/80 text-xs text-emerald-300">
+              Your review was published successfully and unified rating has been updated!
+            </div>
+          )}
+
+          {/* Gestión de reseña propia del usuario logueado */}
           {user ? (
-            <form
-              onSubmit={handleReviewSubmit}
-              className="p-5 rounded-2xl bg-[#141414] border border-[#262626] space-y-4"
-            >
-              <h3 className="text-xs font-semibold text-gray-200 uppercase tracking-wider">
-                Leave your review
-              </h3>
+            (() => {
+              const userReview = reviews.find((r) => r.usuario_id === user.id)
 
-              {reviewSuccess && (
-                <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-800/80 text-xs text-emerald-300">
-                  Your review was published successfully and unified rating has been updated!
-                </div>
-              )}
+              if (userReview && !isEditingReview) {
+                return (
+                  <div className="p-5 rounded-2xl bg-[#171717] border-2 border-amber-500/40 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-xs font-bold text-amber-300">
+                          {user.nombre_usuario.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-xs font-bold text-white">@{user.nombre_usuario}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 font-semibold">
+                          Your Review
+                        </span>
+                      </div>
 
-              <div className="flex items-center gap-3">
-                <label className="text-xs text-gray-400">Rating:</label>
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
-                    <button
-                      type="button"
-                      key={star}
-                      onClick={() => setNewReviewRating(star)}
-                      className="p-1 focus:outline-none"
-                    >
-                      <Star
-                        className={`w-4 h-4 ${
-                          star <= newReviewRating
-                            ? 'fill-amber-400 text-amber-400'
-                            : 'text-gray-600'
-                        }`}
-                      />
-                    </button>
-                  ))}
-                  <span className="text-xs font-bold text-amber-400 ml-2">
-                    {newReviewRating}/10
-                  </span>
-                </div>
-              </div>
+                      <div className="flex items-center gap-2">
+                        {userReview.puntaje !== null && userReview.puntaje !== undefined ? (
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0d0d0d] border border-[#262626] text-amber-400 text-xs font-bold">
+                            <Star className="w-3.5 h-3.5 fill-current" />
+                            <span>{userReview.puntaje.toFixed(1)}/10</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">No score rating</span>
+                        )}
 
-              <textarea
-                required
-                rows={3}
-                value={newReviewText}
-                onChange={(e) => setNewReviewText(e.target.value)}
-                placeholder="What did you think of this title? Share your thoughts without spoilers..."
-                className="w-full p-3 text-sm bg-[#0d0d0d] border border-[#262626] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-              />
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(userReview)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#222222] hover:bg-[#2c2c2c] text-gray-200 hover:text-white border border-[#333333] text-xs font-semibold transition-colors"
+                          title="Edit your review"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Edit</span>
+                        </button>
 
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={submittingReview}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
+                        <button
+                          type="button"
+                          onClick={handleDeleteReview}
+                          disabled={deletingReview}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-red-950/30 hover:bg-red-900/50 text-red-300 hover:text-red-200 border border-red-800/40 text-xs font-semibold transition-colors disabled:opacity-50"
+                          title="Delete review"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>{deletingReview ? 'Deleting...' : 'Delete'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-gray-200 leading-relaxed whitespace-pre-line">
+                      {userReview.texto}
+                    </p>
+
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 border-t border-[#262626]">
+                      <span>
+                        {userReview.fecha
+                          ? `Last updated: ${new Date(userReview.fecha).toLocaleDateString()}`
+                          : ''}
+                      </span>
+                    </div>
+                  </div>
+                )
+              }
+
+              // Formulario de edición o creación
+              return (
+                <form
+                  onSubmit={handleReviewSubmit}
+                  className="p-5 rounded-2xl bg-[#141414] border border-[#262626] space-y-4"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  {submittingReview ? 'Publishing...' : 'Post Review'}
-                </button>
-              </div>
-            </form>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold text-gray-200 uppercase tracking-wider">
+                      {isEditingReview ? 'Edit your review' : 'Leave your review'}
+                    </h3>
+                    {isEditingReview && (
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="text-xs text-gray-400 hover:text-white underline"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Toggle para dejar puntaje o no */}
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-300 select-none">
+                      <input
+                        type="checkbox"
+                        checked={includeScore}
+                        onChange={(e) => setIncludeScore(e.target.checked)}
+                        className="w-4 h-4 rounded border-[#333333] bg-[#0d0d0d] text-amber-500 focus:ring-amber-500"
+                      />
+                      <span className="font-medium">Include rating / Calificar con puntaje</span>
+                    </label>
+
+                    {includeScore && (
+                      <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-[#0d0d0d] border border-[#262626]">
+                        <div className="flex items-center gap-1.5">
+                          <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                          <span className="text-sm font-bold text-amber-400 w-12 text-center">
+                            {reviewScore.toFixed(1)}
+                          </span>
+                          <span className="text-[11px] text-gray-500">/ 10</span>
+                        </div>
+
+                        {/* Botones de incremento / decremento de 0.5 */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setReviewScore((prev) => Math.max(0, Math.round((prev - 0.5) * 2) / 2))}
+                            className="p-1.5 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] text-gray-300 hover:text-white border border-[#333333] transition-colors"
+                            title="-0.5"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReviewScore((prev) => Math.min(10, Math.round((prev + 0.5) * 2) / 2))}
+                            className="p-1.5 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] text-gray-300 hover:text-white border border-[#333333] transition-colors"
+                            title="+0.5"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Slider continuo con salto de 0.5 */}
+                        <input
+                          type="range"
+                          min="0"
+                          max="10"
+                          step="0.5"
+                          value={reviewScore}
+                          onChange={(e) => setReviewScore(parseFloat(e.target.value))}
+                          className="flex-1 min-w-[140px] accent-amber-500 cursor-pointer h-1.5 bg-[#262626] rounded-lg"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <textarea
+                    required
+                    rows={3}
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    placeholder="What did you think of this title? Share your thoughts without spoilers..."
+                    className="w-full p-3 text-sm bg-[#0d0d0d] border border-[#262626] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                  />
+
+                  <div className="flex justify-end gap-2">
+                    {isEditingReview && (
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="px-4 py-2 rounded-xl bg-[#222222] hover:bg-[#2c2c2c] text-gray-300 hover:text-white text-xs font-bold transition-all"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={submittingReview}
+                      className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {submittingReview ? 'Saving...' : isEditingReview ? 'Save Changes' : 'Post Review'}
+                    </button>
+                  </div>
+                </form>
+              )
+            })()
           ) : (
             <div className="p-6 rounded-2xl bg-[#141414] border border-[#262626] text-center space-y-2">
               <p className="text-xs text-gray-400">Sign in to rate and leave a review.</p>
@@ -822,46 +1033,81 @@ export const TitleDetailPage: React.FC = () => {
             </div>
           )}
 
-          {/* Listado de reseñas */}
+          {/* Listado de reseñas de la comunidad y TMDB */}
           <div className="space-y-4">
-            {reviews.length === 0 ? (
-              <p className="text-xs text-gray-500 italic">No reviews for this title yet. Be the first to share your thoughts!</p>
-            ) : (
-              reviews.map((rev) => (
-                <div
-                  key={rev.id}
-                  className="p-4 rounded-xl bg-[#141414] border border-[#262626] space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xs font-bold text-amber-300">
-                        {rev.nombre_usuario ? rev.nombre_usuario.charAt(0).toUpperCase() : rev.autor_tmdb ? rev.autor_tmdb.charAt(0).toUpperCase() : 'U'}
+            {(() => {
+              const otherReviews = reviews.filter((r) => !user || r.usuario_id !== user.id)
+
+              if (otherReviews.length === 0) {
+                const hasUserReview = user && reviews.some((r) => r.usuario_id === user.id)
+                return (
+                  <p className="text-xs text-gray-500 italic">
+                    {hasUserReview
+                      ? 'No other reviews for this title yet.'
+                      : 'No reviews for this title yet. Be the first to share your thoughts!'}
+                  </p>
+                )
+              }
+
+              return (
+                <>
+                  {otherReviews.map((rev) => (
+                    <div
+                      key={rev.id}
+                      className="p-4 rounded-xl bg-[#141414] border border-[#262626] space-y-2"
+                    >
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xs font-bold text-amber-300">
+                            {rev.nombre_usuario
+                              ? rev.nombre_usuario.charAt(0).toUpperCase()
+                              : rev.autor_tmdb
+                              ? rev.autor_tmdb.charAt(0).toUpperCase()
+                              : 'U'}
+                          </div>
+                          <span className="text-xs font-semibold text-gray-200">
+                            {rev.nombre_usuario || rev.autor_tmdb || 'User'}
+                          </span>
+                          {rev.autor_tmdb && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#202020] text-amber-400/90 border border-amber-500/30 font-semibold">
+                              TMDB Review
+                            </span>
+                          )}
+                        </div>
+
+                        {rev.puntaje !== null && rev.puntaje !== undefined && (
+                          <div className="flex items-center gap-1 text-amber-400 text-xs font-bold">
+                            <Star className="w-3 h-3 fill-current" />
+                            <span>{rev.puntaje}/10</span>
+                          </div>
+                        )}
                       </div>
-                      <span className="text-xs font-semibold text-gray-200">
-                        {rev.nombre_usuario || rev.autor_tmdb || 'User'}
+
+                      <p className="text-xs sm:text-sm text-gray-300 leading-relaxed whitespace-pre-line">
+                        {rev.texto}
+                      </p>
+                      <span className="text-[10px] text-gray-500 block">
+                        {rev.fecha ? new Date(rev.fecha).toLocaleDateString() : '-'}
                       </span>
-                      {rev.autor_tmdb && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#202020] text-amber-400/90 border border-amber-500/30 font-semibold">
-                          TMDB
-                        </span>
-                      )}
                     </div>
+                  ))}
 
-                    {rev.puntaje && (
-                      <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold">
-                        <Star className="w-3 h-3 fill-current" />
-                        <span>{rev.puntaje}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">{rev.texto}</p>
-                  <span className="text-[10px] text-gray-500 block">
-                    {rev.fecha ? new Date(rev.fecha).toLocaleDateString() : ''}
-                  </span>
-                </div>
-              ))
-            )}
+                  {/* Paginación / Cargar más */}
+                  {hasMoreReviews && (
+                    <div className="flex justify-center pt-2">
+                      <button
+                        type="button"
+                        onClick={handleLoadMoreReviews}
+                        disabled={loadingMoreReviews}
+                        className="px-5 py-2 rounded-xl bg-[#171717] hover:bg-[#202020] border border-[#262626] text-xs font-semibold text-gray-300 hover:text-white transition-all disabled:opacity-50"
+                      >
+                        {loadingMoreReviews ? 'Loading more reviews...' : 'Load more reviews'}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </div>
         </section>
       </div>

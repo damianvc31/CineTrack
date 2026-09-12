@@ -107,6 +107,23 @@ async def post_review(
     )
 
 
+@router.delete("/titles/{title_id}/reviews", status_code=status.HTTP_200_OK)
+async def delete_review(
+    title_id: int,
+    current_user: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Elimina la reseña propia del usuario para el título especificado y recalcula ratings."""
+    deleted = await catalog_service.delete_user_review(db, titulo_id=title_id, usuario_id=current_user.id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró una reseña del usuario para este título."
+        )
+    return {"message": "Reseña eliminada correctamente."}
+
+
+
 @router.get("/genres", response_model=list[GenreResponse])
 async def list_genres(
     db: AsyncSession = Depends(get_db)

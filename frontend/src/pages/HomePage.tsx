@@ -401,7 +401,7 @@ export const HomePage: React.FC = () => {
                 </Link>
 
                 <Link
-                  to="/profile#reviews"
+                  to="/reviews"
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-300 hover:text-white hover:bg-[#202020] transition-colors"
                 >
                   <MessageSquare className="w-4 h-4 text-amber-400" />

@@ -133,3 +133,28 @@ export interface UserStats {
     metric_value: number
   }>
 }
+
+export interface UserReviewItem {
+  id: number
+  titulo_id: number
+  titulo_nombre: string
+  titulo_tipo: string
+  titulo_portada_url?: string | null
+  titulo_fecha_estreno?: string | null
+  puntaje?: number | null
+  texto: string
+  fecha: string
+}
+
+export interface UserReviewsListResponse {
+  items: UserReviewItem[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface UnreviewedWatchedResponse {
+  items: TitleCard[]
+  total: number
+}
+

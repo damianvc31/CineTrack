@@ -2,6 +2,23 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.7.0] - 2026-09-12
+### Agregado
+- **Motor Integral de Reseñas y Calificaciones (Fase 2):**
+  - **Regla de 1 Reseña por Usuario por Título:** Si el usuario autenticado ya escribió una reseña para un título, en la pantalla de detalle (`TitleDetailPage`) se muestra su reseña destacada con botones para editar (lápiz) o eliminar (tacho de basura), impidiendo crear múltiples reseñas duplicadas.
+  - **Calificación Decimal en Saltos de 0.5 (0.0 a 10.0):** Validador Pydantic estricto en `ReviewCreate` que solo permite múltiplos de 0.5 (`0.0, 0.5, 1.0, ..., 10.0`) para calificaciones de CineTrack. Las notas nativas de TMDB se importan y muestran tal cual, sin forzarlas ni bloquearlas.
+  - **Puntaje Opcional (`puntaje = None`):** Checkbox interactivo en el formulario que permite dejar únicamente una reseña textual sin calificar. Las reseñas sin puntaje no interfieren ni alteran el promedio ponderado del `rating_unificado`.
+  - **Endpoint de Eliminación y Recálculo:** Nuevo endpoint `DELETE /api/v1/titles/{title_id}/reviews` que borra la reseña propia y recalcula atómicamente el `rating_unificado` del título.
+  - **Endpoints de Reseñas de Usuario:**
+    - `GET /api/v1/users/me/reviews`: Lista paginada con metadatos del título (nombre, póster, tipo, año) y reseña del usuario.
+    - `GET /api/v1/users/me/unreviewed-watched`: Lista de títulos marcados como vistos (`vista`) que aún no cuentan con reseña del usuario.
+  - **Pantalla Dedicada `/reviews` (`ReviewsPage`):**
+    - Pestaña *"My Reviews"*: Administración centralizada de todas las reseñas redactadas por el usuario, con soporte de edición inline, eliminación y paginación.
+    - Pestaña *"Pending Reviews"*: Catálogo de títulos vistos pendientes de reseña con redactor rápido e instantáneo in-place.
+  - **Distingo Visual de Fuentes:** Insignia oficial `TMDB Review` en bordes dorados para reseñas importadas de The Movie Database, y avatar con iniciales para opiniones de la comunidad CineTrack.
+  - **Control de Paginación Progresiva:** Botón "Load more reviews" para títulos con un alto volumen de reseñas públicas.
+  - **Pruebas Automatizadas:** 3 tests dedicados en `backend/tests/test_reviews.py` cubriendo validación de saltos de 0.5, upsert, eliminación con recálculo de rating unificado, reseñas sin puntaje y títulos pendientes de reseña (49 tests totales pasando en verde en backend, suite de frontend en Vitest pasando).
+
 ## [v0.6.0] - 2026-09-12
 ### Agregado
 - **Alineación Visual y Estructural con Wireframes de Figma AI (`home-logged.png`, `series-detail.png`):**

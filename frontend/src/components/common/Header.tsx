@@ -143,11 +143,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                           <Heart className="w-3.5 h-3.5 text-red-400" /> Favorites & Lists
                         </Link>
                         <Link
-                          to="/profile#reviews"
+                          to="/reviews"
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <MessageSquare className="w-3.5 h-3.5 text-indigo-400" /> Reviews
+                          <MessageSquare className="w-3.5 h-3.5 text-amber-400" /> Reviews
                         </Link>
                         <Link
                           to="/profile#settings"

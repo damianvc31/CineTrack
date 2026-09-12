@@ -65,6 +65,13 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
    - **Versión Mínima:** Recomendador simple sin function calling (implementado como última pieza del flujo núcleo según `spec.md`). Conexión vía API a modelo gratuito/eficiente (Google Gemini API / Groq API) con un prompt directo estructurado que combina el texto del usuario con sus preferencias de perfil (favoritos, vistos, reseñas) y puntajes de comunidad.
    - **Versión Superior:** Evolución planificada a *function calling* estructurado (herramientas de búsqueda exacta + similitud semántica con embeddings vectoriales), con la arquitectura de FastAPI ya preparada para soportar ambas modalidades.
 
+6. **Motor Integral de Reseñas y Calificación Decimal:**
+   - **Regla Estricta 1 Reseña por Usuario por Título:** Garantizada mediante validación y upsert a nivel de servicio y restricciones de unicidad.
+   - **Escala de Calificación Decimal:** Puntaje de 0.0 a 10.0 en múltiplos exactos de 0.5 (`abs(v*2 - round(v*2)) < 1e-6`) validado por Pydantic en `ReviewCreate`, aplicado exclusivamente a las reseñas locales de CineTrack. Las notas de TMDB se preservan con sus valores originales continuos.
+   - **Puntaje Opcional y Rating Unificado:** Si el usuario no asigna puntaje (`puntaje = None`), la reseña es puramente textual y se excluye de la fórmula de promedio ponderado `rating_unificado`, evitando penalizar o sesgar el catálogo.
+   - **Recálculo Atómico de Rating:** Toda inserción, actualización o eliminación (`DELETE /api/v1/titles/{id}/reviews`) dispara `recalculate_unified_ratings(titulo_id)` de forma atómica.
+   - **Endpoints de Usuario:** `/api/v1/users/me/reviews` (paginado) y `/api/v1/users/me/unreviewed-watched` (títulos vistos sin reseña).
+
 ---
 
 ## 4. Arquitectura de Frontend (React 19 + Vite 8 + Tailwind CSS v4)
@@ -73,6 +80,7 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
    - **Alineación con Wireframes Figma AI:** Distribución en 3 columnas en desktop (Asistente IA, catálogo curado central y panel personal), optimizado para mobile con carruseles de snap-scroll horizontal.
    - **Sistema de Tokens Cinemático:** Fondo carbón profundo `#0d0d0d`, superficies `#141414`, bordes sobrios `#262626` y acentos cálidos dorado/ámbar (`#f59e0b` / `#eab308`).
    - **Internacionalización y Resiliencia:** Interfaz unificada en inglés per wireframes, componente `<CountryFlag />` para banderas con fallback unicode, y renderizado de nombres completos de país e idioma original mediante el estándar ECMAScript `Intl.DisplayNames`.
+   - **Pantalla de Reseñas (`/reviews`):** Pestañas "My Reviews" (con edición y eliminación) y "Pending Reviews" (con redacción in-place para títulos vistos).
    - **PWA Ready:** Archivo `manifest.json` y meta tags de visualización `standalone` con `theme-color: #0d0d0d` para instalación nativa directa.
 
 2. **Atribución Legal Obligatoria de TMDB (Sección 3 de Términos de Uso):**
@@ -92,14 +100,14 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 ├── docs/                   # UMLs, wireframes y especificaciones visuales
 ├── backend/                # API FastAPI, modelos SQLAlchemy, servicios
 │   ├── app/
-│   │   ├── api/            # Routers (v1: auth, titles, home, admin, users)
+│   │   ├── api/            # Routers (v1: auth, titles, home, admin, users, states)
 │   │   ├── core/           # Configuración, JWT, variables de entorno
 │   │   ├── db/             # Conexión DB, sesión async, Base
 │   │   ├── models/         # Modelos de dominio ORM
 │   │   ├── schemas/        # Esquemas Pydantic v2
 │   │   ├── services/       # Lógica de catálogo, TMDB, estados
 │   │   └── main.py         # Entrypoint de FastAPI
-│   ├── tests/              # Suite de 45 pruebas Pytest
+│   ├── tests/              # Suite de 49 pruebas Pytest
 │   └── alembic/            # Migraciones de esquema
 ├── frontend/               # SPA React 19 + Vite 8 + TypeScript
 │   ├── public/             # Estáticos directos (manifest.json, favicon, logo TMDB)
@@ -107,7 +115,7 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 │   │   ├── assets/         # Branding SVG (CineTrack, TMDB) y placeholders
 │   │   ├── components/     # Header, Footer, TitleCard, CarouselRow, AuthModal
 │   │   ├── context/        # AuthContext y hook useAuth
-│   │   ├── pages/          # Home, Catalog, TitleDetail, Library, Profile, Recommendations
+│   │   ├── pages/          # Home, Catalog, TitleDetail, Library, Reviews, Profile, Recommendations
 │   │   ├── services/       # api.ts, catalogService.ts, authService.ts
 │   │   ├── types/          # Contratos TypeScript de catálogo, usuario y auth
 │   │   └── App.tsx         # Router SPA y providers

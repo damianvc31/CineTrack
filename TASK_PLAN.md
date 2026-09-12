@@ -78,11 +78,14 @@
     - [x] Header: botón `X` de limpieza en inputs de búsqueda, ocultar botón "Explore" en `/catalog`, y avatar condicional (limpio en Home logueado, activo con campana en otras páginas).
     - [x] Retirar enlaces redundantes sueltos de catálogo en Home.
     - [x] Banderita de país en cards y detalle (con nombre completo de país e idioma original en detalle, y guión '-' para datos faltantes o duración 0).
-  - [ ] **Fase 2: Motor Integral de Reseñas**
-    - [ ] Endpoints para crear (1 por usuario por título), editar, eliminar y recalcular rating unificado.
-    - [ ] Soporte de reseña sin puntaje (`puntaje = None` / `-`) y escala de 0 a 10 con saltos de 0.5.
-    - [ ] Visualización de reseñas de TMDB y locales.
-    - [ ] Pantalla dedicada `/reviews` para gestionar y redactar reseñas de títulos vistos.
+  - [x] **Fase 2: Motor Integral de Reseñas (v0.7.0)**
+    - [x] Regla estricta de 1 reseña por usuario por título: vista de reseña propia con botón de edición (lápiz) y eliminación (tacho de basura), ocultando el formulario de creación.
+    - [x] Eliminación segura vía `DELETE /api/v1/titles/{id}/reviews` y recálculo automático de `rating_unificado`.
+    - [x] Validación de calificación decimal de 0.0 a 10.0 en saltos exactos de 0.5 (aplicada exclusivamente a reseñas de CineTrack; calificaciones TMDB se preservan intactas).
+    - [x] Checkbox / toggle para reseña opcional con o sin puntaje (`puntaje = None` / `-`), sin alterar el rating unificado global.
+    - [x] Visualización completa de reseñas (comunidad local con avatares + TMDB con badge oficial `TMDB Review`), con paginación progresiva.
+    - [x] Pantalla dedicada `/reviews` con dos pestañas: "My Reviews" (gestión, edición y borrado) y "Pending Reviews" (títulos marcados como vistos pendientes de reseña con redactor rápido in-place).
+    - [x] Suite de 49 pruebas en backend (`pytest`) y tests unitarios en Vitest (100% pasando).
   - [ ] **Fase 3: Progreso de Siguiendo, Orden Cronológico, Perfil y Settings**
     - [ ] Barra segmentada por temporada en Siguiendo (episodios estrenados).
     - [ ] Orden `updated_at DESC` en listas de usuario.
