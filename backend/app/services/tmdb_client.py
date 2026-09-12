@@ -167,3 +167,8 @@ class TMDBClient:
             params["end_date"] = end_date
         return await self._request("GET", endpoint, params=params)
 
+    async def get_person(self, person_id: int) -> Dict[str, Any]:
+        """Obtiene información de una persona/actor desde TMDB, incluyendo profile_path."""
+        endpoint = f"/person/{person_id}"
+        return await self._request("GET", endpoint)
+

@@ -83,11 +83,14 @@ class TMDBSyncService:
         elenco_list = []
         for member in cast_sorted[:settings.TMDB_CAST_LIMIT]:
             if member.get("name"):
+                profile_path = member.get("profile_path")
+                foto_url = f"https://image.tmdb.org/t/p/w185{profile_path}" if profile_path else None
                 elenco_list.append({
                     "tmdb_id": member.get("id"),
                     "nombre": member["name"],
                     "personaje": member.get("character"),
-                    "orden": member.get("order", 0)
+                    "orden": member.get("order", 0),
+                    "foto_url": foto_url
                 })
 
         return director, guionista, elenco_list
@@ -115,6 +118,7 @@ class TMDBSyncService:
             tmdb_id = actor_dict.get("tmdb_id")
             personaje = actor_dict.get("personaje")
             orden = actor_dict.get("orden", 0)
+            foto_url = actor_dict.get("foto_url")
 
             # Buscar o crear actor
             if tmdb_id:
@@ -127,9 +131,12 @@ class TMDBSyncService:
                 actor = Actor(
                     nombre=nombre,
                     tmdb_id=tmdb_id,
+                    foto_url=foto_url,
                 )
                 self.db.add(actor)
                 await self.db.flush()
+            elif foto_url and not actor.foto_url:
+                actor.foto_url = foto_url
 
             # Evitar insertar dos veces el mismo par (titulo_id, actor_id)
             if actor.id in attached_actor_ids:

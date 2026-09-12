@@ -637,6 +637,7 @@ async def get_title_detail(
                 actor_id=item.actor_id,
                 tmdb_id=item.actor.tmdb_id if item.actor else None,
                 nombre=item.actor.nombre if item.actor else "Desconocido",
+                foto_url=item.actor.foto_url if item.actor else None,
                 personaje=item.personaje,
                 orden=item.orden
             )

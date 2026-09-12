@@ -1,6 +1,20 @@
-import React, { useState } from 'react'
-import { X, User as UserIcon, MapPin, FileText, Image as ImageIcon, AlertCircle } from 'lucide-react'
+import React, { useState, useRef } from 'react'
+import {
+  X,
+  User as UserIcon,
+  MapPin,
+  FileText,
+  Image as ImageIcon,
+  AlertCircle,
+  Upload,
+  ZoomIn,
+  ZoomOut,
+  Move,
+  Check,
+  RotateCcw,
+} from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useLanguage } from '@/context/LanguageContext'
 import { authService } from '@/services/authService'
 
 interface EditProfileModalProps {
@@ -15,6 +29,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   onSuccess,
 }) => {
   const { user, updateUser } = useAuth()
+  const { language } = useLanguage()
 
   const [country, setCountry] = useState(user?.pais || '')
   const [city, setCity] = useState(user?.ciudad || '')
@@ -23,7 +38,112 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Cropper / Centering interactive state
+  const [cropMode, setCropMode] = useState(false)
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null)
+  const [zoom, setZoom] = useState(1.0)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageRef = useRef<HTMLImageElement>(null)
+
   if (!isOpen || !user) return null
+
+  // Manejar selección de archivo desde la PC
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      setError(language === 'es' ? 'Por favor selecciona un archivo de imagen válido.' : 'Please select a valid image file.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setImageToCrop(reader.result as string)
+      setZoom(1.0)
+      setPan({ x: 0, y: 0 })
+      setCropMode(true)
+      setError(null)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // Mouse / Touch Dragging handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y })
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return
+    setPan({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    })
+  }
+
+  const handleMouseUp = () => {
+    setIsDragging(false)
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true)
+      setDragStart({ x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y })
+    }
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || e.touches.length !== 1) return
+    setPan({
+      x: e.touches[0].clientX - dragStart.x,
+      y: e.touches[0].clientY - dragStart.y,
+    })
+  }
+
+  // Aplicar recorte y centrado en canvas 256x256 y subir a backend
+  const handleApplyCrop = async () => {
+    if (!imageRef.current) return
+    setLoading(true)
+    setError(null)
+
+    try {
+      const img = imageRef.current
+      const canvas = document.createElement('canvas')
+      canvas.width = 256
+      canvas.height = 256
+      const ctx = canvas.getContext('2d')
+
+      if (!ctx) throw new Error('Could not initialize canvas context')
+
+      const viewportSize = 200
+      const baseScale = Math.max(viewportSize / img.naturalWidth, viewportSize / img.naturalHeight)
+      const renderW = img.naturalWidth * baseScale * zoom
+      const renderH = img.naturalHeight * baseScale * zoom
+      const renderX = viewportSize / 2 + pan.x - renderW / 2
+      const renderY = viewportSize / 2 + pan.y - renderH / 2
+
+      const ratio = 256 / viewportSize
+      ctx.drawImage(img, renderX * ratio, renderY * ratio, renderW * ratio, renderH * ratio)
+
+      const croppedDataUri = canvas.toDataURL('image/jpeg', 0.92)
+
+      // Guardar avatar vía endpoint dedicado
+      const updated = await authService.uploadAvatar(croppedDataUri)
+      updateUser(updated)
+      setAvatarUrl(updated.avatar_url || croppedDataUri)
+      setCropMode(false)
+      setImageToCrop(null)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al procesar el avatar.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,42 +197,176 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Avatar Preview & URL */}
-          <div className="flex items-center gap-4 p-3.5 rounded-xl bg-[#0d0d0d] border border-[#262626]">
-            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-amber-500/50 bg-[#1f1f1f] flex items-center justify-center shrink-0 shadow-lg">
-              {avatarUrl ? (
+        {cropMode && imageToCrop ? (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="text-center space-y-1">
+              <h4 className="text-sm font-bold text-white">
+                {language === 'es' ? 'Ajustar y Centrar Avatar' : 'Adjust & Center Avatar'}
+              </h4>
+              <p className="text-xs text-gray-400">
+                {language === 'es'
+                  ? 'Arrastra la imagen con el mouse para centrarla y usa el zoom para encuadrar tu foto.'
+                  : 'Drag the image to position and use zoom to frame your avatar perfectly.'}
+              </p>
+            </div>
+
+            {/* Viewport circular 200x200 */}
+            <div className="flex justify-center my-4">
+              <div
+                className="relative w-[200px] h-[200px] rounded-full overflow-hidden border-4 border-amber-500 shadow-2xl bg-[#0a0a0a] cursor-grab active:cursor-grabbing select-none"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleMouseUp}
+              >
                 <img
-                  src={avatarUrl}
-                  alt="Avatar preview"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    // Fallback to initial if image fails
-                    ;(e.target as HTMLElement).style.display = 'none'
+                  ref={imageRef}
+                  src={imageToCrop}
+                  alt="Crop preview"
+                  draggable={false}
+                  className="absolute max-w-none pointer-events-none transition-transform duration-75"
+                  style={{
+                    left: '50%',
+                    top: '50%',
+                    transform: `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                   }}
                 />
-              ) : (
-                <span className="text-xl font-extrabold text-amber-400">
-                  {user.nombre_usuario.charAt(0).toUpperCase()}
-                </span>
-              )}
-            </div>
-            <div className="flex-1 space-y-1">
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                Avatar Image URL
-              </label>
-              <div className="relative">
-                <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <input
-                  type="url"
-                  placeholder="https://example.com/your-photo.jpg"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-[#181818] border border-[#333333] rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60"
-                />
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center border border-white/10 rounded-full">
+                  <Move className="w-6 h-6 text-white/20" />
+                </div>
               </div>
             </div>
+
+            {/* Zoom Slider */}
+            <div className="flex items-center justify-center gap-3 px-5 py-2.5 bg-[#0d0d0d] border border-[#262626] rounded-xl max-w-xs mx-auto">
+              <ZoomOut className="w-4 h-4 text-gray-400 shrink-0" />
+              <input
+                type="range"
+                min="1.0"
+                max="3.0"
+                step="0.05"
+                value={zoom}
+                onChange={(e) => setZoom(parseFloat(e.target.value))}
+                className="flex-1 accent-amber-500 cursor-pointer h-1.5 bg-[#262626] rounded-lg"
+              />
+              <ZoomIn className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="text-[11px] font-mono font-bold text-gray-300 w-9 text-right">
+                {zoom.toFixed(1)}x
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-center gap-3 pt-3 border-t border-[#262626]">
+              <button
+                type="button"
+                onClick={() => {
+                  setCropMode(false)
+                  setImageToCrop(null)
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-400 hover:text-white bg-[#1a1a1a] hover:bg-[#252525] border border-[#333] transition-all"
+              >
+                {language === 'es' ? 'Cancelar' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleApplyCrop}
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-50"
+              >
+                <Check className="w-4 h-4" />
+                {loading
+                  ? (language === 'es' ? 'Procesando...' : 'Processing...')
+                  : (language === 'es' ? 'Aplicar y Guardar' : 'Apply & Save')}
+              </button>
+            </div>
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Input file invisible */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept="image/png,image/jpeg,image/webp,image/jpg"
+              className="hidden"
+            />
+
+            {/* Avatar Preview & Selection */}
+            <div className="p-3.5 rounded-xl bg-[#0d0d0d] border border-[#262626] space-y-3">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-amber-500/50 bg-[#1f1f1f] flex items-center justify-center shrink-0 shadow-lg">
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt="Avatar preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        ;(e.target as HTMLElement).style.display = 'none'
+                      }}
+                    />
+                  ) : (
+                    <span className="text-xl font-extrabold text-amber-400">
+                      {user.nombre_usuario.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex-1 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                      {language === 'es' ? 'Foto de Perfil' : 'Profile Picture'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md shadow-amber-500/10 transition-all active:scale-95"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{language === 'es' ? 'Subir de mi PC' : 'Upload from PC'}</span>
+                    </button>
+
+                    {avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageToCrop(avatarUrl)
+                          setZoom(1.0)
+                          setPan({ x: 0, y: 0 })
+                          setCropMode(true)
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-[#2a2a2a] text-gray-300 hover:text-white border border-[#333333] text-xs font-semibold transition-all"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>{language === 'es' ? 'Re-encuadrar' : 'Re-center'}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* URL alternativo */}
+              <div className="pt-2 border-t border-[#1f1f1f]">
+                <label className="block text-[10px] text-gray-400 mb-1">
+                  {language === 'es' ? 'O bien pega un enlace directo de imagen (URL)' : 'Or paste a direct image URL'}
+                </label>
+                <div className="relative">
+                  <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <input
+                    type="url"
+                    placeholder="https://example.com/your-photo.jpg"
+                    value={avatarUrl}
+                    onChange={(e) => setAvatarUrl(e.target.value)}
+                    className="w-full pl-9 pr-3 py-1.5 bg-[#181818] border border-[#333333] rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60"
+                  />
+                </div>
+              </div>
+            </div>
 
           {/* Username (Locked / Non-editable) */}
           <div>
@@ -198,6 +452,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </button>
           </div>
         </form>
+      )}
       </div>
     </div>
   )

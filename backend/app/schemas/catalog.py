@@ -17,6 +17,7 @@ class CastMemberResponse(BaseModel):
     actor_id: int
     tmdb_id: int | None = None
     nombre: str
+    foto_url: str | None = None
     personaje: str | None = None
     orden: int = 0
 

@@ -175,12 +175,18 @@ export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOp
 
       {/* Info Card Body */}
       <div className="p-2.5 flex flex-col justify-between flex-1 gap-1">
-        <h3
-          title={title.nombre}
-          className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-400 transition-colors line-clamp-1"
-        >
-          {title.nombre}
-        </h3>
+        <div className="relative group/title">
+          <h3
+            title={title.nombre}
+            className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-400 transition-colors line-clamp-1"
+          >
+            {title.nombre}
+          </h3>
+          {/* Tooltip instantáneo para títulos largos */}
+          <div className="absolute left-0 bottom-full mb-1.5 hidden group-hover/title:block z-30 px-2.5 py-1 bg-[#171717]/95 backdrop-blur-md border border-[#383838] rounded-lg shadow-2xl text-xs font-semibold text-amber-200 whitespace-normal max-w-[220px] pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+            {title.nombre}
+          </div>
+        </div>
 
         <div className="flex items-center justify-between text-[11px] text-gray-400 gap-1">
           <div className="flex items-center gap-1 min-w-0 flex-1">

@@ -23,10 +23,12 @@ import {
   Trash2,
   Minus,
   Plus,
+  Users,
 } from 'lucide-react'
 import { catalogService } from '@/services/catalogService'
 import type { TitleDetail, ReviewItem, SeasonItem } from '@/types/catalog'
 import { useAuth } from '@/context/AuthContext'
+import { useLanguage } from '@/context/LanguageContext'
 import posterFallback from '@/assets/placeholders/poster-empty.svg'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { getLanguageName } from '@/utils/countryUtils'
@@ -38,6 +40,7 @@ interface OutletContextType {
 export const TitleDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
+  const { language } = useLanguage()
   const { openAuth } = useOutletContext<OutletContextType>()
 
   const [title, setTitle] = useState<TitleDetail | null>(null)
@@ -1003,6 +1006,66 @@ export const TitleDetailPage: React.FC = () => {
                 </div>
               )
             )}
+          </section>
+        )}
+
+        {/* Sección de Reparto Principal / Top Cast */}
+        {title.elenco && title.elenco.length > 0 && (
+          <section className="space-y-4 pt-6 border-t border-gray-800">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                <Users className="w-5 h-5 text-amber-400" />{' '}
+                {language === 'es' ? 'Reparto Principal' : 'Top Cast'}
+              </h2>
+              <span className="text-xs text-gray-400">
+                {title.elenco.length} {language === 'es' ? 'actores' : 'actors'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+              {title.elenco.slice(0, 12).map((actor) => (
+                <div
+                  key={`${actor.actor_id}-${actor.orden}`}
+                  className="p-3 rounded-2xl bg-[#141414] border border-[#262626] hover:border-amber-500/40 transition-all flex flex-col items-center text-center space-y-2.5 group shadow-sm"
+                >
+                  {/* Foto de perfil del actor con fallback */}
+                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-[#2b2b2b] group-hover:border-amber-500/50 bg-[#1c1c1c] flex items-center justify-center shrink-0 shadow-md transition-all">
+                    {actor.foto_url ? (
+                      <img
+                        src={actor.foto_url}
+                        alt={actor.nombre}
+                        loading="lazy"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          ;(e.target as HTMLElement).style.display = 'none'
+                        }}
+                      />
+                    ) : (
+                      <span className="text-xl font-black text-gray-500 group-hover:text-amber-400 transition-colors">
+                        {actor.nombre.charAt(0)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 w-full space-y-0.5">
+                    <h4
+                      title={actor.nombre}
+                      className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors truncate"
+                    >
+                      {actor.nombre}
+                    </h4>
+                    {actor.personaje && (
+                      <p
+                        title={actor.personaje}
+                        className="text-[11px] text-gray-400 truncate"
+                      >
+                        {actor.personaje}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 

@@ -32,10 +32,24 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
   - Ampliación de avatares en Home (`w-14 h-14` / `w-16 h-16`), Header (`w-10 h-10`) y Perfil (`w-32 h-32`).
   - Menú desplegable de usuario y menú móvil con acceso directo a las 7 secciones clave de la biblioteca (Profile, Favorites, Watchlist, Watch History, Following, Reviews, Settings).
   - Notificaciones toast en inglés estricto en `ReviewsPage` y simplificación de etiqueta a "Favorites" en el panel lateral de Home.
-- **Nuevos Endpoints en Backend:**
-  - `PATCH /api/v1/users/me`: Actualización de perfil (`pais`, `ciudad`, `descripcion`, `avatar_url`).
-  - `POST /api/v1/users/me/change-password`: Modificación segura de credenciales.
-- **Suite de Pruebas Automatizadas:** 53 tests en backend pasando (`pytest`) y suite de frontend en Vitest en verde.
+- **Encuadre y Centrado Interactivo de Avatar desde la PC:**
+  - Selector de archivo local desde la PC en `EditProfileModal` con soporte para formatos PNG, JPG y WebP.
+  - Visor circular interactivo (200×200 px con aro dorado) con **arrastre con el mouse/touch** para posicionar el rostro/detalle y **slider de zoom (1.0x a 3.0x)**.
+  - Renderizado automático en `<canvas>` a miniatura cuadrada optimizada de 256×256 px (~20 KB en JPEG de alta calidad).
+  - Nuevo endpoint `POST /api/v1/users/me/avatar` para almacenar el contenido binario directamente en `Usuario.avatar_binario` y asignar la ruta canónica `Usuario.avatar_url = /api/v1/users/{id}/avatar`.
+  - Endpoint público `GET /api/v1/users/{id}/avatar` para servir la imagen con cabeceras `Cache-Control` de alto rendimiento.
+- **Incorporación de Fotos de Actores y Sección Top Cast:**
+  - Nueva columna `foto_url` en la tabla `actores` y schema `CastMemberResponse`.
+  - Captura del `profile_path` oficial de TMDB (`https://image.tmdb.org/t/p/w185...`) en el servicio de sincronización (`tmdb_sync_service.py`).
+  - Nuevo job asíncrono CLI `backend/app/jobs/populate_actor_photos.py` para consultar y enriquecer en lotes las fotos de los actores del catálogo local.
+  - Sección visual **"Top Cast / Reparto Principal"** en `TitleDetailPage` con avatares circulares de actores, fotos oficiales, nombres y personajes.
+  - Actualización del modelo UML de datos (`docs/UML/modelo_datos/uml_version_minima.mmd` y `uml_version_superior.mmd`).
+- **Corrección de Layout y Animaciones en Gráfico Donut de Géneros (`DonutGenreChart`):**
+  - Rediseño de la leyenda a una columna vertical limpia con truncado inteligente (`truncate`), evitando que los nombres compuestos en español colisionen o se superpongan con los conteos y porcentajes.
+  - Conservación de animaciones fluidas con SVG: resaltado dinámico con *glow* al pasar el mouse por arcos o leyenda, atenuación de los demás sectores y centro dinámico interactivo con porcentaje, nombre completo y cantidad de títulos.
+- **Tooltips Flotantes Instantáneos en Listas de Perfil:**
+  - Inclusión de tooltips instantáneos (`group-hover/rank` y `group-hover/pcard`) en los rankings Top 5 (Popularidad, Calificación Promedio, Calificación Propia) y en las listas inferiores (Favoritos, Watchlist, Vistos Recientemente) para desplegar el título completo sin esperar el retardo del navegador.
+- **Suite de Pruebas Automatizadas:** 54 tests en backend pasando (`pytest`) incluyendo prueba unitaria de subida y servicio de avatar (`test_upload_and_get_avatar`), y suite de frontend en Vitest en verde.
 
 ## [v0.7.4] - 2026-09-12
 ### Agregado & Mejorado

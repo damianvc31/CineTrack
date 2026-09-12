@@ -247,12 +247,13 @@ export const ProfilePage: React.FC = () => {
                             key={item.id}
                             className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[#0d0d0d] border border-[#1f1f1f] text-xs hover:border-[#333333] transition-colors"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="relative group/rank flex items-center gap-2.5 min-w-0 flex-1">
                               <span className="text-[11px] font-bold text-gray-500 w-4 text-right shrink-0">
                                 {idx + 1}
                               </span>
                               <Link
                                 to={`/titles/${item.id}`}
+                                title={item.nombre}
                                 className="font-semibold text-gray-200 hover:text-amber-400 transition-colors truncate"
                               >
                                 {item.nombre}
@@ -260,6 +261,10 @@ export const ProfilePage: React.FC = () => {
                                   · {formatTitleSubtitle(item)}
                                 </span>
                               </Link>
+                              {/* Floating instant tooltip */}
+                              <div className="absolute left-6 bottom-full mb-1 hidden group-hover/rank:block z-30 px-2.5 py-1 bg-[#171717]/95 backdrop-blur-md border border-[#383838] rounded-lg shadow-2xl text-xs font-semibold text-amber-200 whitespace-normal max-w-[240px] pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                                {item.nombre} <span className="text-[10px] text-gray-400 block font-normal">· {formatTitleSubtitle(item)}</span>
+                              </div>
                             </div>
 
                             <div className="flex items-center gap-1 text-emerald-400 text-[11px] font-bold shrink-0">
@@ -307,12 +312,13 @@ export const ProfilePage: React.FC = () => {
                             key={item.id}
                             className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[#0d0d0d] border border-[#1f1f1f] text-xs hover:border-[#333333] transition-colors"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="relative group/rank flex items-center gap-2.5 min-w-0 flex-1">
                               <span className="text-[11px] font-bold text-gray-500 w-4 text-right shrink-0">
                                 {idx + 1}
                               </span>
                               <Link
                                 to={`/titles/${item.id}`}
+                                title={item.nombre}
                                 className="font-semibold text-gray-200 hover:text-amber-400 transition-colors truncate"
                               >
                                 {item.nombre}
@@ -320,6 +326,10 @@ export const ProfilePage: React.FC = () => {
                                   · {formatTitleSubtitle(item)}
                                 </span>
                               </Link>
+                              {/* Floating instant tooltip */}
+                              <div className="absolute left-6 bottom-full mb-1 hidden group-hover/rank:block z-30 px-2.5 py-1 bg-[#171717]/95 backdrop-blur-md border border-[#383838] rounded-lg shadow-2xl text-xs font-semibold text-amber-200 whitespace-normal max-w-[240px] pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                                {item.nombre} <span className="text-[10px] text-gray-400 block font-normal">· {formatTitleSubtitle(item)}</span>
+                              </div>
                             </div>
 
                             <div className="flex items-center gap-1 text-amber-400 text-[11px] font-bold shrink-0">
@@ -348,12 +358,13 @@ export const ProfilePage: React.FC = () => {
                             key={item.id}
                             className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[#0d0d0d] border border-[#1f1f1f] text-xs hover:border-[#333333] transition-colors"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="relative group/rank flex items-center gap-2.5 min-w-0 flex-1">
                               <span className="text-[11px] font-bold text-gray-500 w-4 text-right shrink-0">
                                 {idx + 1}
                               </span>
                               <Link
                                 to={`/titles/${item.id}`}
+                                title={item.nombre}
                                 className="font-semibold text-gray-200 hover:text-amber-400 transition-colors truncate"
                               >
                                 {item.nombre}
@@ -361,6 +372,10 @@ export const ProfilePage: React.FC = () => {
                                   · {formatTitleSubtitle(item)}
                                 </span>
                               </Link>
+                              {/* Floating instant tooltip */}
+                              <div className="absolute left-6 bottom-full mb-1 hidden group-hover/rank:block z-30 px-2.5 py-1 bg-[#171717]/95 backdrop-blur-md border border-[#383838] rounded-lg shadow-2xl text-xs font-semibold text-amber-200 whitespace-normal max-w-[240px] pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                                {item.nombre} <span className="text-[10px] text-gray-400 block font-normal">· {formatTitleSubtitle(item)}</span>
+                              </div>
                             </div>
 
                             <div className="flex items-center gap-1 text-amber-400 text-[11px] font-bold shrink-0">
@@ -580,10 +595,17 @@ const ProfilePosterCard: React.FC<{ item: TitleCard; showStatusBadge?: boolean }
         )}
       </div>
 
-      <div className="space-y-0.5 min-w-0">
-        <h4 className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors truncate">
+      <div className="relative group/pcard space-y-0.5 min-w-0">
+        <h4
+          title={item.nombre}
+          className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors truncate"
+        >
           {item.nombre}
         </h4>
+        {/* Instant floating tooltip for long title */}
+        <div className="absolute left-0 bottom-full mb-1 hidden group-hover/pcard:block z-30 px-2 py-1 bg-[#171717]/95 backdrop-blur-md border border-[#383838] rounded-lg shadow-2xl text-xs font-semibold text-amber-200 whitespace-normal max-w-[180px] pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+          {item.nombre}
+        </div>
         <div className="flex items-center justify-between text-[11px] text-gray-400">
           <span>{item.anio_estreno || ''}</span>
           <div className="flex items-center gap-1 text-amber-400 font-bold">

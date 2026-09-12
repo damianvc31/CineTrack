@@ -45,3 +45,7 @@ class UserUpdate(BaseModel):
 class PasswordChangeRequest(BaseModel):
     current_password: str = Field(..., description="Contraseña actual")
     new_password: str = Field(..., min_length=6, max_length=100, description="Nueva contraseña")
+
+
+class AvatarUploadPayload(BaseModel):
+    image_base64: str = Field(..., description="Data URI o imagen codificada en base64")

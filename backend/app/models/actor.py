@@ -32,6 +32,7 @@ class Actor(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     tmdb_id: Mapped[int | None] = mapped_column(Integer, unique=True, nullable=True, index=True)
     nombre: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
+    foto_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Relación directa simple Many-to-Many
     titulos: Mapped[list["Titulo"]] = relationship(

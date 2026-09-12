@@ -1,11 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import base64
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.security import hash_password, verify_password
 from app.db.session import get_db
 from app.models.usuario import Usuario
-from app.schemas.auth import PasswordChangeRequest, UserResponse, UserUpdate
+from app.schemas.auth import (
+    AvatarUploadPayload,
+    PasswordChangeRequest,
+    UserResponse,
+    UserUpdate,
+)
 from app.schemas.catalog import (
     UnreviewedWatchedResponse,
     UserLibraryResponse,
@@ -102,3 +108,55 @@ async def change_my_password(
     current_user.password_hash = hash_password(payload.new_password)
     await db.commit()
     return {"message": "Contraseña actualizada exitosamente."}
+
+
+@router.post("/me/avatar", response_model=UserResponse)
+async def upload_my_avatar(
+    payload: AvatarUploadPayload,
+    current_user: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> UserResponse:
+    """Recibe un avatar en base64 (Data URI recortado y encuadrado), lo decodifica y persiste en avatar_binario."""
+    raw_b64 = payload.image_base64
+    if "," in raw_b64:
+        raw_b64 = raw_b64.split(",", 1)[1]
+
+    try:
+        binary_data = base64.b64decode(raw_b64)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Formato de imagen base64 inválido."
+        )
+
+    # Límite de tamaño: 3MB
+    if len(binary_data) > 3 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La imagen excede el límite máximo de 3 MB."
+        )
+
+    current_user.avatar_binario = binary_data
+    current_user.avatar_url = f"/api/v1/users/{current_user.id}/avatar"
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.get("/{user_id}/avatar")
+async def get_user_avatar(
+    user_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Retorna la imagen binaria del avatar del usuario."""
+    user = await db.get(Usuario, user_id)
+    if not user or not user.avatar_binario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Avatar no encontrado."
+        )
+    return Response(
+        content=user.avatar_binario,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "max-age=86400, public"}
+    )

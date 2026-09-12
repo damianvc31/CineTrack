@@ -26,10 +26,10 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 - **Beneficio:** Elimina `JOINs` costosos en las pantallas principales y de exploración ("Todos", "Trending", "Estrenos") donde se presentan películas y series de forma unificada.
 
 ### 2.2. Esquema Relacional Principal
-1. **`usuarios`**: Autenticación mínima (login/password con hash `bcrypt`/`argon2`), perfil (país, ciudad, biografía, avatar, fecha_registro, flag `es_admin`).
+1. **`usuarios`**: Autenticación mínima (login/password con hash `bcrypt`/`argon2`), perfil (país, ciudad, biografía, `avatar_url`, `avatar_binario` para persistencia nativa de imagen recortada, fecha_registro, flag `es_admin`).
 2. **`titulos`**: Catálogo de películas y series con metadatos técnicos y de TMDB. Utiliza campos exactos tipo `Date` (`fecha_estreno` y `fecha_fin`), exponiendo propiedades calculadas `@property anio_estreno` y `anio_fin` con setters para retrocompatibilidad total. Columna indexada y persistida `rating_unificado`.
 3. **`generos`** & **`titulos_generos`**: Clasificación N:M (un título pertenece a múltiples géneros).
-4. **`actores`** & **`titulos_elenco`**: Reparto principal N:M con columnas `personaje` y `orden`.
+4. **`actores`** & **`titulos_elenco`**: Reparto principal N:M con columnas `foto_url` (imagen oficial TMDB `w185`), `personaje` y `orden`.
 5. **`temporadas`** & **`episodios`**: Jerarquía episódica de series con duraciones por episodio y fechas de emisión.
 6. **`estados_usuario_titulos`**: Estado granular por usuario (`favorito` booleano independiente, y `estado` mutuamente excluyente: `watchlist`, `siguiendo`, `vista`, o `null`), con sus respectivas marcas temporales para ordenamiento.
 7. **`episodios_vistos`**: Historial atómico de episodios vistos por usuario y fecha.
@@ -38,8 +38,10 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 ### 2.3. Desacoplamiento de Reglas de Negocio
 > *Las especificaciones funcionales y de dominio —incluyendo los criterios de curación de la Home, ventanas temporales, pools dinámicos, máquina de estados por episodios, fórmula de calificación unificada, políticas de ingesta inicial, sincronización diaria y reglas de créditos de elenco— están formalmente desacopladas en [docs/CATALOG_SPECS.md](docs/CATALOG_SPECS.md).*
 
-### 2.4. Almacenamiento de Avatares
-- **Versión Mínima:** Selección de avatares predeterminados locales (identicons/SVGs) o URLs externas. Subida de avatares guardando una miniatura optimizada directamente en la base de datos (`BYTEA` / Base64 limitada a <300 KB), evitando la pérdida de archivos en filesystems efímeros de hosting PaaS.
+### 2.4. Almacenamiento de Avatares y Encuadre Interactivo
+- **Encuadre/Centrado Interactivo (Cropper):** En `EditProfileModal`, el usuario puede cargar cualquier imagen local (`.png`, `.jpg`, `.webp`), arrastrarla con el mouse para centrarla en un visor circular y aplicar zoom (1.0x a 3.0x).
+- **Persistencia Binaria:** Al aplicar, se renderiza el área encuadrada a un `<canvas>` 256×256 px en formato JPEG (~20 KB), enviado a `POST /api/v1/users/me/avatar` que almacena los bytes en `Usuario.avatar_binario` y establece `Usuario.avatar_url = /api/v1/users/{id}/avatar`.
+- **Servicio Público:** El endpoint `GET /api/v1/users/{user_id}/avatar` sirve la imagen con cabeceras `Cache-Control` públicas, permitiendo además usar URLs remotas estándar como alternativa.
 
 ---
 
@@ -82,8 +84,15 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 
 9. **Endpoints de Usuario y Estadísticas de Perfil:**
    - `PATCH /api/v1/users/me`: Actualización de biografía, país, ciudad y URL de avatar (nombre de usuario inmutable).
+   - `POST /api/v1/users/me/avatar`: Carga de avatar recortado en Base64, persistido en `avatar_binario` y referenciado en `avatar_url`.
+   - `GET /api/v1/users/{id}/avatar`: Entrega pública de la imagen del avatar con cabeceras de caché HTTP.
    - `POST /api/v1/users/me/change-password`: Verificación de contraseña actual y actualización segura con hash `bcrypt`.
    - `GET /api/v1/users/me/stats`: Incorporación de `avg_movies_per_week` y `seasons_completed_count`, preservando la calificación personal verificada (`Resena.puntaje`) en el Top 5 por calificación.
+
+10. **Reparto Principal con Fotos y Job de Población:**
+    - Modelo `Actor` con columna `foto_url` (resolución TMDB `w185`).
+    - Job asíncrono `app.jobs.populate_actor_photos` para consultar en lote fotos de actores en TMDB con control de rate limit.
+    - Componente visual de Top Cast en `TitleDetailPage` con avatares circulares de actores, fotos oficiales, nombres y personajes.
 
 ---
 

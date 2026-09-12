@@ -87,3 +87,32 @@ async def test_user_stats_extended_fields(async_client: AsyncClient):
     assert "seasons_completed_count" in data
     assert isinstance(data["avg_movies_per_week"], (int, float))
     assert isinstance(data["seasons_completed_count"], int)
+
+
+@pytest.mark.asyncio
+async def test_upload_and_get_avatar(async_client: AsyncClient):
+    """Verifica la subida de un avatar en base64 y su posterior consulta como imagen binaria."""
+    reg_resp = await async_client.post("/api/v1/auth/register", json={
+        "nombre_usuario": "avatar_user_test",
+        "password": "password123"
+    })
+    assert reg_resp.status_code == 201
+    user_data = reg_resp.json()["user"]
+    token = reg_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Data URI simulada de un píxel JPEG válido
+    pixel_b64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="
+
+    upload_resp = await async_client.post("/api/v1/users/me/avatar", headers=headers, json={
+        "image_base64": pixel_b64
+    })
+    assert upload_resp.status_code == 200
+    updated_user = upload_resp.json()
+    assert updated_user["avatar_url"] == f"/api/v1/users/{user_data['id']}/avatar"
+
+    # Consultar la imagen binaria pública
+    get_avatar_resp = await async_client.get(f"/api/v1/users/{user_data['id']}/avatar")
+    assert get_avatar_resp.status_code == 200
+    assert get_avatar_resp.headers["content-type"] == "image/jpeg"
+    assert len(get_avatar_resp.content) > 0
