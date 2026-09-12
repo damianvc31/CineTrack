@@ -181,6 +181,15 @@ async def test_list_titles_with_filters_and_search(async_client: AsyncClient, sa
     assert res_g.status_code == 200
     assert len(res_g.json()) >= 2
 
+    # 11. Filtro por sección (section=others) con All types (tipo=None) y tipo=tv
+    res_sec_oth = await async_client.get("/api/v1/titles?section=others")
+    assert res_sec_oth.status_code == 200
+    assert res_sec_oth.json()["total"] >= 1
+
+    res_sec_oth_tv = await async_client.get("/api/v1/titles?section=others&tipo=tv")
+    assert res_sec_oth_tv.status_code == 200
+    assert res_sec_oth_tv.json()["total"] >= 1
+
 
 @pytest.mark.asyncio
 async def test_get_title_detail(async_client: AsyncClient, sample_catalog):

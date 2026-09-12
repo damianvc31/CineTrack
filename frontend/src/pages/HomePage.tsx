@@ -322,8 +322,8 @@ export const HomePage: React.FC = () => {
           {/* Carousel: Other Collections */}
           {data.others && data.others.length > 0 && (
             <CarouselRow
-              title="More Discoveries"
-              subtitle="Hidden gems and diverse collections"
+              title={t('sectionOthers')}
+              subtitle={language === 'es' ? 'Joyas ocultas y colecciones diversas' : 'Hidden gems and diverse collections'}
               icon={<Compass className="w-5 h-5 text-amber-400" />}
               titles={data.others}
               viewMoreLink={`/catalog?section=others${tipoParam}`}

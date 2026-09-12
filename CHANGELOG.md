@@ -9,7 +9,9 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 - **Alineación y Anclaje Central Fijo de Explorar y Búsqueda (`Header.tsx`):**
   - Se implementó un contenedor anclado al centro geométrico del header (`absolute left-1/2 -translate-x-1/2`) en desktop/tablet, fijando el botón *"Explore / Explorar"* y la barra de búsqueda exactamente en la misma coordenada horizontal en todas las rutas en que se muestran, eliminando los desplazamientos causados por las variaciones de ancho de los bloques laterales (logo TMDB a la izquierda y avatar/autenticación a la derecha).
   - Se mantiene la exclusión limpia del botón Explorar y del campo de búsqueda en la ruta `/catalog` (tanto en desktop como en mobile), permitiendo que la navegación en el catálogo opere sin redundancias con sus propios controles dedicados de filtrado y búsqueda.
-  - En la vista móvil, el formulario de búsqueda ahora cuenta con su texto de sugerencia (*placeholder*) completamente traducido con internacionalización reactiva.
+- **Corrección de Colección y Filtro "More Discoveries / Más Descubrimientos" (`catalog_service.py` & `HomePage.tsx`):**
+  - Se corrigió el filtrado de `section="others"` en el catálogo (`get_titles`) y en la página principal (`get_home_sections`) para que al consultar sin filtro de tipo (*All types* / Todos los tipos), se consoliden los títulos pertenecientes a géneros minoritarios por categoría (ej. series de géneros con menos de 10 series como *Western* —*Yellowstone*, *1883*, *1923*, *Cowboy Bebop*, etc.— y películas de géneros de nicho). Anteriormente, la suma combinada de películas y series elevaba el conteo total del género por encima de 10, provocando que la sección de descubrimientos quedara vacía (0 títulos) en *All types*.
+  - Se tradujo y localizó reactivamente el título (`t('sectionOthers')`) y subtítulo del carrusel *"Más Descubrimientos"* en `HomePage.tsx`.
 
 ## [v0.8.1] - 2026-09-12
 ### Corregido & Mejorado

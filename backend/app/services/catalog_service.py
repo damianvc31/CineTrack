@@ -1,7 +1,7 @@
 import random
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
-from sqlalchemy import and_, delete, desc, func, or_, select
+from sqlalchemy import and_, delete, desc, func, or_, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -239,24 +239,65 @@ async def get_titles(
     elif active_section == "top_rated":
         query = query.where(Titulo.vote_count_tmdb >= settings.HOME_TOP_RATED_MIN_VOTES)
     elif active_section == "others":
-        genre_count_subq = (
-            select(titulos_generos.c.genero_id)
-            .join(Titulo, Titulo.id == titulos_generos.c.titulo_id)
-        )
         if tipo and tipo in ("movie", "tv"):
-            genre_count_subq = genre_count_subq.where(Titulo.tipo == tipo)
-        genre_count_subq = (
-            genre_count_subq
-            .group_by(titulos_generos.c.genero_id)
-            .having(func.count(titulos_generos.c.titulo_id) < settings.HOME_GENRE_MIN_TITLES_FOR_CAROUSEL)
-            .scalar_subquery()
-        )
-        titles_in_minor = (
-            select(titulos_generos.c.titulo_id)
-            .where(titulos_generos.c.genero_id.in_(genre_count_subq))
-            .scalar_subquery()
-        )
-        query = query.where(Titulo.id.in_(titles_in_minor))
+            genre_count_subq = (
+                select(titulos_generos.c.genero_id)
+                .join(Titulo, Titulo.id == titulos_generos.c.titulo_id)
+                .where(Titulo.tipo == tipo)
+                .group_by(titulos_generos.c.genero_id)
+                .having(func.count(titulos_generos.c.titulo_id) < settings.HOME_GENRE_MIN_TITLES_FOR_CAROUSEL)
+                .scalar_subquery()
+            )
+            titles_in_minor = (
+                select(titulos_generos.c.titulo_id)
+                .where(titulos_generos.c.genero_id.in_(genre_count_subq))
+                .scalar_subquery()
+            )
+            query = query.where(Titulo.id.in_(titles_in_minor))
+        else:
+            # En "All types", incluir títulos pertenecientes a géneros minoritarios
+            # por tipo de medio (ej. series de géneros con < 10 series) o globales (< 10 total)
+            tv_minor_g = (
+                select(titulos_generos.c.genero_id)
+                .join(Titulo, Titulo.id == titulos_generos.c.titulo_id)
+                .where(Titulo.tipo == "tv")
+                .group_by(titulos_generos.c.genero_id)
+                .having(func.count(titulos_generos.c.titulo_id) < settings.HOME_GENRE_MIN_TITLES_FOR_CAROUSEL)
+                .scalar_subquery()
+            )
+            tv_titles = (
+                select(titulos_generos.c.titulo_id)
+                .join(Titulo, Titulo.id == titulos_generos.c.titulo_id)
+                .where(Titulo.tipo == "tv", titulos_generos.c.genero_id.in_(tv_minor_g))
+            )
+
+            mv_minor_g = (
+                select(titulos_generos.c.genero_id)
+                .join(Titulo, Titulo.id == titulos_generos.c.titulo_id)
+                .where(Titulo.tipo == "movie")
+                .group_by(titulos_generos.c.genero_id)
+                .having(func.count(titulos_generos.c.titulo_id) < settings.HOME_GENRE_MIN_TITLES_FOR_CAROUSEL)
+                .scalar_subquery()
+            )
+            mv_titles = (
+                select(titulos_generos.c.titulo_id)
+                .join(Titulo, Titulo.id == titulos_generos.c.titulo_id)
+                .where(Titulo.tipo == "movie", titulos_generos.c.genero_id.in_(mv_minor_g))
+            )
+
+            all_minor_g = (
+                select(titulos_generos.c.genero_id)
+                .group_by(titulos_generos.c.genero_id)
+                .having(func.count(titulos_generos.c.titulo_id) < settings.HOME_GENRE_MIN_TITLES_FOR_CAROUSEL)
+                .scalar_subquery()
+            )
+            all_titles = (
+                select(titulos_generos.c.titulo_id)
+                .where(titulos_generos.c.genero_id.in_(all_minor_g))
+            )
+
+            union_others = union(tv_titles, mv_titles, all_titles).subquery()
+            query = query.where(Titulo.id.in_(select(union_others.c.titulo_id)))
 
     # 2. Ordenamiento puro (criterio + dirección)
     is_asc = order.lower() == "asc"
@@ -520,6 +561,49 @@ async def get_home_sections(
         )
         if tipo in ("movie", "tv"):
             oth_q = oth_q.where(Titulo.tipo == tipo)
+        oth_q = _apply_base_filters(oth_q)
+        oth_q = oth_q.order_by(desc(Titulo.popularidad), desc(Titulo.id)).limit(settings.HOME_GENRE_POOL_SIZE)
+        oth_pool = (await db.execute(oth_q)).scalars().all()
+        if len(oth_pool) > sample_size:
+            others_titulos = random.sample(oth_pool, sample_size)
+        else:
+            others_titulos = list(oth_pool)
+    elif not tipo:
+        # En 'All types', si ningún género global tiene < 10 títulos,
+        # consolidar los títulos de géneros minoritarios por tipo (ej. series Western)
+        tv_minor_g = (
+            select(titulos_generos.c.genero_id)
+            .join(Titulo, Titulo.id == titulos_generos.c.titulo_id)
+            .where(Titulo.tipo == "tv")
+            .group_by(titulos_generos.c.genero_id)
+            .having(func.count(titulos_generos.c.titulo_id) < settings.HOME_GENRE_MIN_TITLES_FOR_CAROUSEL)
+            .scalar_subquery()
+        )
+        tv_titles = (
+            select(titulos_generos.c.titulo_id)
+            .join(Titulo, Titulo.id == titulos_generos.c.titulo_id)
+            .where(Titulo.tipo == "tv", titulos_generos.c.genero_id.in_(tv_minor_g))
+        )
+        mv_minor_g = (
+            select(titulos_generos.c.genero_id)
+            .join(Titulo, Titulo.id == titulos_generos.c.titulo_id)
+            .where(Titulo.tipo == "movie")
+            .group_by(titulos_generos.c.genero_id)
+            .having(func.count(titulos_generos.c.titulo_id) < settings.HOME_GENRE_MIN_TITLES_FOR_CAROUSEL)
+            .scalar_subquery()
+        )
+        mv_titles = (
+            select(titulos_generos.c.titulo_id)
+            .join(Titulo, Titulo.id == titulos_generos.c.titulo_id)
+            .where(Titulo.tipo == "movie", titulos_generos.c.genero_id.in_(mv_minor_g))
+        )
+        union_oth = union(tv_titles, mv_titles).subquery()
+        oth_q = (
+            select(Titulo)
+            .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
+            .where(Titulo.id.in_(select(union_oth.c.titulo_id)))
+            .distinct()
+        )
         oth_q = _apply_base_filters(oth_q)
         oth_q = oth_q.order_by(desc(Titulo.popularidad), desc(Titulo.id)).limit(settings.HOME_GENRE_POOL_SIZE)
         oth_pool = (await db.execute(oth_q)).scalars().all()
