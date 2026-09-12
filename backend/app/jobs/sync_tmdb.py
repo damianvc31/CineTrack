@@ -107,7 +107,7 @@ async def main():
                 if titulo:
                     await db.commit()
                     await service.recalculate_percentiles()
-                    logger.info(f"Título importado con éxito: {titulo.titulo} (ID local: {titulo.id})")
+                    logger.info(f"Título importado con éxito: {titulo.nombre} (ID local: {titulo.id})")
                 else:
                     logger.error(f"No se pudo importar el título con ID {args.import_tmdb_id}")
 

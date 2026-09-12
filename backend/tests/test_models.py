@@ -270,3 +270,40 @@ async def test_resenas_polimorficas(db_session: AsyncSession):
     with pytest.raises(IntegrityError):
         await db_session.commit()
     await db_session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_pelicula_y_serie_mismo_tmdb_id(db_session: AsyncSession):
+    """Verifica que una película y una serie puedan coexistir con el mismo tmdb_id, pero no dos del mismo tipo."""
+    m = Titulo(
+        tmdb_id=121,
+        tipo="movie",
+        nombre="The Lord of the Rings",
+        popularidad=100.0
+    )
+    s = Titulo(
+        tmdb_id=121,
+        tipo="tv",
+        nombre="Doctor Who",
+        popularidad=80.0
+    )
+    db_session.add_all([m, s])
+    await db_session.commit()
+
+    assert m.id is not None
+    assert s.id is not None
+    assert m.id != s.id
+    assert m.tmdb_id == s.tmdb_id == 121
+
+    # Intentar agregar otra película con el mismo tmdb_id=121 debe fallar por duplicado
+    m_dup = Titulo(
+        tmdb_id=121,
+        tipo="movie",
+        nombre="Another LOTR",
+        popularidad=50.0
+    )
+    db_session.add(m_dup)
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+    await db_session.rollback()
+

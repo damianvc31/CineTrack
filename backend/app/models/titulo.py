@@ -1,6 +1,6 @@
 from datetime import date
 from typing import TYPE_CHECKING
-from sqlalchemy import Date, Float, Integer, String, Text
+from sqlalchemy import Date, Float, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -17,9 +17,12 @@ if TYPE_CHECKING:
 
 class Titulo(Base):
     __tablename__ = "titulos"
+    __table_args__ = (
+        UniqueConstraint("tmdb_id", "tipo", name="uq_titulos_tmdb_id_tipo"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    tmdb_id: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
+    tmdb_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
     tipo: Mapped[str] = mapped_column(String(10), index=True, nullable=False)  # 'movie' | 'tv'
     nombre: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     sinopsis: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -49,6 +52,11 @@ class Titulo(Base):
             self.fecha_fin = date(val, 1, 1)
         else:
             self.fecha_fin = None
+
+    @property
+    def titulo(self) -> str:
+        return self.nombre
+
     director: Mapped[str | None] = mapped_column(String(150), index=True, nullable=True)
     guionista: Mapped[str | None] = mapped_column(String(150), index=True, nullable=True)
     pais: Mapped[str | None] = mapped_column(String(100), nullable=True)
