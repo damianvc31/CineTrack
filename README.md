@@ -8,7 +8,7 @@ Aplicación web de seguimiento de cine y series estilo "TV Time" con arquitectur
 
 - **Python:** 3.12+ (testeado con Python 3.14)
 - **Node.js:** 20+ LTS (testeado con Node.js 24 LTS)
-- **Base de Datos:** PostgreSQL 15+
+- **Base de Datos:** PostgreSQL 15+ o SQLite 3 (soporte dual para desarrollo y producción)
 
 ---
 
@@ -21,10 +21,12 @@ cp .env.example .env
 ```
 
 Variables clave requeridas:
-- `DATABASE_URL`: Cadena de conexión PostgreSQL (ej. `postgresql+asyncpg://usuario:password@localhost:5432/cinetrack`)
-- `AUTH_SECRET_KEY`: Clave secreta para firma de sesiones/tokens del login
+- `DATABASE_URL`: Cadena de conexión (ej. `postgresql+asyncpg://usuario:password@localhost:5432/cinetrack` o `sqlite+aiosqlite:///cinetrack.db`)
+- `AUTH_SECRET_KEY`: Clave secreta para firma de sesiones/tokens JWT del login
+- `ADMIN_API_KEY`: Clave secreta para endpoints y tareas administrativas automatizadas
 - `TMDB_API_KEY`: Read Access Token o API Key de The Movie Database (TMDB)
 - `AI_PROVIDER_API_KEY`: API Key para el servicio de IA del recomendador (Google Gemini o Groq)
+- `HOME_*`: Parámetros de ajuste de ventanas temporales, pools y umbrales de Home (`HOME_NEW_RELEASES_DAYS=60`, `HOME_TRENDING_DAYS=90`, etc.)
 
 ---
 
@@ -112,6 +114,30 @@ Todos los jobs de sincronización pueden dispararse también vía HTTP (`HTTP 20
 - `DELETE /api/v1/admin/catalog?confirm=true`: Vaciado total del catálogo y entidades dependientes (preserva usuarios y géneros).
 
 *Autenticación requerida:* Enviar cabecera `Authorization: Bearer <token_admin>` (usuario con `es_admin=True`) o cabecera `X-Admin-Key: <ADMIN_API_KEY>`.
+
+#### Endpoints Principales de la Aplicación (API HTTP)
+- **Autenticación:**
+  - `POST /api/v1/auth/register`: Registro de usuario.
+  - `POST /api/v1/auth/login`: Login y obtención de JWT Bearer Token.
+  - `GET /api/v1/auth/me`: Perfil del usuario autenticado.
+- **Catálogo y Exploración:**
+  - `GET /api/v1/home`: Secciones curadas (New Releases, Trending, Classics, Top Rated, By Genre, Others) con exclusión automática de títulos vistos para usuarios logueados. Soporta filtro `?tipo=movie|tv`.
+  - `GET /api/v1/titles`: Listado paginado con filtros (`tipo`, `genero_id`, `q`, `sort_by`: popularity, rating, newest, classics).
+  - `GET /api/v1/titles/{id}`: Detalle completo de película o serie (elenco jerarquizado, temporadas y episodios con estado `visto`).
+  - `GET /api/v1/genres`: Listado maestro de géneros.
+- **Reseñas de Usuarios:**
+  - `GET /api/v1/titles/{id}/reviews`: Reseñas paginadas del título (TMDB y usuarios locales).
+  - `POST /api/v1/titles/{id}/reviews`: Publicar/editar reseña propia con puntaje (recalcula automáticamente el `rating_unificado`).
+- **Biblioteca y Seguimiento (Estados de Título):**
+  - `POST /api/v1/titles/{id}/favorite`: Marcar / desmarcar favorito.
+  - `POST /api/v1/titles/{id}/watchlist`: Agregar / quitar de watchlist.
+  - `POST /api/v1/titles/{id}/watched`: Marcar película como vista (o desmarcar).
+  - `POST /api/v1/titles/{id}/seasons/{season}/episodes/{episode}/watch`: Marcar / desmarcar episodio visto (transición a `siguiendo` o `vista`).
+  - `POST /api/v1/titles/{id}/seasons/{season}/watch`: Marcar / desmarcar temporada completa en lote.
+- **Perfil y Métricas del Usuario:**
+  - `GET /api/v1/users/me/library`: Biblioteca del usuario dividida en `following`, `favorites`, `watchlist` y `recently_watched`.
+  - `GET /api/v1/users/me/stats`: Estadísticas de tiempo invertido (horas en cine vs TV), conteos y Top 5 (popularidad, rating comunitario y calificaciones propias).
+
 
 #### Tareas Programadas en Producción (Cron)
 Para mantener actualizado el catálogo automáticamente en un servidor o contenedor, se programa la ejecución diaria del comando `--daily` mediante cron (o invocando el endpoint `/daily` con curl y la API Key):
