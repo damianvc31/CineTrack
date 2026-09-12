@@ -587,11 +587,11 @@ export const ReviewsPage: React.FC = () => {
                             </span>
                             <span>•</span>
                             <span>{t.anio_estreno || '-'}</span>
-                            {t.tipo === 'tv' && t.user_estado && (
+                            {t.user_estado && (
                               <>
                                 <span>•</span>
                                 <span
-                                  className={`px-1.5 py-0.2 rounded text-[10px] font-semibold border ${
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
                                     t.user_estado === 'siguiendo'
                                       ? 'bg-blue-950/40 text-blue-300 border-blue-800/60'
                                       : t.user_estado === 'vista'
@@ -602,7 +602,7 @@ export const ReviewsPage: React.FC = () => {
                                   {t.user_estado === 'siguiendo'
                                     ? 'Watching'
                                     : t.user_estado === 'vista'
-                                    ? 'Completed'
+                                    ? 'Watched'
                                     : 'Dropped'}
                                 </span>
                               </>
