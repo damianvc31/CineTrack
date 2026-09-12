@@ -547,60 +547,67 @@ export const TitleDetailPage: React.FC = () => {
 
                 {/* 3 & 4. Lógica de Series: Siguiendo ▶️ / Abandonar ❌ vs Watchlist 🔖 */}
                 {title.tipo === 'tv' ? (
-                  <>
-                    {userEstado === 'siguiendo' && (
+                  (() => {
+                    const hasWatchedEpisodes = !!title.temporadas?.some((t) => t.episodios?.some((e) => e.visto))
+                    const isAbandoned = userEstado !== 'siguiendo' && userEstado !== 'vista' && hasWatchedEpisodes
+
+                    return (
                       <>
-                        {/* Badge Siguiendo (no interactuable / activo) */}
-                        <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-900/40 border border-blue-500 text-blue-300 cursor-default shadow-md">
-                          <Play className="w-4 h-4 fill-current" />
-                          <span>Siguiendo</span>
-                        </span>
+                        {userEstado === 'siguiendo' && (
+                          <>
+                            {/* Badge Siguiendo (no interactuable / activo) */}
+                            <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-900/40 border border-blue-500 text-blue-300 cursor-default shadow-md">
+                              <Play className="w-4 h-4 fill-current" />
+                              <span>Siguiendo</span>
+                            </span>
 
-                        {/* Botón Abandonar serie ❌ */}
-                        <button
-                          onClick={handleUnfollow}
-                          title="Abandonar serie conservando episodios vistos"
-                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-950/40 border border-red-700/80 text-red-300 hover:bg-red-900/50 hover:border-red-500 transition-all"
-                        >
-                          <X className="w-4 h-4" />
-                          <span>Abandonar</span>
-                        </button>
+                            {/* Botón Abandonar serie ❌ */}
+                            <button
+                              onClick={handleUnfollow}
+                              title="Abandonar serie conservando episodios vistos"
+                              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-950/40 border border-red-700/80 text-red-300 hover:bg-red-900/50 hover:border-red-500 transition-all"
+                            >
+                              <X className="w-4 h-4" />
+                              <span>Abandonar</span>
+                            </button>
+                          </>
+                        )}
+
+                        {isAbandoned && (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-950/40 border border-red-800/60 text-red-300">
+                              <X className="w-4 h-4 text-red-400" />
+                              <span>Serie Abandonada</span>
+                            </span>
+
+                            <button
+                              onClick={handleFollow}
+                              title="Reanudar seguimiento de la serie"
+                              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-blue-300 hover:text-white shadow-md transition-all"
+                            >
+                              <Play className="w-4 h-4 fill-current text-blue-400" />
+                              <span>Reanudar / Follow</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Si no está siguiendo ni en vista ni abandonada, se muestra Watchlist */}
+                        {userEstado !== 'siguiendo' && userEstado !== 'vista' && !isAbandoned && (
+                          <button
+                            onClick={handleWatchlistToggle}
+                            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                              userEstado === 'watchlist'
+                                ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-md'
+                                : 'bg-[#141414] border-[#262626] text-gray-300 hover:bg-amber-500/10 hover:border-amber-500/40 hover:text-amber-300'
+                            }`}
+                          >
+                            <Bookmark className={`w-4 h-4 ${userEstado === 'watchlist' ? 'fill-current' : ''}`} />
+                            <span>Watchlist</span>
+                          </button>
+                        )}
                       </>
-                    )}
-
-                    {userEstado === 'abandonada' && (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-950/40 border border-red-800/60 text-red-300">
-                          <X className="w-4 h-4 text-red-400" />
-                          <span>Serie Abandonada</span>
-                        </span>
-
-                        <button
-                          onClick={handleFollow}
-                          title="Reanudar seguimiento de la serie"
-                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-blue-300 hover:text-white shadow-md transition-all"
-                        >
-                          <Play className="w-4 h-4 fill-current text-blue-400" />
-                          <span>Reanudar / Follow</span>
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Si no está siguiendo ni en vista ni abandonada, se muestra Watchlist */}
-                    {userEstado !== 'siguiendo' && userEstado !== 'vista' && userEstado !== 'abandonada' && (
-                      <button
-                        onClick={handleWatchlistToggle}
-                        className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                          userEstado === 'watchlist'
-                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-md'
-                            : 'bg-[#141414] border-[#262626] text-gray-300 hover:bg-amber-500/10 hover:border-amber-500/40 hover:text-amber-300'
-                        }`}
-                      >
-                        <Bookmark className={`w-4 h-4 ${userEstado === 'watchlist' ? 'fill-current' : ''}`} />
-                        <span>Watchlist</span>
-                      </button>
-                    )}
-                  </>
+                    )
+                  })()
                 ) : (
                   /* Para Películas: Watchlist si no está vista */
                   userEstado !== 'vista' && (

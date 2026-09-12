@@ -10,8 +10,8 @@ La pantalla principal (`GET /api/v1/home`) presenta colecciones curadas para des
 
 | Sección | Filtro / Ventana Temporal | Criterios de Calificación y Votos | Pool de Selección | Muestra en Home | Ordenamiento | Extensión "Ver más" |
 |---|---|---|---|---|---|---|
-| **New Releases** | Últimos 60 días (`fecha_estreno >= hoy - 60d`) | Sin mínimo | N/A (directo) | Top 10 | `fecha_estreno DESC, popularidad DESC` | Sí (`/titles?section=new_releases`) |
-| **Trending** | Últimos 90 días (`fecha_estreno` o último episodio) | Sin mínimo | N/A (directo) | Top 10 | `popularidad DESC` | Sí (`/titles?section=trending`) |
+| **New Releases** | Últimos 30 días (`fecha_estreno >= hoy - 30d`) | Sin mínimo | N/A (directo) | Top 10 | `fecha_estreno DESC, popularidad DESC` | Sí (`/titles?section=new_releases`) |
+| **Trending** | Últimos 90 días (`fecha_estreno` o último episodio) | Percentil de popularidad $\ge 80\%$ (`popularidad_percentil >= 0.80`) | N/A (directo) | Top 10 | `popularidad DESC` | Sí (`/titles?section=trending`) |
 | **Classics** | Antigüedad > 20 años (`fecha_estreno <= año_actual - 20`) | `rating >= 7.5` y $\ge 500$ votos | Top 50 más populares | Muestra aleatoria de 10 | `popularidad DESC` (en pool) | Sí (`/titles?section=classics`) |
 | **Top Rated** | Todo el catálogo histórico | Votos $\ge 100$ | Top 100 con mayor rating | Muestra aleatoria de 10 | `rating_unificado DESC, votos DESC` | Sí (`/titles?section=top_rated`) |
 | **By Genre** | Por cada género con $\ge 10$ títulos | Sin restricción | Top 100 del género | Muestra aleatoria de 10 por género | `popularidad DESC` | Sí (`/titles?genero=Nombre` o `genero_id=X`) |
@@ -20,10 +20,10 @@ La pantalla principal (`GET /api/v1/home`) presenta colecciones curadas para des
 ### 1.1. Reglas Específicas por Sección
 
 1. **New Releases:**
-   - Solo incluye estrenos absolutos dentro de la ventana de 60 días (`HOME_NEW_RELEASES_DAYS = 60`).
+   - Solo incluye estrenos absolutos dentro de la ventana de 30 días (`HOME_NEW_RELEASES_DAYS = 30`).
    - Para series, solo ingresan aquellas cuyo estreno de la **primera temporada** ocurrió dentro de la ventana (no ingresan por estrenar nueva temporada).
 2. **Trending:**
-   - Considera producciones con movimiento reciente en una ventana de 90 días (`HOME_TRENDING_DAYS = 90`).
+   - Considera producciones con movimiento reciente en una ventana de 90 días (`HOME_TRENDING_DAYS = 90`) y con un percentil de popularidad mínimo del 80% (`HOME_TRENDING_MIN_POPULARITY_PERCENTILE = 0.80`).
    - Para series, ingresan si la fecha de estreno de la serie o la fecha de emisión de su **último episodio emitido** entra en la ventana de 90 días. Se ignora cualquier temporada placeholder que carezca de episodios.
 3. **Classics:**
    - **Exclusivo de películas:** Si el usuario selecciona el toggle `tipo=tv`, la sección devuelve una lista vacía `[]`.
@@ -36,10 +36,9 @@ La pantalla principal (`GET /api/v1/home`) presenta colecciones curadas para des
    - Si un género tiene $\ge 10$ títulos en la base (`HOME_GENRE_MIN_TITLES_FOR_CAROUSEL`), se renderiza en su propio carrusel horizontal.
    - Los géneros de nicho que no alcanzan los 10 títulos no se descartan: se agrupan ordenados por popularidad en el carrusel de **Others**.
 
-### 1.2. Regla Transversal: Exclusión de Títulos Vistos
-Cuando la petición incluye el token JWT de un usuario autenticado:
-- Se omiten automáticamente de **todos los carruseles de Home** aquellos títulos que el usuario tenga marcados con `estado == 'vista'`.
-- La Home funciona como una vitrina de descubrimiento y exploración continua, evitando recomendar obras ya consumidas.
+### 1.2. Regla Transversal: Preservación de Títulos en Home
+- Los títulos ya vistos (`vista`) o en seguimiento (`siguiendo`) **se preservan en todos los carruseles de Home** con sus respectivos indicadores visuales y badges, evitando vaciar o desvirtuar las colecciones curadas (*Trending, New Releases, Classics, etc.*).
+- Las tarjetas (`TitleCard`) renderizan el estado contextual del usuario autenticado de forma no intrusiva sin alterar la composición ni el orden curado de las secciones.
 
 ---
 
@@ -52,15 +51,15 @@ Cada usuario mantiene un registro individual de interacción con cada título (`
    - `watchlist`: Título guardado para ver en el futuro.
    - `siguiendo`: Serie que se está viendo activamente.
    - `vista`: Película o serie completada.
-   - `abandonada`: Serie descartada antes de finalizar.
+   - `abandonada`: Serie descartada antes de finalizar (estado derivado cuando `estado` es `null` en BD y `episodios_vistos > 0`).
    - `null`: Título sin seguimiento activo.
 
 ### 2.1. Transiciones Atómicas en Series
 - Marcar cualquier episodio como visto (`POST /watch`) transiciona automáticamente la serie a `siguiendo` si no estaba en ese estado.
 - Al marcar el **último episodio pendiente** de una serie, esta transiciona automáticamente a `vista`.
 - Si se desmarca un episodio de una serie con estado `vista`, esta regresa automáticamente a `siguiendo`.
-- **Abandono explícito (`POST /titles/{id}/unfollow`):** Si la serie se encuentra en `siguiendo`, pasa al estado `abandonada` conservando intactos todos los episodios vistos en `EpisodioVisto`.
-- **Reanudación directa (`POST /titles/{id}/follow`):** Permite retomar una serie en estado `abandonada` (o sin estado con episodios vistos previos) regresando directamente a `siguiendo` sin forzar la alteración del checklist de episodios.
+- **Abandono explícito (`POST /titles/{id}/unfollow`):** Si la serie se encuentra en `siguiendo`, pasa a `SinEstado` (`estado = null` en BD) conservando intactos todos los episodios vistos en `EpisodioVisto`, deduciéndose como abandonada.
+- **Reanudación directa (`POST /titles/{id}/follow`):** Permite retomar una serie abandonada con episodios vistos previos, regresando directamente a `siguiendo` sin forzar la alteración del checklist de episodios.
 
 ---
 

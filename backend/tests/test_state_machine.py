@@ -149,14 +149,14 @@ async def test_serie_abandon_and_preserve_progress(async_client: AsyncClient, db
     # Ver ep1 -> estado pasa a siguiendo
     await async_client.post(f"/api/v1/episodes/{ep1.id}/watch", headers=headers)
 
-    # Abandonar serie
+    # Abandonar serie (pasa a SinEstado pero conserva episodios)
     abandon_res = await async_client.post(f"/api/v1/titles/{serie.id}/unfollow", headers=headers)
     assert abandon_res.status_code == 200
-    assert abandon_res.json()["nuevo_estado"] == "abandonada"
+    assert abandon_res.json()["nuevo_estado"] is None
 
-    # Verificar que el estado es abandonada pero el progreso se conserva (1 episodio visto)
+    # Verificar que el estado es None pero el progreso se conserva (1 episodio visto -> abandonada deducida)
     st = await async_client.get(f"/api/v1/titles/{serie.id}/user-state", headers=headers)
-    assert st.json()["estado"] == "abandonada"
+    assert st.json()["estado"] is None
     assert st.json()["episodios_vistos"] == 1
     assert st.json()["total_episodios"] == 2
 

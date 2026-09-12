@@ -89,7 +89,7 @@
   - [x] **Ajustes de UX y Perfeccionamiento de Reseñas (v0.7.1 - v0.7.3)**
     - [x] Ocultamiento de Watchlist en películas vistas, scroll arriba automático en detalle de título, ajuste tipográfico en tarjetas para rangos de años y colapso rápido de episodios de series (v0.7.1).
     - [x] Inclusión de series en curso (`siguiendo`) o abandonadas en Reseñas Pendientes (`/reviews?tab=pending`) e insignias de estado correspondientes (v0.7.2).
-    - [x] Transición explícita de estado `abandonada`, endpoint `POST /titles/{id}/follow` (Reanudar / Follow) para series con progreso previo, actualización de diagramas UML, especificaciones y botón interactivo en UI (v0.7.3).
+    - [x] Modelo de estado `abandonada` deducido (invariante de dominio), endpoint `POST /titles/{id}/follow` (Reanudar / Follow) para series con progreso previo, actualización de diagramas UML, especificaciones y botón interactivo en UI (v0.7.3).
   - [ ] **Fase 3: Progreso de Siguiendo, Orden Cronológico, Perfil y Settings**
     - [ ] Barra segmentada por temporada en Siguiendo (episodios estrenados).
     - [ ] Orden `updated_at DESC` en listas de usuario.

@@ -204,7 +204,7 @@ async def abandon_series(
     usuario_id: int,
     titulo_id: int
 ) -> StateChangeResponse:
-    """Abandona una serie (❌). Pasa de Siguiendo a Abandonada, conservando los episodios vistos."""
+    """Abandona una serie (❌). Pasa de Siguiendo a SinEstado, conservando los episodios vistos."""
     titulo = await db.get(Titulo, titulo_id)
     if not titulo:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Título no encontrado.")
@@ -220,16 +220,15 @@ async def abandon_series(
             detail="Solo las series en estado 'siguiendo' pueden ser abandonadas."
         )
 
-    # Marca estado como abandonada conservando los episodios vistos
-    now_ts = _now()
-    estado_obj.estado = "abandonada"
-    estado_obj.fecha_estado = now_ts
+    # Quita el estado activo pero conserva todos los episodios vistos (estado deducido = abandonada)
+    estado_obj.estado = None
+    estado_obj.fecha_estado = None
 
     await db.commit()
     return StateChangeResponse(
         titulo_id=titulo_id,
-        nuevo_estado="abandonada",
-        fecha_estado=now_ts,
+        nuevo_estado=None,
+        fecha_estado=None,
         mensaje="Serie abandonada. El progreso de episodios vistos se conserva."
     )
 
@@ -382,14 +381,14 @@ async def toggle_episode_watched(
         estado_obj.fecha_estado = _now()
     elif episodios_vistos > 0:
         # Tiene episodios vistos pero no todos los emitidos
-        if estado_obj.estado in (None, "watchlist", "vista", "abandonada"):
+        if estado_obj.estado in (None, "watchlist", "vista"):
             estado_obj.estado = "siguiendo"
             estado_obj.fecha_estado = _now()
         # Si ya estaba en 'siguiendo', permanece en 'siguiendo'
     else:
         # 0 episodios vistos
-        # Caso borde: si estaba en 'siguiendo' o 'abandonada' y desmarcó el único, cae a SinEstado
-        if estado_obj.estado in ("siguiendo", "abandonada"):
+        # Caso borde: si estaba en 'siguiendo' y desmarcó el único, cae a SinEstado
+        if estado_obj.estado == "siguiendo":
             estado_obj.estado = None
             estado_obj.fecha_estado = None
 

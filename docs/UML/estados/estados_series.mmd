@@ -35,3 +35,8 @@ stateDiagram-v2
     NO se puede ir directo a Watchlist:
     icono bookmark bloqueado mientras esta Vista
   end note
+  note right of Abandonada
+    Estado computado / derivado:
+    estado == null en BD && episodios_vistos > 0
+    Icono interactuable: Reanudar / Follow (POST /follow)
+  end note

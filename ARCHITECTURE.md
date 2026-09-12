@@ -73,7 +73,7 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
    - **Endpoints de Usuario:** `/api/v1/users/me/reviews` (paginado) y `/api/v1/users/me/unreviewed-watched` (títulos vistos sin reseña).
 
 7. **Ciclo de Vida y Transición de Estados en Series:**
-   - **Abandono y Reanudación Fluida:** El abandono (`POST /titles/{id}/unfollow`) transiciona la serie a `abandonada` conservando los registros en `EpisodioVisto`. El endpoint `POST /titles/{id}/follow` permite reanudarla directamente a `siguiendo` sin forzar la alteración del checklist de episodios.
+   - **Abandono y Reanudación Fluida:** El abandono (`POST /titles/{id}/unfollow`) quita el estado activo (`estado = None` en base de datos) conservando intactos los registros en `EpisodioVisto`, deduciéndose como "abandonada" en tiempo de lectura e interfaces. El endpoint `POST /titles/{id}/follow` permite reanudarla directamente a `siguiendo` sin forzar la alteración del checklist de episodios.
 
 ---
 
