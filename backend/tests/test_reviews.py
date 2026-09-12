@@ -156,3 +156,31 @@ async def test_review_optional_score_and_pending(async_client: AsyncClient, db_s
     pending_items2 = res_unrev2.json()["items"]
     assert len(pending_items2) == 1
     assert pending_items2[0]["id"] == 2
+
+    # 7. Crear una serie con episodios y marcar 1 episodio visto (estado = 'siguiendo')
+    from app.models import Temporada, Episodio
+    s1 = Titulo(
+        id=3,
+        tmdb_id=2003,
+        tipo="tv",
+        nombre="Severance",
+        fecha_estreno=date(2022, 2, 18),
+        popularidad=95.0,
+        vote_average_tmdb=8.7,
+        vote_count_tmdb=1100,
+        rating_unificado=8.7
+    )
+    temp = Temporada(id=10, titulo_id=3, numero=1)
+    ep1 = Episodio(id=101, temporada_id=10, numero=1, nombre="Good News About Hell", fecha_estreno=date(2022, 2, 18))
+    ep2 = Episodio(id=102, temporada_id=10, numero=2, nombre="Half Loop", fecha_estreno=date(2022, 2, 18))
+    db_session.add_all([s1, temp, ep1, ep2])
+    await db_session.commit()
+
+    # Marcar solo el episodio 1 como visto -> la serie queda en estado "siguiendo" (sin terminar)
+    await async_client.post("/api/v1/episodes/101/watch", headers=headers)
+
+    # Debe aparecer en /users/me/unreviewed-watched porque ya se vio al menos un episodio
+    res_unrev3 = await async_client.get("/api/v1/users/me/unreviewed-watched", headers=headers)
+    pending_ids3 = [p["id"] for p in res_unrev3.json()["items"]]
+    assert 3 in pending_ids3
+

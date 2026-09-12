@@ -2,6 +2,12 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.7.2] - 2026-09-12
+### Agregado & Mejorado
+- **Inclusión de Series en Progreso y Abandonadas en Reseñas Pendientes:** Se expandió el filtro de `GET /api/v1/users/me/unreviewed-watched` para incluir series con estado `siguiendo` (con al menos un episodio visto) o `abandonada`, permitiendo que el usuario pueda evaluar y reseñar series que comenzó a ver aunque no las haya concluido en su totalidad.
+- **Insignias de Estado en Reseñas Pendientes:** En la pestaña *"Pending Reviews"* de [ReviewsPage](file:///d:/Documentos/Cursos/UTN_E-Learning_IA-para-Programadores/Proyectos/CineTrack/frontend/src/pages/ReviewsPage.tsx), se identifican claramente los títulos con badges contextuales (`Watching`, `Completed`, `Dropped`).
+- **Prueba Unitaria Automatizada:** Incorporación de paso de verificación en `backend/tests/test_reviews.py` que comprueba que marcar un solo episodio de una serie la habilita inmediatamente en el listado de pendientes de reseña.
+
 ## [v0.7.1] - 2026-09-12
 ### Corregido & Mejorado
 - **Ocultamiento de Watchlist en Películas Vistas:** El botón de Watchlist ahora se oculta de forma coherente cuando una película ya está marcada como `vista` (tanto en la ficha de detalle [TitleDetailPage](file:///d:/Documentos/Cursos/UTN_E-Learning_IA-para-Programadores/Proyectos/CineTrack/frontend/src/pages/TitleDetailPage.tsx) como en las tarjetas [TitleCard](file:///d:/Documentos/Cursos/UTN_E-Learning_IA-para-Programadores/Proyectos/CineTrack/frontend/src/components/common/TitleCard.tsx)).

@@ -812,7 +812,13 @@ async def get_user_unreviewed_watched_titles(
         .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
         .where(
             EstadoUsuarioTitulo.usuario_id == usuario_id,
-            EstadoUsuarioTitulo.estado == "vista",
+            or_(
+                EstadoUsuarioTitulo.estado == "vista",
+                and_(
+                    Titulo.tipo == "tv",
+                    EstadoUsuarioTitulo.estado.in_(["siguiendo", "abandonada"])
+                )
+            ),
             ~Titulo.id.in_(reviewed_ids_subq)
         )
         .order_by(desc(EstadoUsuarioTitulo.fecha_estado))

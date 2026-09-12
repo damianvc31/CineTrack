@@ -527,7 +527,7 @@ export const ReviewsPage: React.FC = () => {
               <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
               <h3 className="text-lg font-bold text-white">All caught up!</h3>
               <p className="text-xs text-gray-400">
-                You have reviewed all the titles marked as watched in your library.
+                You have reviewed all watched and in-progress titles in your library.
               </p>
               <Link
                 to="/catalog"
@@ -538,9 +538,9 @@ export const ReviewsPage: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-[#141414] border border-[#262626] flex items-center justify-between">
+              <div className="p-4 rounded-xl bg-[#141414] border border-[#262626] flex items-center justify-between flex-wrap gap-2">
                 <span className="text-xs text-gray-300 font-medium">
-                  {pendingTitles.length} titles marked as watched without a review yet.
+                  {pendingTitles.length} watched or in-progress titles waiting for your review.
                 </span>
                 <span className="text-[11px] text-amber-500/90 font-medium">
                   Rate them to refine your recommendations!
@@ -573,7 +573,7 @@ export const ReviewsPage: React.FC = () => {
                             {t.nombre}
                           </Link>
 
-                          <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                          <div className="flex items-center gap-2 text-[11px] text-gray-400 flex-wrap">
                             <span className="flex items-center gap-1">
                               {t.tipo === 'movie' ? (
                                 <>
@@ -587,6 +587,26 @@ export const ReviewsPage: React.FC = () => {
                             </span>
                             <span>•</span>
                             <span>{t.anio_estreno || '-'}</span>
+                            {t.tipo === 'tv' && t.user_estado && (
+                              <>
+                                <span>•</span>
+                                <span
+                                  className={`px-1.5 py-0.2 rounded text-[10px] font-semibold border ${
+                                    t.user_estado === 'siguiendo'
+                                      ? 'bg-blue-950/40 text-blue-300 border-blue-800/60'
+                                      : t.user_estado === 'vista'
+                                      ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/60'
+                                      : 'bg-red-950/40 text-red-300 border-red-800/60'
+                                  }`}
+                                >
+                                  {t.user_estado === 'siguiendo'
+                                    ? 'Watching'
+                                    : t.user_estado === 'vista'
+                                    ? 'Completed'
+                                    : 'Dropped'}
+                                </span>
+                              </>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold pt-1">
