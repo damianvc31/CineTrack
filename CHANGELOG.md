@@ -2,6 +2,13 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.7.1] - 2026-09-12
+### Corregido & Mejorado
+- **Ocultamiento de Watchlist en Películas Vistas:** El botón de Watchlist ahora se oculta de forma coherente cuando una película ya está marcada como `vista` (tanto en la ficha de detalle [TitleDetailPage](file:///d:/Documentos/Cursos/UTN_E-Learning_IA-para-Programadores/Proyectos/CineTrack/frontend/src/pages/TitleDetailPage.tsx) como en las tarjetas [TitleCard](file:///d:/Documentos/Cursos/UTN_E-Learning_IA-para-Programadores/Proyectos/CineTrack/frontend/src/components/common/TitleCard.tsx)).
+- **Scroll Automático al Inicio en Detalle:** Al navegar hacia la ficha de cualquier título, el scroll de la ventana se reposiciona inmediatamente arriba del todo (`window.scrollTo({ top: 0, behavior: 'instant' })`).
+- **Ajuste Tipográfico en Tarjetas:** Optimización del ancho flexible (`min-w-0 flex-1`) y tamaño de fuente (`text-[10px] tracking-tight`) en el metadato de año y temporadas para que rangos largos (ej. `5 seasons | 2008-2013`) entren fluidamente junto a la bandera sin truncarse prematuramente.
+- **Colapso Rápido de Episodios:** Botón toggle *"Hide Episodes / Show Episodes"* en la cabecera de temporadas de series, permitiendo plegar la lista de episodios para saltar directamente a la sección de reseñas y comentarios sin scrollear extensamente.
+
 ## [v0.7.0] - 2026-09-12
 ### Agregado
 - **Motor Integral de Reseñas y Calificaciones (Fase 2):**
