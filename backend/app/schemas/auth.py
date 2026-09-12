@@ -33,3 +33,15 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class UserUpdate(BaseModel):
+    pais: str | None = Field(default=None, max_length=100)
+    ciudad: str | None = Field(default=None, max_length=100)
+    descripcion: str | None = Field(default=None, max_length=500)
+    avatar_url: str | None = Field(default=None, max_length=500)
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(..., description="Contraseña actual")
+    new_password: str = Field(..., min_length=6, max_length=100, description="Nueva contraseña")

@@ -47,6 +47,15 @@ class SeasonResponse(BaseModel):
     episodios: list[EpisodeResponse] = Field(default_factory=list)
 
 
+class SeasonProgressResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    numero: int
+    total_episodios: int
+    episodios_vistos: int
+    estado: Literal["completed", "in_progress", "unwatched"]
+
+
 class TitleCardResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -72,6 +81,8 @@ class TitleCardResponse(BaseModel):
     user_estado: str | None = None
     pais: str | None = None
     idioma_original: str | None = None
+    seasons_progress: list[SeasonProgressResponse] | None = None
+    following_status_text: str | None = None
 
 
 class TitleDetailResponse(TitleCardResponse):
@@ -180,7 +191,9 @@ class UserStatsResponse(BaseModel):
     movie_hours: float
     tv_hours: float
     movies_watched_count: int
+    avg_movies_per_week: float = 0.0
     series_watched_count: int
+    seasons_completed_count: int = 0
     episodes_watched_count: int
     top_by_popularity: list[TopTitleStat] = Field(default_factory=list)
     top_by_community_rating: list[TopTitleStat] = Field(default_factory=list)

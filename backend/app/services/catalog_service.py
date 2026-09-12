@@ -1,5 +1,5 @@
 import random
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
 from sqlalchemy import and_, delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,7 @@ from app.models import (
     titulos_elenco,
     titulos_generos,
 )
+from app.models.usuario import Usuario
 from app.schemas.catalog import (
     CastMemberResponse,
     EpisodeResponse,
@@ -26,6 +27,7 @@ from app.schemas.catalog import (
     HomeSectionsResponse,
     ReviewCreate,
     ReviewResponse,
+    SeasonProgressResponse,
     SeasonResponse,
     TitleCardResponse,
     TitleDetailResponse,
@@ -42,7 +44,9 @@ from app.schemas.catalog import (
 def _build_title_card(
     titulo: Titulo,
     user_state: Optional[EstadoUsuarioTitulo] = None,
-    is_abandoned: bool = False
+    is_abandoned: bool = False,
+    seasons_progress: Optional[List[SeasonProgressResponse]] = None,
+    following_status_text: Optional[str] = None
 ) -> TitleCardResponse:
     total_seasons = len(titulo.temporadas) if titulo.tipo == "tv" and hasattr(titulo, "temporadas") and titulo.temporadas else None
     genres = [GenreResponse(id=g.id, nombre=g.nombre) for g in titulo.generos] if hasattr(titulo, "generos") and titulo.generos else []
@@ -80,6 +84,8 @@ def _build_title_card(
         user_estado=user_estado,
         pais=titulo.pais,
         idioma_original=titulo.idioma_original,
+        seasons_progress=seasons_progress,
+        following_status_text=following_status_text,
     )
 
 
@@ -909,37 +915,116 @@ async def get_user_library(
     db: AsyncSession,
     usuario_id: int
 ) -> UserLibraryResponse:
-    """Devuelve las listas de títulos categorizados por estado para el usuario."""
+    """Devuelve las listas de títulos categorizados por estado para el usuario con orden cronológico descendente y progreso de siguiendo."""
     q = (
         select(Titulo, EstadoUsuarioTitulo)
         .join(EstadoUsuarioTitulo, EstadoUsuarioTitulo.titulo_id == Titulo.id)
-        .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
+        .options(
+            selectinload(Titulo.generos),
+            selectinload(Titulo.temporadas).selectinload(Temporada.episodios)
+        )
         .where(EstadoUsuarioTitulo.usuario_id == usuario_id)
     )
     res = await db.execute(q)
     rows = res.all()
 
-    following = []
-    favorites = []
-    watchlist = []
-    recently_watched = []
+    # Obtener IDs de episodios vistos del usuario
+    vistos_q = select(EpisodioVisto.episodio_id).where(EpisodioVisto.usuario_id == usuario_id)
+    vistos_res = await db.execute(vistos_q)
+    watched_ep_ids = set(vistos_res.scalars().all())
+
+    today = date.today()
+
+    following_items = []
+    favorites_items = []
+    watchlist_items = []
+    recently_watched_items = []
 
     for titulo, st in rows:
-        card = _build_title_card(titulo, st)
+        seasons_prog = None
+        status_text = None
+
+        if st.estado == "siguiendo" and titulo.tipo == "tv":
+            seasons_prog = []
+            earliest_uncompleted = None
+            valid_seasons = sorted(
+                [s for s in titulo.temporadas if s.numero > 0],
+                key=lambda x: x.numero
+            )
+            for s in valid_seasons:
+                aired_eps = [ep for ep in s.episodios if not ep.fecha_estreno or ep.fecha_estreno <= today]
+                total_eps = len(aired_eps)
+                if total_eps == 0:
+                    continue
+                vistos = sum(1 for ep in aired_eps if ep.id in watched_ep_ids)
+                if total_eps > 0 and vistos == total_eps:
+                    estado_temp = "completed"
+                elif vistos > 0:
+                    estado_temp = "in_progress"
+                else:
+                    estado_temp = "unwatched"
+
+                seasons_prog.append(SeasonProgressResponse(
+                    numero=s.numero,
+                    total_episodios=total_eps,
+                    episodios_vistos=vistos,
+                    estado=estado_temp
+                ))
+
+                if estado_temp != "completed" and earliest_uncompleted is None:
+                    earliest_uncompleted = (s.numero, estado_temp)
+
+            if earliest_uncompleted:
+                s_num, s_st = earliest_uncompleted
+                if s_st == "in_progress":
+                    status_text = f"S{s_num} in progress"
+                else:
+                    status_text = f"S{s_num} watchlist"
+            elif seasons_prog:
+                status_text = "All caught up"
+
+        card = _build_title_card(
+            titulo,
+            user_state=st,
+            seasons_progress=seasons_prog,
+            following_status_text=status_text
+        )
+
+        min_date = datetime.min.replace(tzinfo=timezone.utc)
+
         if st.favorito:
-            favorites.append(card)
+            fav_date = st.fecha_favorito if st.fecha_favorito else min_date
+            if fav_date.tzinfo is None:
+                fav_date = fav_date.replace(tzinfo=timezone.utc)
+            favorites_items.append((fav_date, card))
+
         if st.estado == "watchlist":
-            watchlist.append(card)
+            st_date = st.fecha_estado if st.fecha_estado else min_date
+            if st_date.tzinfo is None:
+                st_date = st_date.replace(tzinfo=timezone.utc)
+            watchlist_items.append((st_date, card))
         elif st.estado == "siguiendo":
-            following.append(card)
+            st_date = st.fecha_estado if st.fecha_estado else min_date
+            if st_date.tzinfo is None:
+                st_date = st_date.replace(tzinfo=timezone.utc)
+            following_items.append((st_date, card))
         elif st.estado == "vista":
-            recently_watched.append(card)
+            st_date = st.fecha_estado if st.fecha_estado else min_date
+            if st_date.tzinfo is None:
+                st_date = st_date.replace(tzinfo=timezone.utc)
+            recently_watched_items.append((st_date, card))
+
+    # Orden cronológico descendente (más reciente primero)
+    favorites_items.sort(key=lambda x: x[0], reverse=True)
+    watchlist_items.sort(key=lambda x: x[0], reverse=True)
+    following_items.sort(key=lambda x: x[0], reverse=True)
+    recently_watched_items.sort(key=lambda x: x[0], reverse=True)
 
     return UserLibraryResponse(
-        following=following,
-        favorites=favorites,
-        watchlist=watchlist,
-        recently_watched=recently_watched
+        following=[item[1] for item in following_items],
+        favorites=[item[1] for item in favorites_items],
+        watchlist=[item[1] for item in watchlist_items],
+        recently_watched=[item[1] for item in recently_watched_items]
     )
 
 
@@ -993,6 +1078,39 @@ async def get_user_stats(
     movie_hours = round(movie_minutes / 60.0, 1)
     tv_hours = round(tv_minutes / 60.0, 1)
     total_hours = round((movie_minutes + tv_minutes) / 60.0, 1)
+
+    # Promedio de películas por semana desde el registro
+    user = await db.get(Usuario, usuario_id)
+    if user and user.fecha_registro:
+        reg_date = user.fecha_registro
+        if reg_date.tzinfo is None:
+            reg_date = reg_date.replace(tzinfo=timezone.utc)
+        now_utc = datetime.now(timezone.utc)
+        days_diff = max(1.0, (now_utc - reg_date).total_seconds() / 86400.0)
+        weeks = max(1.0, days_diff / 7.0)
+        avg_movies_per_week = round(movies_count / weeks, 1)
+    else:
+        avg_movies_per_week = float(movies_count)
+
+    # Temporadas completadas
+    q_seasons = (
+        select(Temporada)
+        .options(selectinload(Temporada.episodios))
+        .join(Episodio, Episodio.temporada_id == Temporada.id)
+        .join(EpisodioVisto, EpisodioVisto.episodio_id == Episodio.id)
+        .where(EpisodioVisto.usuario_id == usuario_id)
+        .distinct()
+    )
+    res_seasons = await db.execute(q_seasons)
+    user_touched_seasons = res_seasons.scalars().all()
+
+    user_ep_ids = {ep.id for ep, _ in watched_ep_rows}
+    today = date.today()
+    seasons_completed_count = 0
+    for s in user_touched_seasons:
+        aired_eps = [ep for ep in s.episodios if not ep.fecha_estreno or ep.fecha_estreno <= today]
+        if aired_eps and all(ep.id in user_ep_ids for ep in aired_eps):
+            seasons_completed_count += 1
 
     # 3. Distribución de géneros vistos
     genres_dist = {}
@@ -1081,7 +1199,9 @@ async def get_user_stats(
         movie_hours=movie_hours,
         tv_hours=tv_hours,
         movies_watched_count=movies_count,
+        avg_movies_per_week=avg_movies_per_week,
         series_watched_count=series_count,
+        seasons_completed_count=seasons_completed_count,
         episodes_watched_count=episodes_count,
         top_by_popularity=top_pop,
         top_by_community_rating=top_community,

@@ -383,8 +383,7 @@ async def toggle_episode_watched(
         # Tiene episodios vistos pero no todos los emitidos
         if estado_obj.estado in (None, "watchlist", "vista"):
             estado_obj.estado = "siguiendo"
-            estado_obj.fecha_estado = _now()
-        # Si ya estaba en 'siguiendo', permanece en 'siguiendo'
+        estado_obj.fecha_estado = _now()
     else:
         # 0 episodios vistos
         # Caso borde: si estaba en 'siguiendo' y desmarcó el único, cae a SinEstado
@@ -599,7 +598,7 @@ async def toggle_season_watched(
     elif episodios_vistos > 0:
         if estado_obj.estado in (None, "watchlist", "vista"):
             estado_obj.estado = "siguiendo"
-            estado_obj.fecha_estado = _now()
+        estado_obj.fecha_estado = _now()
     else:
         if estado_obj.estado == "siguiendo":
             estado_obj.estado = None
