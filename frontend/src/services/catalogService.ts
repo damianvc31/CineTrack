@@ -77,6 +77,9 @@ export const catalogService = {
   unfollowSeries: (titleId: number) =>
     api.post<{ nuevo_estado: string | null; mensaje: string }>(`/titles/${titleId}/unfollow`),
 
+  followSeries: (titleId: number) =>
+    api.post<{ nuevo_estado: string | null; mensaje: string }>(`/titles/${titleId}/follow`),
+
   getUserState: (titleId: number) =>
     api.get<{
       titulo_id: number

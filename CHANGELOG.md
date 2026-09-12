@@ -2,6 +2,14 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.7.3] - 2026-09-12
+### Agregado & Mejorado
+- **Transición Explícita de Estado 'Abandonada':** Al presionar *Abandonar* (`POST /api/v1/titles/{id}/unfollow`), la serie transiciona explícitamente a `estado = 'abandonada'` conservando todos los episodios vistos en base de datos.
+- **Nuevo Endpoint de Reanudación Directa (`POST /api/v1/titles/{id}/follow`):** Permite retomar de inmediato el seguimiento de una serie abandonada que tenga episodios vistos previos, transicionándola a `siguiendo` sin forzar la alteración del checklist de episodios.
+- **Botón 'Reanudar / Follow' en Detalle:** En la pantalla de detalle (`TitleDetailPage`), las series en estado `abandonada` muestran la insignia `Serie Abandonada` junto al botón interactivo con ícono `Play` para reanudarlas con un solo clic.
+- **Actualización de UML y Especificaciones:** Incorporación formal del nodo `Abandonada` y las transiciones en el diagrama de estados Mermaid (`docs/UML/estados/estados_series.mmd`), `docs/CATALOG_SPECS.md` y `ARCHITECTURE.md`.
+- **Suite de Pruebas Automatizadas:** 50 tests pasando en backend (`pytest`), cubriendo el ciclo completo de abandono, reanudación y validaciones de borde.
+
 ## [v0.7.2] - 2026-09-12
 ### Agregado & Mejorado
 - **Inclusión de Series en Progreso y Abandonadas en Reseñas Pendientes:** Se expandió el filtro de `GET /api/v1/users/me/unreviewed-watched` para incluir series con estado `siguiendo` (con al menos un episodio visto) o `abandonada`, permitiendo que el usuario pueda evaluar y reseñar series que comenzó a ver aunque no las haya concluido en su totalidad.

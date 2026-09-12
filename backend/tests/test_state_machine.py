@@ -152,15 +152,25 @@ async def test_serie_abandon_and_preserve_progress(async_client: AsyncClient, db
     # Abandonar serie
     abandon_res = await async_client.post(f"/api/v1/titles/{serie.id}/unfollow", headers=headers)
     assert abandon_res.status_code == 200
-    assert abandon_res.json()["nuevo_estado"] is None
+    assert abandon_res.json()["nuevo_estado"] == "abandonada"
 
-    # Verificar que el estado es None pero el progreso se conserva (1 episodio visto)
+    # Verificar que el estado es abandonada pero el progreso se conserva (1 episodio visto)
     st = await async_client.get(f"/api/v1/titles/{serie.id}/user-state", headers=headers)
-    assert st.json()["estado"] is None
+    assert st.json()["estado"] == "abandonada"
     assert st.json()["episodios_vistos"] == 1
     assert st.json()["total_episodios"] == 2
 
-    # Volver a poner en Watchlist conservando progreso previo
+    # Reanudar seguimiento con follow (Reanudar / Follow)
+    follow_res = await async_client.post(f"/api/v1/titles/{serie.id}/follow", headers=headers)
+    assert follow_res.status_code == 200
+    assert follow_res.json()["nuevo_estado"] == "siguiendo"
+
+    st_follow = await async_client.get(f"/api/v1/titles/{serie.id}/user-state", headers=headers)
+    assert st_follow.json()["estado"] == "siguiendo"
+    assert st_follow.json()["episodios_vistos"] == 1
+
+    # Volver a abandonar y poner en Watchlist conservando progreso previo
+    await async_client.post(f"/api/v1/titles/{serie.id}/unfollow", headers=headers)
     wl_res = await async_client.post(f"/api/v1/titles/{serie.id}/watchlist", headers=headers)
     assert wl_res.status_code == 200
     assert wl_res.json()["nuevo_estado"] == "watchlist"
@@ -168,6 +178,37 @@ async def test_serie_abandon_and_preserve_progress(async_client: AsyncClient, db
     st_after = await async_client.get(f"/api/v1/titles/{serie.id}/user-state", headers=headers)
     assert st_after.json()["estado"] == "watchlist"
     assert st_after.json()["episodios_vistos"] == 1
+
+
+@pytest.mark.asyncio
+async def test_serie_resume_follow_validation(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica validaciones de /titles/{id}/follow (requiere episodios vistos y no estar en siguiendo/vista)."""
+    serie = Titulo(tmdb_id=3002, tipo="tv", nombre="Fringe")
+    temp = Temporada(titulo=serie, numero=1)
+    ep1 = Episodio(temporada=temp, numero=1, nombre="Pilot")
+    ep2 = Episodio(temporada=temp, numero=2, nombre="The Same Old Story")
+    db_session.add_all([serie, temp, ep1, ep2])
+    await db_session.commit()
+    await db_session.refresh(serie)
+    await db_session.refresh(ep1)
+    serie_id = serie.id
+    ep1_id = ep1.id
+
+    token = await create_user_and_get_token(async_client, "user_follow_val")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Intentar follow sin haber visto ningún episodio -> 400 Bad Request
+    res_no_ep = await async_client.post(f"/api/v1/titles/{serie_id}/follow", headers=headers)
+    assert res_no_ep.status_code == 400
+    assert "No se puede reanudar una serie sin episodios vistos" in res_no_ep.json()["detail"]
+
+    # Marcar episodio -> pasa a siguiendo
+    await async_client.post(f"/api/v1/episodes/{ep1_id}/watch", headers=headers)
+
+    # Intentar follow cuando ya está en siguiendo -> 400 Bad Request
+    res_already_following = await async_client.post(f"/api/v1/titles/{serie_id}/follow", headers=headers)
+    assert res_already_following.status_code == 400
+    assert "ya se encuentra en estado 'siguiendo'" in res_already_following.json()["detail"]
 
 
 @pytest.mark.asyncio

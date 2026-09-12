@@ -56,6 +56,16 @@ async def unfollow_series(
     return await state_service.abandon_series(db, usuario_id=current_user.id, titulo_id=title_id)
 
 
+@router.post("/titles/{title_id}/follow", response_model=StateChangeResponse)
+async def follow_series(
+    title_id: int,
+    current_user: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> StateChangeResponse:
+    """Reanuda el seguimiento de una serie abandonada con episodios vistos previamente."""
+    return await state_service.follow_series(db, usuario_id=current_user.id, titulo_id=title_id)
+
+
 @router.get("/titles/{title_id}/user-state", response_model=TitleUserStateResponse)
 async def get_title_state(
     title_id: int,

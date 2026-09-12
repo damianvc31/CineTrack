@@ -59,6 +59,8 @@ Cada usuario mantiene un registro individual de interacción con cada título (`
 - Marcar cualquier episodio como visto (`POST /watch`) transiciona automáticamente la serie a `siguiendo` si no estaba en ese estado.
 - Al marcar el **último episodio pendiente** de una serie, esta transiciona automáticamente a `vista`.
 - Si se desmarca un episodio de una serie con estado `vista`, esta regresa automáticamente a `siguiendo`.
+- **Abandono explícito (`POST /titles/{id}/unfollow`):** Si la serie se encuentra en `siguiendo`, pasa al estado `abandonada` conservando intactos todos los episodios vistos en `EpisodioVisto`.
+- **Reanudación directa (`POST /titles/{id}/follow`):** Permite retomar una serie en estado `abandonada` (o sin estado con episodios vistos previos) regresando directamente a `siguiendo` sin forzar la alteración del checklist de episodios.
 
 ---
 

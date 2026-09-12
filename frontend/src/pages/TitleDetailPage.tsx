@@ -164,6 +164,20 @@ export const TitleDetailPage: React.FC = () => {
     }
   }
 
+  const handleFollow = async () => {
+    if (!user) {
+      openAuth()
+      return
+    }
+    try {
+      const res = await catalogService.followSeries(titleId)
+      setUserEstado(res.nuevo_estado ?? 'siguiendo')
+      loadData(false)
+    } catch (err) {
+      console.error('Error reanudando serie:', err)
+    }
+  }
+
   const handleEpisodeToggle = async (
     seasonNum: number,
     episodeNum: number,
@@ -555,10 +569,21 @@ export const TitleDetailPage: React.FC = () => {
                     )}
 
                     {userEstado === 'abandonada' && (
-                      <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-gray-900 border border-gray-700 text-gray-400">
-                        <X className="w-4 h-4 text-red-400" />
-                        <span>Serie Abandonada</span>
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-950/40 border border-red-800/60 text-red-300">
+                          <X className="w-4 h-4 text-red-400" />
+                          <span>Serie Abandonada</span>
+                        </span>
+
+                        <button
+                          onClick={handleFollow}
+                          title="Reanudar seguimiento de la serie"
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-blue-300 hover:text-white shadow-md transition-all"
+                        >
+                          <Play className="w-4 h-4 fill-current text-blue-400" />
+                          <span>Reanudar / Follow</span>
+                        </button>
+                      </div>
                     )}
 
                     {/* Si no está siguiendo ni en vista ni abandonada, se muestra Watchlist */}
