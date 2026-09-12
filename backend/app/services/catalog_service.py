@@ -1130,7 +1130,7 @@ async def get_user_stats(
             select(Titulo)
             .options(selectinload(Titulo.temporadas))
             .where(Titulo.id.in_(all_watched_title_ids))
-            .order_by(desc(Titulo.popularidad))
+            .order_by(desc(Titulo.popularidad_percentil), desc(Titulo.popularidad))
             .limit(5)
         )
         res_pop = await db.execute(q_pop)
@@ -1143,7 +1143,10 @@ async def get_user_stats(
                 anio_fin=t.anio_fin,
                 total_seasons=len(t.temporadas) if t.tipo == "tv" else None,
                 portada_url=t.portada_url,
-                metric_value=round(t.popularidad, 1)
+                metric_value=round(
+                    (t.popularidad_percentil if (t.popularidad_percentil and t.popularidad_percentil > 1) else ((t.popularidad_percentil or 0.0) * 100)),
+                    1
+                )
             )
             for t in res_pop.scalars().all()
         ]

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Search, Compass, Sparkles, User as UserIcon, LogOut, Menu, X, Heart, MessageSquare, Settings, Bell, Bookmark, Eye, PlaySquare } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useLanguage } from '@/context/LanguageContext'
 import tmdbLogo from '@/assets/branding/tmdb-logo.svg'
 import cinetrackLogo from '@/assets/branding/cinetrack-logo.svg'
 
@@ -11,6 +12,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
   const { user, logout } = useAuth()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
   const isCatalog = location.pathname === '/catalog'
@@ -65,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#171717] hover:bg-[#222222] border border-[#262626] text-gray-300 hover:text-white transition-all shrink-0"
                 >
                   <Compass className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Explore</span>
+                  <span>{t('catalog')}</span>
                 </Link>
 
                 {/* Barra de Búsqueda con X de limpieza */}
@@ -75,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search movies, series, cast..."
+                    placeholder={t('searchPlaceholder')}
                     className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#171717] border border-[#262626] rounded-full text-gray-200 placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
                   />
                   {searchQuery && (
@@ -139,56 +141,56 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                         onMouseLeave={() => setUserDropdownOpen(false)}
                       >
                         <div className="px-4 py-2 border-b border-[#262626] text-[11px] text-gray-400">
-                          Signed in as <strong className="text-gray-200 block truncate">@{user.nombre_usuario}</strong>
+                          {t('signedInAs')} <strong className="text-gray-200 block truncate">@{user.nombre_usuario}</strong>
                         </div>
                         <Link
                           to="/profile"
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <UserIcon className="w-4 h-4 text-amber-500" /> Profile
+                          <UserIcon className="w-4 h-4 text-amber-500" /> {t('profile')}
                         </Link>
                         <Link
                           to="/library?tab=favoritos"
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <Heart className="w-4 h-4 text-red-400" /> Favorites
+                          <Heart className="w-4 h-4 text-red-400" /> {t('favorites')}
                         </Link>
                         <Link
                           to="/library?tab=watchlist"
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <Bookmark className="w-4 h-4 text-amber-400" /> Watchlist
+                          <Bookmark className="w-4 h-4 text-amber-400" /> {t('watchlist')}
                         </Link>
                         <Link
                           to="/library?tab=vistas"
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <Eye className="w-4 h-4 text-emerald-400" /> Watch History
+                          <Eye className="w-4 h-4 text-emerald-400" /> {t('watchHistory')}
                         </Link>
                         <Link
                           to="/library?tab=siguiendo"
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <PlaySquare className="w-4 h-4 text-amber-400" /> Following
+                          <PlaySquare className="w-4 h-4 text-amber-400" /> {t('following')}
                         </Link>
                         <Link
                           to="/reviews"
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <MessageSquare className="w-4 h-4 text-amber-400" /> Reviews
+                          <MessageSquare className="w-4 h-4 text-amber-400" /> {t('reviews')}
                         </Link>
                         <Link
                           to="/settings"
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <Settings className="w-4 h-4 text-gray-400" /> Settings
+                          <Settings className="w-4 h-4 text-gray-400" /> {t('settings')}
                         </Link>
                         <div className="border-t border-[#262626] my-1"></div>
                         <button
@@ -198,7 +200,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                           }}
                           className="w-full flex items-center gap-2.5 px-4 py-2 text-left text-red-400 hover:text-red-300 hover:bg-red-950/20"
                         >
-                          <LogOut className="w-4 h-4" /> Sign Out
+                          <LogOut className="w-4 h-4" /> {t('signOut')}
                         </button>
                       </div>
                     )}
@@ -211,13 +213,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   onClick={() => onOpenAuth?.('login')}
                   className="px-3.5 py-1.5 text-xs font-semibold rounded-full text-gray-300 hover:text-white hover:bg-[#181818] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-all active:scale-95"
                 >
-                  Log In
+                  {t('logIn')}
                 </button>
                 <button
                   onClick={() => onOpenAuth?.('register')}
                   className="px-3.5 py-1.5 text-xs font-semibold rounded-full bg-amber-500 hover:bg-amber-400 text-black shadow-md shadow-amber-500/20 transition-all active:scale-95"
                 >
-                  Sign Up
+                  {t('signUp')}
                 </button>
               </div>
             )}
@@ -265,76 +267,76 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
               onClick={() => setMobileMenuOpen(false)}
               className="px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
             >
-              Home
+              {t('home')}
             </Link>
             <Link
               to="/catalog"
               onClick={() => setMobileMenuOpen(false)}
               className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-amber-400 hover:text-white hover:bg-[#171717]"
             >
-              <Compass className="w-4 h-4 text-amber-500" /> Explore Catalog
+              <Compass className="w-4 h-4 text-amber-500" /> {t('exploreCatalog')}
             </Link>
             <Link
               to="/recommendations"
               onClick={() => setMobileMenuOpen(false)}
               className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-indigo-300 hover:bg-[#171717]"
             >
-              <Sparkles className="w-4 h-4 text-amber-500" /> AI Assistant
+              <Sparkles className="w-4 h-4 text-amber-500" /> {t('aiAssistant')}
             </Link>
 
             {user && (
               <>
                 <div className="border-t border-[#262626] my-2 pt-2">
-                  <span className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Account</span>
+                  <span className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('account')}</span>
                 </div>
                 <Link
                   to="/profile"
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
                 >
-                  <UserIcon className="w-4 h-4 text-amber-500" /> Profile
+                  <UserIcon className="w-4 h-4 text-amber-500" /> {t('profile')}
                 </Link>
                 <Link
                   to="/library?tab=favoritos"
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
                 >
-                  <Heart className="w-4 h-4 text-red-400" /> Favorites
+                  <Heart className="w-4 h-4 text-red-400" /> {t('favorites')}
                 </Link>
                 <Link
                   to="/library?tab=watchlist"
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
                 >
-                  <Bookmark className="w-4 h-4 text-amber-400" /> Watchlist
+                  <Bookmark className="w-4 h-4 text-amber-400" /> {t('watchlist')}
                 </Link>
                 <Link
                   to="/library?tab=vistas"
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
                 >
-                  <Eye className="w-4 h-4 text-emerald-400" /> Watch History
+                  <Eye className="w-4 h-4 text-emerald-400" /> {t('watchHistory')}
                 </Link>
                 <Link
                   to="/library?tab=siguiendo"
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
                 >
-                  <PlaySquare className="w-4 h-4 text-amber-400" /> Following
+                  <PlaySquare className="w-4 h-4 text-amber-400" /> {t('following')}
                 </Link>
                 <Link
                   to="/reviews"
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
                 >
-                  <MessageSquare className="w-4 h-4 text-amber-400" /> Reviews
+                  <MessageSquare className="w-4 h-4 text-amber-400" /> {t('reviews')}
                 </Link>
                 <Link
                   to="/settings"
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
                 >
-                  <Settings className="w-4 h-4 text-gray-400" /> Settings
+                  <Settings className="w-4 h-4 text-gray-400" /> {t('settings')}
                 </Link>
                 <button
                   onClick={() => {
@@ -343,7 +345,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-950/20 text-left"
                 >
-                  <LogOut className="w-4 h-4" /> Sign Out
+                  <LogOut className="w-4 h-4" /> {t('signOut')}
                 </button>
               </>
             )}
@@ -357,7 +359,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   }}
                   className="w-full py-2 px-3 text-xs font-semibold rounded-xl text-gray-200 bg-[#171717] hover:bg-[#202020] border border-[#2e2e2e] text-center transition-colors"
                 >
-                  Log In
+                  {t('logIn')}
                 </button>
                 <button
                   onClick={() => {
@@ -366,7 +368,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   }}
                   className="w-full py-2 px-3 text-xs font-semibold rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-center shadow-md shadow-amber-500/20 transition-colors"
                 >
-                  Sign Up / Register
+                  {t('signUpRegister')}
                 </button>
               </div>
             )}

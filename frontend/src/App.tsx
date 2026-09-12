@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { LanguageProvider } from '@/context/LanguageContext'
 import { AuthProvider } from '@/context/AuthContext'
 import { Layout } from '@/components/layout/Layout'
 import { HomePage } from '@/pages/HomePage'
@@ -12,8 +13,9 @@ import { SettingsPage } from '@/pages/SettingsPage'
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <LanguageProvider>
+      <AuthProvider>
+        <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
@@ -29,6 +31,7 @@ function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+  </LanguageProvider>
   )
 }
 

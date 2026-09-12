@@ -30,6 +30,7 @@ import {
   Video,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useLanguage } from '@/context/LanguageContext'
 import { catalogService } from '@/services/catalogService'
 import type { HomeSections } from '@/types/catalog'
 import { CarouselRow } from '@/components/common/CarouselRow'
@@ -41,6 +42,7 @@ interface OutletContextType {
 export const HomePage: React.FC = () => {
   const { openAuth } = useOutletContext<OutletContextType>()
   const { user, logout } = useAuth()
+  const { t, translateGenreName, language } = useLanguage()
   const navigate = useNavigate()
 
   const [data, setData] = useState<HomeSections | null>(null)
@@ -224,7 +226,7 @@ export const HomePage: React.FC = () => {
                     : 'text-gray-400 hover:text-white hover:bg-[#202020]'
                 }`}
               >
-                <Layers className="w-3.5 h-3.5" /> All
+                <Layers className="w-3.5 h-3.5" /> {t('all')}
               </button>
               <button
                 onClick={() => handleTipoChange('movie')}
@@ -234,7 +236,7 @@ export const HomePage: React.FC = () => {
                     : 'text-gray-400 hover:text-white hover:bg-[#202020]'
                 }`}
               >
-                <Film className="w-3.5 h-3.5" /> Movies
+                <Film className="w-3.5 h-3.5" /> {t('movies')}
               </button>
               <button
                 onClick={() => handleTipoChange('tv')}
@@ -244,7 +246,7 @@ export const HomePage: React.FC = () => {
                     : 'text-gray-400 hover:text-white hover:bg-[#202020]'
                 }`}
               >
-                <Tv className="w-3.5 h-3.5" /> Series
+                <Tv className="w-3.5 h-3.5" /> {t('series')}
               </button>
             </div>
           </div>
@@ -259,8 +261,8 @@ export const HomePage: React.FC = () => {
 
           {/* Carousel 1: 🔥 Trending */}
           <CarouselRow
-            title="Trending Now"
-            subtitle="The most popular titles people are talking about"
+            title={t('trendingNow')}
+            subtitle={language === 'es' ? 'Los títulos más populares del momento' : 'The most popular titles people are talking about'}
             icon={<Flame className="w-5 h-5 text-amber-400" />}
             titles={data.trending}
             viewMoreLink={`/catalog?section=trending${tipoParam}`}
@@ -270,8 +272,8 @@ export const HomePage: React.FC = () => {
 
           {/* Carousel 2: 🕒 New Releases (last 30 days) */}
           <CarouselRow
-            title="New Releases"
-            subtitle="Fresh premieres from the last 30 days"
+            title={t('newReleases')}
+            subtitle={language === 'es' ? 'Estrenos recientes de los últimos 30 días' : 'Fresh premieres from the last 30 days'}
             icon={<Clock className="w-5 h-5 text-amber-400" />}
             titles={data.new_releases}
             viewMoreLink={`/catalog?section=new_releases${tipoParam}`}
@@ -281,8 +283,8 @@ export const HomePage: React.FC = () => {
 
           {/* Carousel 3: 💎 Classics (Gems) */}
           <CarouselRow
-            title="Classics"
-            subtitle="Time-tested gems and historic cinema"
+            title={t('allTimeClassics')}
+            subtitle={language === 'es' ? 'Joyas aclamadas del cine y la televisión' : 'Time-tested gems and historic cinema'}
             icon={<Gem className="w-5 h-5 text-amber-400" />}
             titles={data.classics}
             viewMoreLink={`/catalog?section=classics${tipoParam}`}
@@ -292,8 +294,8 @@ export const HomePage: React.FC = () => {
 
           {/* Carousel 4: ⭐ Top Rated */}
           <CarouselRow
-            title="Top Rated"
-            subtitle="Critically acclaimed titles with the highest scores"
+            title={t('topRated')}
+            subtitle={language === 'es' ? 'Títulos con las calificaciones más altas' : 'Critically acclaimed titles with the highest scores'}
             icon={<Award className="w-5 h-5 text-amber-400" />}
             titles={data.top_rated}
             viewMoreLink={`/catalog?section=top_rated${tipoParam}`}
@@ -306,8 +308,8 @@ export const HomePage: React.FC = () => {
             Object.entries(data.by_genre).map(([genreName, items]) => (
               <CarouselRow
                 key={genreName}
-                title={genreName}
-                subtitle={`Top ${genreName} selections`}
+                title={translateGenreName(genreName)}
+                subtitle={language === 'es' ? `Selección destacada de ${translateGenreName(genreName)}` : `Top ${genreName} selections`}
                 icon={getGenreIcon(genreName)}
                 titles={items}
                 viewMoreLink={`/catalog?genero=${encodeURIComponent(genreName)}${tipoParam}`}
@@ -378,7 +380,7 @@ export const HomePage: React.FC = () => {
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-300 hover:text-white hover:bg-[#202020] transition-colors"
                 >
                   <UserIcon className="w-4 h-4 text-amber-400" />
-                  <span className="font-medium">Profile</span>
+                  <span className="font-medium">{t('profile')}</span>
                 </Link>
 
                 <Link
@@ -386,7 +388,7 @@ export const HomePage: React.FC = () => {
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-300 hover:text-white hover:bg-[#202020] transition-colors"
                 >
                   <Heart className="w-4 h-4 text-red-400" />
-                  <span className="font-medium">Favorites</span>
+                  <span className="font-medium">{t('favorites')}</span>
                 </Link>
 
                 <Link
@@ -394,7 +396,7 @@ export const HomePage: React.FC = () => {
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-300 hover:text-white hover:bg-[#202020] transition-colors"
                 >
                   <Bookmark className="w-4 h-4 text-amber-400" />
-                  <span className="font-medium">Watchlist</span>
+                  <span className="font-medium">{t('watchlist')}</span>
                 </Link>
 
                 <Link
@@ -402,7 +404,7 @@ export const HomePage: React.FC = () => {
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-300 hover:text-white hover:bg-[#202020] transition-colors"
                 >
                   <Eye className="w-4 h-4 text-emerald-400" />
-                  <span className="font-medium">Watch History</span>
+                  <span className="font-medium">{t('watchHistory')}</span>
                 </Link>
 
                 <Link
@@ -410,7 +412,7 @@ export const HomePage: React.FC = () => {
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-300 hover:text-white hover:bg-[#202020] transition-colors"
                 >
                   <PlaySquare className="w-4 h-4 text-amber-400" />
-                  <span className="font-medium">Following</span>
+                  <span className="font-medium">{t('following')}</span>
                 </Link>
 
                 <Link
@@ -418,7 +420,7 @@ export const HomePage: React.FC = () => {
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-300 hover:text-white hover:bg-[#202020] transition-colors"
                 >
                   <MessageSquare className="w-4 h-4 text-amber-400" />
-                  <span className="font-medium">Reviews</span>
+                  <span className="font-medium">{t('reviews')}</span>
                 </Link>
 
                 <Link
@@ -426,7 +428,7 @@ export const HomePage: React.FC = () => {
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-300 hover:text-white hover:bg-[#202020] transition-colors"
                 >
                   <Settings className="w-4 h-4 text-gray-400" />
-                  <span className="font-medium">Settings</span>
+                  <span className="font-medium">{t('settings')}</span>
                 </Link>
 
                 <div className="border-t border-[#262626] pt-2 mt-2">
@@ -435,7 +437,7 @@ export const HomePage: React.FC = () => {
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-950/20 transition-colors text-left"
                   >
                     <LogOut className="w-4 h-4" />
-                    <span className="font-medium">Sign Out</span>
+                    <span className="font-medium">{t('signOut')}</span>
                   </button>
                 </div>
               </nav>
@@ -446,9 +448,9 @@ export const HomePage: React.FC = () => {
                 <Heart className="w-6 h-6 text-amber-400" />
               </div>
               <div className="space-y-1">
-                <h4 className="text-sm font-bold text-white">Your Personal CineTrack</h4>
+                <h4 className="text-sm font-bold text-white">{t('yourPersonalCineTrack')}</h4>
                 <p className="text-xs text-gray-400 leading-relaxed">
-                  Sign in to save favorites, build your watchlist, and track series episodes.
+                  {t('signInPrompt')}
                 </p>
               </div>
               <div className="flex flex-col gap-2 pt-1">
@@ -456,13 +458,13 @@ export const HomePage: React.FC = () => {
                   onClick={() => openAuth('register')}
                   className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all active:scale-98"
                 >
-                  Create Account
+                  {t('createAccount')}
                 </button>
                 <button
                   onClick={() => openAuth('login')}
                   className="w-full py-2 px-4 rounded-xl bg-[#1a1a1a] hover:bg-[#222222] border border-[#333333] text-gray-200 text-xs font-semibold transition-all active:scale-98"
                 >
-                  Log In
+                  {t('logIn')}
                 </button>
               </div>
             </div>

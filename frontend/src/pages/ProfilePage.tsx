@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { catalogService } from '@/services/catalogService'
 import { useAuth } from '@/context/AuthContext'
+import { useLanguage } from '@/context/LanguageContext'
 import type { UserLibrary, UserStats, TopTitleStatItem, TitleCard } from '@/types/catalog'
 import { EditProfileModal } from '@/components/profile/EditProfileModal'
 import { SeasonProgressBar } from '@/components/profile/SeasonProgressBar'
@@ -24,6 +25,7 @@ import { DonutGenreChart } from '@/components/profile/DonutGenreChart'
 
 export const ProfilePage: React.FC = () => {
   const { user } = useAuth()
+  const { t, language } = useLanguage()
   const navigate = useNavigate()
 
   const [stats, setStats] = useState<UserStats | null>(null)
@@ -132,12 +134,12 @@ export const ProfilePage: React.FC = () => {
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-400">Member since {memberSinceText}</p>
+            <p className="text-xs text-gray-400">{t('memberSince')} {memberSinceText}</p>
           </div>
 
           {/* Bio text */}
           <p className="text-xs text-gray-300 leading-relaxed italic">
-            {user.descripcion || 'Lover of cinema and series.'}
+            {user.descripcion || (language === 'es' ? 'Amante del cine y las series.' : 'Lover of cinema and series.')}
           </p>
 
           {/* Location */}
@@ -157,7 +159,7 @@ export const ProfilePage: React.FC = () => {
             className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-[#1c1c1c] hover:bg-[#252525] border border-[#2f2f2f] text-gray-300 hover:text-white text-xs font-semibold transition-colors"
           >
             <Pencil className="w-3.5 h-3.5 text-amber-400" />
-            <span>Edit Profile</span>
+            <span>{t('editProfile')}</span>
           </button>
         </aside>
 
@@ -165,15 +167,15 @@ export const ProfilePage: React.FC = () => {
         <section className="lg:col-span-8 bg-[#141414] border border-[#262626] rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl">
           {/* Header */}
           <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
-            <h2 className="text-xl font-bold text-white tracking-tight">Statistics</h2>
+            <h2 className="text-xl font-bold text-white tracking-tight">{t('statistics')}</h2>
             <span className="px-2.5 py-1 rounded-full bg-[#1e1e1e] border border-[#2c2c2c] text-[10px] font-bold uppercase tracking-wider text-gray-300">
-              All Time
+              {language === 'es' ? 'Histórico' : 'All Time'}
             </span>
           </div>
 
           {loading ? (
             <div className="py-16 text-center text-xs text-gray-400 animate-pulse">
-              Loading user metrics...
+              {language === 'es' ? 'Cargando métricas de usuario...' : 'Loading user metrics...'}
             </div>
           ) : error ? (
             <div className="p-4 rounded-xl bg-red-950/40 border border-red-800/60 flex items-center gap-3 text-xs text-red-400">
@@ -188,13 +190,13 @@ export const ProfilePage: React.FC = () => {
                 <div className="p-5 rounded-2xl bg-[#0d0d0d] border border-[#262626] space-y-1">
                   <div className="flex items-center gap-2 text-gray-400 text-xs font-semibold uppercase tracking-wider">
                     <Clock className="w-4 h-4 text-amber-500" />
-                    <span>Total Hours</span>
+                    <span>{t('totalHours')}</span>
                   </div>
                   <div className="text-3xl sm:text-4xl font-black text-[#f59e0b] pt-1">
                     {Math.round(stats.total_hours)}h
                   </div>
                   <p className="text-[11px] text-gray-400 pt-0.5">
-                    Movies: {Math.round(stats.movie_hours)}h • Series: {Math.round(stats.tv_hours)}h
+                    {t('moviesLabel')}: {Math.round(stats.movie_hours)}h • {t('seriesLabel')}: {Math.round(stats.tv_hours)}h
                   </p>
                 </div>
 
@@ -202,13 +204,13 @@ export const ProfilePage: React.FC = () => {
                 <div className="p-5 rounded-2xl bg-[#0d0d0d] border border-[#262626] space-y-1">
                   <div className="flex items-center gap-2 text-gray-400 text-xs font-semibold uppercase tracking-wider">
                     <Film className="w-4 h-4 text-amber-500" />
-                    <span>Movies Watched</span>
+                    <span>{t('moviesWatched')}</span>
                   </div>
                   <div className="text-3xl sm:text-4xl font-black text-[#f59e0b] pt-1">
                     {stats.movies_watched_count}
                   </div>
                   <p className="text-[11px] text-gray-400 pt-0.5">
-                    Avg: {stats.avg_movies_per_week?.toFixed(1) || '0.0'} movies / week
+                    {language === 'es' ? 'Promedio' : 'Avg'}: {stats.avg_movies_per_week?.toFixed(1) || '0.0'} {t('avgMoviesPerWeek')}
                   </p>
                 </div>
 
@@ -216,13 +218,13 @@ export const ProfilePage: React.FC = () => {
                 <div className="p-5 rounded-2xl bg-[#0d0d0d] border border-[#262626] space-y-1">
                   <div className="flex items-center gap-2 text-gray-400 text-xs font-semibold uppercase tracking-wider">
                     <Tv className="w-4 h-4 text-amber-500" />
-                    <span>Series Watched</span>
+                    <span>{t('seriesWatched')}</span>
                   </div>
                   <div className="text-3xl sm:text-4xl font-black text-[#f59e0b] pt-1">
                     {stats.series_watched_count}
                   </div>
                   <p className="text-[11px] text-gray-400 pt-0.5">
-                    Seasons: {stats.seasons_completed_count || 0} completed
+                    {language === 'es' ? 'Temporadas' : 'Seasons'}: {stats.seasons_completed_count || 0} {t('seasonsCompletedText')}
                   </p>
                 </div>
               </div>
@@ -235,7 +237,7 @@ export const ProfilePage: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-300">
                       <Flame className="w-4 h-4 text-amber-500" />
-                      <span>Top 5 Watched by Popularity</span>
+                      <span>{t('top5Popularity')}</span>
                     </div>
 
                     <div className="space-y-2">
@@ -262,12 +264,12 @@ export const ProfilePage: React.FC = () => {
 
                             <div className="flex items-center gap-1 text-emerald-400 text-[11px] font-bold shrink-0">
                               <TrendingUp className="w-3 h-3" />
-                              <span>{Math.round(item.metric_value)}%</span>
+                              <span>{Math.round(item.metric_value > 1 ? item.metric_value : item.metric_value * 100)}%</span>
                             </div>
                           </div>
                         ))
                       ) : (
-                        <p className="text-xs text-gray-500 italic">No watched titles yet.</p>
+                        <p className="text-xs text-gray-500 italic">{t('noWatchedTitles')}</p>
                       )}
                     </div>
                   </div>
@@ -278,12 +280,13 @@ export const ProfilePage: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-300">
                       <PieChart className="w-4 h-4 text-amber-500" />
-                      <span>Genres Watched</span>
+                      <span>{t('genresWatched')}</span>
                     </div>
 
                     <DonutGenreChart
                       genresDistribution={stats.genres_distribution}
                       totalTitles={totalWatchedTitles}
+                      lang={language}
                     />
                   </div>
                 </div>
@@ -294,7 +297,7 @@ export const ProfilePage: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-300">
                       <Award className="w-4 h-4 text-amber-500" />
-                      <span>Top 5 Watched by Average Rating</span>
+                      <span>{t('top5Rating')}</span>
                     </div>
 
                     <div className="space-y-2">
@@ -326,7 +329,7 @@ export const ProfilePage: React.FC = () => {
                           </div>
                         ))
                       ) : (
-                        <p className="text-xs text-gray-500 italic">No watched titles yet.</p>
+                        <p className="text-xs text-gray-500 italic">{t('noWatchedTitles')}</p>
                       )}
                     </div>
                   </div>
@@ -335,7 +338,7 @@ export const ProfilePage: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-300">
                       <Star className="w-4 h-4 text-amber-500 fill-amber-500/20" />
-                      <span>Top 5 Watched by My Rating</span>
+                      <span>{t('top5MyRating')}</span>
                     </div>
 
                     <div className="space-y-2">
@@ -368,7 +371,7 @@ export const ProfilePage: React.FC = () => {
                         ))
                       ) : (
                         <p className="text-xs text-gray-500 italic">
-                          You haven't reviewed any watched titles yet.
+                          {t('noRatedTitles')}
                         </p>
                       )}
                     </div>
@@ -386,7 +389,7 @@ export const ProfilePage: React.FC = () => {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-2">
-            <h2 className="text-xl font-bold text-white">Following</h2>
+            <h2 className="text-xl font-bold text-white">{t('following')}</h2>
             <span className="text-xs font-semibold text-gray-500">
               ({library?.following.length || 0})
             </span>
@@ -396,7 +399,7 @@ export const ProfilePage: React.FC = () => {
             to="/library?tab=siguiendo"
             className="flex items-center gap-1 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors"
           >
-            <span>View All</span>
+            <span>{t('viewAll')}</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -443,7 +446,9 @@ export const ProfilePage: React.FC = () => {
           </div>
         ) : (
           <div className="p-8 rounded-2xl bg-[#141414] border border-[#262626] text-center text-xs text-gray-400">
-            You are not following any active series. Browse the catalog to start tracking episodes!
+            {language === 'es'
+              ? 'No estás siguiendo ninguna serie activa. ¡Explora el catálogo para empezar a marcar episodios!'
+              : 'You are not following any active series. Browse the catalog to start tracking episodes!'}
           </div>
         )}
       </section>
@@ -456,7 +461,7 @@ export const ProfilePage: React.FC = () => {
         <section className="space-y-4">
           <div className="flex items-center justify-between pb-2 border-b border-[#262626]">
             <div className="flex items-baseline gap-2">
-              <h3 className="text-base font-bold text-white">Favorites</h3>
+              <h3 className="text-base font-bold text-white">{t('favorites')}</h3>
               <span className="text-xs font-semibold text-gray-500">
                 ({library?.favorites.length || 0})
               </span>
@@ -465,7 +470,7 @@ export const ProfilePage: React.FC = () => {
               to="/library?tab=favoritos"
               className="flex items-center gap-0.5 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors"
             >
-              <span>View All</span>
+              <span>{t('viewAll')}</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -475,7 +480,9 @@ export const ProfilePage: React.FC = () => {
               <ProfilePosterCard key={item.id} item={item} />
             ))}
             {(!library || library.favorites.length === 0) && (
-              <p className="col-span-3 text-xs text-gray-500 italic py-4">No favorites saved yet.</p>
+              <p className="col-span-3 text-xs text-gray-500 italic py-4">
+                {language === 'es' ? 'Aún no guardaste favoritos.' : 'No favorites saved yet.'}
+              </p>
             )}
           </div>
         </section>
@@ -484,7 +491,7 @@ export const ProfilePage: React.FC = () => {
         <section className="space-y-4">
           <div className="flex items-center justify-between pb-2 border-b border-[#262626]">
             <div className="flex items-baseline gap-2">
-              <h3 className="text-base font-bold text-white">Watchlist</h3>
+              <h3 className="text-base font-bold text-white">{t('watchlist')}</h3>
               <span className="text-xs font-semibold text-gray-500">
                 ({library?.watchlist.length || 0})
               </span>
@@ -493,7 +500,7 @@ export const ProfilePage: React.FC = () => {
               to="/library?tab=watchlist"
               className="flex items-center gap-0.5 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors"
             >
-              <span>View All</span>
+              <span>{t('viewAll')}</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -503,7 +510,9 @@ export const ProfilePage: React.FC = () => {
               <ProfilePosterCard key={item.id} item={item} />
             ))}
             {(!library || library.watchlist.length === 0) && (
-              <p className="col-span-3 text-xs text-gray-500 italic py-4">Watchlist is empty.</p>
+              <p className="col-span-3 text-xs text-gray-500 italic py-4">
+                {language === 'es' ? 'Tu lista está vacía.' : 'Watchlist is empty.'}
+              </p>
             )}
           </div>
         </section>
@@ -512,7 +521,7 @@ export const ProfilePage: React.FC = () => {
         <section className="space-y-4">
           <div className="flex items-center justify-between pb-2 border-b border-[#262626]">
             <div className="flex items-baseline gap-2">
-              <h3 className="text-base font-bold text-white">Recently Watched</h3>
+              <h3 className="text-base font-bold text-white">{t('recentlyWatched')}</h3>
               <span className="text-xs font-semibold text-gray-500">
                 ({library?.recently_watched.length || 0})
               </span>
@@ -521,7 +530,7 @@ export const ProfilePage: React.FC = () => {
               to="/library?tab=vistas"
               className="flex items-center gap-0.5 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors"
             >
-              <span>View All</span>
+              <span>{t('viewAll')}</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -531,7 +540,9 @@ export const ProfilePage: React.FC = () => {
               <ProfilePosterCard key={item.id} item={item} showStatusBadge={item.tipo === 'tv'} />
             ))}
             {(!library || library.recently_watched.length === 0) && (
-              <p className="col-span-3 text-xs text-gray-500 italic py-4">No watched titles yet.</p>
+              <p className="col-span-3 text-xs text-gray-500 italic py-4">
+                {language === 'es' ? 'Aún no hay títulos vistos.' : 'No watched titles yet.'}
+              </p>
             )}
           </div>
         </section>

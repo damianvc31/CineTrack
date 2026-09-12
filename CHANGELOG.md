@@ -16,12 +16,16 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
   - **Tarjeta de Identidad:** Avatar prominente (`w-32 h-32`), nombre de usuario, país, ciudad, biografía y botón de edición con lápiz.
   - **Modal de Edición de Perfil (`EditProfileModal`):** Permite actualizar biografía, país, ciudad y URL de avatar con vista previa instantánea. Nombre de usuario bloqueado (`read-only`).
   - **Métricas Destacadas (Números Dorados):** Total de horas vistas, promedio semanal de películas (`avg_movies_per_week`) y temporadas de series completadas (`seasons_completed_count`).
-  - **Rankings Top 5:** Top 5 películas y series más vistas (con formato `Nombre · N seasons | AAAA-AAAA`) y Top 5 por calificación propia con puntaje personal verificado (`⭐ X.X`).
-  - **Gráfico Donut SVG de Géneros (`DonutGenreChart`):** Distribución proporcional de los géneros más consumidos con conteo central de títulos y leyenda interactiva.
+  - **Rankings Top 5:** Top 5 películas y series más vistas (con formato `Nombre · N seasons | AAAA-AAAA`), Top 5 por calificación propia con puntaje personal verificado (`⭐ X.X`) y Top 5 por popularidad corregido.
+  - **Corrección de Métrica de Popularidad:** En lugar de exhibir la puntuación bruta no acotada de TMDB (`Titulo.popularidad` que causaba valores anómalos de 126% o 148%), ahora se utiliza rigurosamente el percentil poblacional normalizado (`Titulo.popularidad_percentil` normalizado al rango 0–100%), ordenando el ranking por percentil descendente para reflejar con precisión matemática el impacto del título en el catálogo (ej. Fauda 97%, Friends 95%, Landman 89%, MobLand 83%, The Godfather 77%).
+  - **Gráfico Donut SVG de Géneros (`DonutGenreChart`):** Distribución proporcional de los géneros más consumidos con conteo central de títulos, leyenda interactiva y nombres traducidos reactivamente según el idioma activo.
   - **Sección Following y Listas Inferiores:** Fila completa dedicada a series en seguimiento con barras de progreso y pestañas inferiores para Favoritos, Watchlist y Vistos recientemente.
+- **Sistema Global de Internacionalización y Localización Reactiva (`LanguageContext`):**
+  - Creación de contexto global `LanguageProvider` y hook `useLanguage()` sincronizado bidireccionalmente con `localStorage`.
+  - Diccionario integral `UI_STRINGS` en inglés y español que traduce dinámicamente cabecera, barra de búsqueda, navegación de cuenta desplegable, menú móvil, tabs de biblioteca, carruseles y panel lateral de Home, perfil de usuario y configuración, sin recargas de página ni modificaciones a la base de datos.
 - **Pantalla Dedicada de Configuración (`/settings` - `SettingsPage`):**
   - Formulario seguro de cambio de contraseña con validación de contraseña actual y repetición de nueva clave (`POST /api/v1/users/me/change-password`).
-  - Selector de preferencia de idioma de interfaz (English / Español) con diccionario local en frontend para nombres de géneros (`genreTranslations.ts`) sin alterar la base de datos.
+  - Selector de preferencia de idioma de interfaz (English / Español) conectado reactivamente al contexto global y al diccionario de géneros (`genreTranslations.ts`).
 - **Armonización Estética y UX Cinemática:**
   - `AuthModal` adaptado a paleta carbón/dorado con localización íntegra al inglés, soporte de modo inicial dinámico (`initialMode?: 'login' | 'register'`) y campos completos de perfil (país, ciudad, bio, avatar) durante el registro.
   - **Separación de Botones de Autenticación con Significado Propio:** Reemplazo de accesos ambiguos por dos botones diferenciados de **Log In** y **Sign Up / Create Account** (en cabecera desktop, menú móvil, panel lateral de Home y estados deslogueados de Library y Reviews), abriendo directamente el formulario correspondiente pero permitiendo la alternancia ágil entre inicio de sesión y registro dentro del modal.

@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { Lock, Globe, AlertCircle, CheckCircle } from 'lucide-react'
 import { authService } from '@/services/authService'
+import { useLanguage } from '@/context/LanguageContext'
 
 export const SettingsPage: React.FC = () => {
+  const { language, setLanguage, t } = useLanguage()
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState('')
@@ -12,10 +14,6 @@ export const SettingsPage: React.FC = () => {
   const [pwdError, setPwdError] = useState<string | null>(null)
   const [pwdSuccess, setPwdSuccess] = useState<string | null>(null)
 
-  // Language preferences
-  const [language, setLanguage] = useState<'en' | 'es'>(() => {
-    return (localStorage.getItem('cinetrack_lang') as 'en' | 'es') || 'en'
-  })
   const [langSaved, setLangSaved] = useState(false)
 
   const handlePasswordChange = async (e: React.FormEvent) => {
@@ -56,7 +54,6 @@ export const SettingsPage: React.FC = () => {
 
   const handleLanguageChange = (newLang: 'en' | 'es') => {
     setLanguage(newLang)
-    localStorage.setItem('cinetrack_lang', newLang)
     setLangSaved(true)
     setTimeout(() => setLangSaved(false), 2500)
   }
@@ -65,9 +62,9 @@ export const SettingsPage: React.FC = () => {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
       {/* Title */}
       <div className="pb-4 border-b border-[#262626]">
-        <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Settings</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{t('settingsHeading')}</h1>
         <p className="text-xs sm:text-sm text-gray-400 mt-1">
-          Manage your account security and interface preferences
+          {t('settingsSubtitle')}
         </p>
       </div>
 
@@ -78,8 +75,8 @@ export const SettingsPage: React.FC = () => {
             <Lock className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-white">Security & Password</h2>
-            <p className="text-xs text-gray-400">Change your account password securely</p>
+            <h2 className="text-base font-bold text-white">{t('securityPassword')}</h2>
+            <p className="text-xs text-gray-400">{language === 'es' ? 'Cambia la contraseña de tu cuenta de forma segura' : 'Change your account password securely'}</p>
           </div>
         </div>
 
@@ -100,7 +97,7 @@ export const SettingsPage: React.FC = () => {
         <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1">
-              Current Password
+              {t('currentPassword')}
             </label>
             <input
               type="password"
@@ -113,7 +110,7 @@ export const SettingsPage: React.FC = () => {
 
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1">
-              New Password <span className="text-[10px] text-gray-500">(min. 6 characters)</span>
+              {t('newPassword')} <span className="text-[10px] text-gray-500">{language === 'es' ? '(mín. 6 caracteres)' : '(min. 6 characters)'}</span>
             </label>
             <input
               type="password"
@@ -127,7 +124,7 @@ export const SettingsPage: React.FC = () => {
 
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1">
-              Confirm New Password
+              {t('confirmPassword')}
             </label>
             <input
               type="password"
@@ -145,7 +142,7 @@ export const SettingsPage: React.FC = () => {
               disabled={pwdLoading}
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
             >
-              {pwdLoading ? 'Updating Password...' : 'Update Password'}
+              {pwdLoading ? (language === 'es' ? 'Actualizando Contraseña...' : 'Updating Password...') : t('updatePassword')}
             </button>
           </div>
         </form>
@@ -158,14 +155,14 @@ export const SettingsPage: React.FC = () => {
             <Globe className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-white">Interface & Language</h2>
-            <p className="text-xs text-gray-400">Choose your preferred language for menus and navigation</p>
+            <h2 className="text-base font-bold text-white">{t('interfacePreferences')}</h2>
+            <p className="text-xs text-gray-400">{t('interfaceLanguageDesc')}</p>
           </div>
         </div>
 
         <div className="space-y-4 max-w-md">
           <label className="block text-xs font-medium text-gray-300">
-            Display Language
+            {t('interfaceLanguage')}
           </label>
 
           <div className="grid grid-cols-2 gap-3">
@@ -199,7 +196,7 @@ export const SettingsPage: React.FC = () => {
           {langSaved && (
             <div className="flex items-center gap-1.5 text-xs text-emerald-400 pt-1">
               <CheckCircle className="w-3.5 h-3.5" />
-              <span>Language preference updated.</span>
+              <span>{t('preferencesSaved')}</span>
             </div>
           )}
         </div>
