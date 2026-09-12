@@ -90,16 +90,21 @@ export const TitleDetailPage: React.FC = () => {
       setHasMoreReviews(list.length >= 20)
 
       if (titleRes.tipo === 'tv' && titleRes.temporadas && titleRes.temporadas.length > 0) {
-        setSelectedSeason((prev) => {
-          const exists = titleRes.temporadas.some((t) => t.numero === prev)
-          return exists ? prev : titleRes.temporadas[0].numero
-        })
+        const visible = titleRes.temporadas.filter(
+          (t) => (t.episodios && t.episodios.length > 0) || t.fecha_estreno
+        )
+        if (visible.length > 0) {
+          setSelectedSeason((prev) => {
+            const exists = visible.some((t) => t.numero === prev)
+            return exists ? prev : visible[0].numero
+          })
+        }
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message)
       } else {
-        setError('Error al cargar la información del título.')
+        setError('Failed to load title information.')
       }
     } finally {
       if (showSpinner) setLoading(false)
@@ -119,7 +124,7 @@ export const TitleDetailPage: React.FC = () => {
       const res = await catalogService.toggleFavorite(titleId)
       setIsFavorite(res.favorito)
     } catch (err) {
-      console.error('Error alternando favorito:', err)
+      console.error('Error toggling favorite:', err)
     }
   }
 
@@ -132,7 +137,7 @@ export const TitleDetailPage: React.FC = () => {
       const res = await catalogService.toggleWatchlist(titleId)
       setUserEstado(res.nuevo_estado ?? null)
     } catch (err) {
-      console.error('Error alternando watchlist:', err)
+      console.error('Error toggling watchlist:', err)
     }
   }
 
@@ -146,7 +151,7 @@ export const TitleDetailPage: React.FC = () => {
       setUserEstado(res.nuevo_estado ?? null)
       loadData(false)
     } catch (err) {
-      console.error('Error alternando visto:', err)
+      console.error('Error toggling watched:', err)
     }
   }
 
@@ -160,7 +165,7 @@ export const TitleDetailPage: React.FC = () => {
       setUserEstado(res.nuevo_estado ?? null)
       loadData(false)
     } catch (err) {
-      console.error('Error abandonando serie:', err)
+      console.error('Error dropping series:', err)
     }
   }
 
@@ -174,7 +179,7 @@ export const TitleDetailPage: React.FC = () => {
       setUserEstado(res.nuevo_estado ?? 'siguiendo')
       loadData(false)
     } catch (err) {
-      console.error('Error reanudando serie:', err)
+      console.error('Error resuming series:', err)
     }
   }
 
@@ -189,7 +194,7 @@ export const TitleDetailPage: React.FC = () => {
       return
     }
     if (isUnreleased && !isWatched) {
-      setEpisodeNotice(`El episodio E${episodeNum} aún no se ha estrenado. Solo es posible marcar episodios emitidos.`)
+      setEpisodeNotice(`Episode E${episodeNum} has not aired yet. Only aired episodes can be marked.`)
       setTimeout(() => setEpisodeNotice(null), 4500)
       return
     }
@@ -203,7 +208,7 @@ export const TitleDetailPage: React.FC = () => {
       if (err instanceof Error) {
         setEpisodeNotice(err.message)
       } else {
-        setEpisodeNotice('Error al actualizar el episodio.')
+        setEpisodeNotice('Failed to update episode.')
       }
       setTimeout(() => setEpisodeNotice(null), 4500)
     }
@@ -285,7 +290,7 @@ export const TitleDetailPage: React.FC = () => {
 
   const handleDeleteReview = async () => {
     if (!user) return
-    if (!window.confirm('Are you sure you want to delete your review? / ¿Estás seguro de que deseas eliminar tu reseña?')) {
+    if (!window.confirm('Are you sure you want to delete your review?')) {
       return
     }
     setDeletingReview(true)
@@ -299,7 +304,7 @@ export const TitleDetailPage: React.FC = () => {
       const updatedTitle = await catalogService.getTitleDetail(titleId)
       setTitle(updatedTitle)
     } catch (err) {
-      console.error('Error eliminando reseña:', err)
+      console.error('Error deleting review:', err)
     } finally {
       setDeletingReview(false)
     }
@@ -320,7 +325,7 @@ export const TitleDetailPage: React.FC = () => {
         setHasMoreReviews(false)
       }
     } catch (err) {
-      console.error('Error cargando más reseñas:', err)
+      console.error('Error loading more reviews:', err)
     } finally {
       setLoadingMoreReviews(false)
     }
@@ -351,10 +356,18 @@ export const TitleDetailPage: React.FC = () => {
     )
   }
 
+  // Temporadas visibles en el selector y lista de episodios:
+  // Solo se muestran temporadas con episodios cargados o con fecha de estreno confirmada.
+  // Temporadas confirmadas sin fecha ni episodios (ej. Landman S3) solo informan el badge superior.
+  const visibleSeasons: SeasonItem[] =
+    title.tipo === 'tv' && title.temporadas
+      ? title.temporadas.filter(
+          (s) => (s.episodios && s.episodios.length > 0) || s.fecha_estreno
+        )
+      : []
+
   const currentSeasonData: SeasonItem | undefined =
-    title.tipo === 'tv'
-      ? title.temporadas.find((s) => s.numero === selectedSeason)
-      : undefined
+    visibleSeasons.find((s) => s.numero === selectedSeason) || visibleSeasons[0]
 
   // Portada e imagen
   const portada = title.portada_url || title.poster_url || posterFallback
@@ -367,29 +380,17 @@ export const TitleDetailPage: React.FC = () => {
   const startYear = title.anio_estreno || (title.fecha_estreno ? title.fecha_estreno.substring(0, 4) : '')
   const endYear = title.anio_fin || (title.fecha_fin ? title.fecha_fin.substring(0, 4) : '')
   const yearRange = endYear ? `${startYear}-${endYear}` : `${startYear}-`
-  const seasonsLabel = `${title.total_seasons || 1} ${title.total_seasons === 1 ? 'temporada' : 'temporadas'}`
+  const seasonsLabel = `${visibleSeasons.length || 1} ${visibleSeasons.length === 1 ? 'season' : 'seasons'}`
 
-  // Renderizar tag semántico de estado de serie
+  // Render semantic series status badge based on season progress and TMDB status
   const renderStatusBadge = () => {
     if (title.tipo !== 'tv' || !title.status_tmdb) return null
     const st = title.status_tmdb.toLowerCase()
 
-    if (st.includes('returning') || st.includes('emisión') || st.includes('emision')) {
-      const nextDate = title.proximo_episodio_fecha
-        ? ` — nueva temporada el ${title.proximo_episodio_fecha}`
-        : ' — en emisión'
-      return (
-        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 text-xs font-bold shadow-sm">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>Renovada{nextDate}</span>
-        </span>
-      )
-    }
-
     if (st.includes('ended') || st.includes('finaliz')) {
       return (
         <span className="px-3 py-1 rounded-full bg-gray-800/90 border border-gray-600 text-gray-300 text-xs font-semibold">
-          Finalizada
+          Ended
         </span>
       )
     }
@@ -397,14 +398,114 @@ export const TitleDetailPage: React.FC = () => {
     if (st.includes('cancel')) {
       return (
         <span className="px-3 py-1 rounded-full bg-red-950/80 border border-red-600/70 text-red-300 text-xs font-bold">
-          Cancelada
+          Canceled
         </span>
       )
     }
 
+    const todayStr = new Date().toISOString().split('T')[0]
+
+    // 1. Detect if a season is actively in progress:
+    // (has at least 1 aired episode AND at least 1 unreleased/future episode)
+    let inProgressSeason: { seasonNum: number; nextEpDate?: string } | null = null
+    // 2. Future season with a scheduled air date
+    let upcomingSeasonWithDate: { seasonNum: number; startDate: string } | null = null
+    // 3. Confirmed future season WITHOUT scheduled date (dateless, like Landman Season 3)
+    let confirmedSeasonDateless: { seasonNum: number } | null = null
+
+    if (title.temporadas && title.temporadas.length > 0) {
+      const sortedSeasons = [...title.temporadas].sort((a, b) => a.numero - b.numero)
+
+      for (const season of sortedSeasons) {
+        const eps = season.episodios || []
+        const airedEpisodes = eps.filter(
+          (ep) => ep.fecha_estreno && ep.fecha_estreno <= todayStr
+        )
+        const unreleasedEpisodes = eps
+          .filter((ep) => ep.fecha_estreno && ep.fecha_estreno > todayStr)
+          .sort((a, b) => (a.fecha_estreno! > b.fecha_estreno! ? 1 : -1))
+
+        if (airedEpisodes.length > 0 && unreleasedEpisodes.length > 0) {
+          inProgressSeason = {
+            seasonNum: season.numero,
+            nextEpDate: unreleasedEpisodes[0]?.fecha_estreno || title.proximo_episodio_fecha || undefined,
+          }
+          break
+        }
+
+        // Check if this season is entirely in the future (not started yet)
+        if (airedEpisodes.length === 0) {
+          if (unreleasedEpisodes.length > 0) {
+            if (!upcomingSeasonWithDate) {
+              upcomingSeasonWithDate = {
+                seasonNum: season.numero,
+                startDate: unreleasedEpisodes[0]!.fecha_estreno!,
+              }
+            }
+          } else if (season.fecha_estreno) {
+            if (!upcomingSeasonWithDate) {
+              upcomingSeasonWithDate = {
+                seasonNum: season.numero,
+                startDate: season.fecha_estreno,
+              }
+            }
+          } else {
+            // Season confirmed without episodes or air_date yet (e.g. Landman S3)
+            if (!confirmedSeasonDateless) {
+              confirmedSeasonDateless = {
+                seasonNum: season.numero,
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Next scheduled date from TMDB if available
+    const nextDate = title.proximo_episodio_fecha
+
+    // State 1: Active season in progress -> Currently Airing (Green pulse)
+    if (inProgressSeason) {
+      const nextDateStr = inProgressSeason.nextEpDate
+        ? ` — Next ep on ${inProgressSeason.nextEpDate}`
+        : ''
+      return (
+        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 text-xs font-bold shadow-sm">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>Currently Airing{nextDateStr}</span>
+        </span>
+      )
+    }
+
+    // State 2: A new season is scheduled in the calendar with a known/estimated date -> Renewed (Blue)
+    if (upcomingSeasonWithDate || nextDate) {
+      const dateStr = upcomingSeasonWithDate?.startDate || nextDate
+      const label = upcomingSeasonWithDate ? `Season ${upcomingSeasonWithDate.seasonNum}` : 'New Season'
+      return (
+        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-950/80 border border-blue-500/60 text-blue-300 text-xs font-bold shadow-sm">
+          <span className="w-2 h-2 rounded-full bg-blue-400" />
+          <span>Renewed — {label}{dateStr ? ` on ${dateStr}` : ''}</span>
+        </span>
+      )
+    }
+
+    // State 3: Confirmed renewal without a release date yet, or TMDB status In Production / Planned -> Renewed TBA (Purple/Violet)
+    if (confirmedSeasonDateless || st.includes('production') || st.includes('planned')) {
+      const label = confirmedSeasonDateless ? `Season ${confirmedSeasonDateless.seasonNum}` : 'Next Season'
+      const statusSuffix = st.includes('production') ? 'In Production' : 'TBA'
+      return (
+        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-500/60 text-purple-300 text-xs font-bold shadow-sm">
+          <span className="w-2 h-2 rounded-full bg-purple-400" />
+          <span>Renewed — {label} ({statusSuffix})</span>
+        </span>
+      )
+    }
+
+    // State 4: Season concluded, active show without scheduled future seasons -> Pending Renewal (Amber)
     return (
-      <span className="px-3 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-300 text-xs">
-        {title.status_tmdb}
+      <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/60 border border-amber-600/50 text-amber-300 text-xs font-semibold">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+        <span>Pending Renewal (Between Seasons)</span>
       </span>
     )
   }
@@ -517,9 +618,9 @@ export const TitleDetailPage: React.FC = () => {
                 </div>
               )}
 
-              {/* 4 Íconos de Acción según el Wireframe */}
+              {/* 4 Action Icons */}
               <div className="pt-4 border-t border-gray-800 flex flex-wrap items-center gap-3">
-                {/* 1. Botón Favorito ❤️ */}
+                {/* 1. Favorite button */}
                 <button
                   onClick={handleFavoriteToggle}
                   className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
@@ -529,10 +630,10 @@ export const TitleDetailPage: React.FC = () => {
                   }`}
                 >
                   <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
-                  <span>Favorito</span>
+                  <span>Favorite</span>
                 </button>
 
-                {/* 2. Botón Visto 👁️ */}
+                {/* 2. Watched button */}
                 <button
                   onClick={handleWatchedToggle}
                   className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
@@ -542,10 +643,10 @@ export const TitleDetailPage: React.FC = () => {
                   }`}
                 >
                   <Eye className="w-4 h-4" />
-                  <span>{userEstado === 'vista' ? 'Vista' : 'Marcar Vista'}</span>
+                  <span>{userEstado === 'vista' ? 'Watched' : 'Mark Watched'}</span>
                 </button>
 
-                {/* 3 & 4. Lógica de Series: Siguiendo ▶️ / Abandonar ❌ vs Watchlist 🔖 */}
+                {/* 3 & 4. Series Logic: Following / Drop Series vs Watchlist */}
                 {title.tipo === 'tv' ? (
                   (() => {
                     const hasWatchedEpisodes = !!title.temporadas?.some((t) => t.episodios?.some((e) => e.visto))
@@ -555,20 +656,20 @@ export const TitleDetailPage: React.FC = () => {
                       <>
                         {userEstado === 'siguiendo' && (
                           <>
-                            {/* Badge Siguiendo (no interactuable / activo) */}
+                            {/* Following Badge */}
                             <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-900/40 border border-blue-500 text-blue-300 cursor-default shadow-md">
                               <Play className="w-4 h-4 fill-current" />
-                              <span>Siguiendo</span>
+                              <span>Following</span>
                             </span>
 
-                            {/* Botón Abandonar serie ❌ */}
+                            {/* Drop Series Button */}
                             <button
                               onClick={handleUnfollow}
-                              title="Abandonar serie conservando episodios vistos"
+                              title="Drop series keeping watched episodes history"
                               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-950/40 border border-red-700/80 text-red-300 hover:bg-red-900/50 hover:border-red-500 transition-all"
                             >
                               <X className="w-4 h-4" />
-                              <span>Abandonar</span>
+                              <span>Drop Series</span>
                             </button>
                           </>
                         )}
@@ -577,21 +678,21 @@ export const TitleDetailPage: React.FC = () => {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-950/40 border border-red-800/60 text-red-300">
                               <X className="w-4 h-4 text-red-400" />
-                              <span>Serie Abandonada</span>
+                              <span>Dropped Series</span>
                             </span>
 
                             <button
                               onClick={handleFollow}
-                              title="Reanudar seguimiento de la serie"
+                              title="Resume following series"
                               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-blue-300 hover:text-white shadow-md transition-all"
                             >
                               <Play className="w-4 h-4 fill-current text-blue-400" />
-                              <span>Reanudar / Follow</span>
+                              <span>Resume / Follow</span>
                             </button>
                           </div>
                         )}
 
-                        {/* Si no está siguiendo ni en vista ni abandonada, se muestra Watchlist */}
+                        {/* Watchlist button if not following, watched or dropped */}
                         {userEstado !== 'siguiendo' && userEstado !== 'vista' && !isAbandoned && (
                           <button
                             onClick={handleWatchlistToggle}
@@ -609,7 +710,7 @@ export const TitleDetailPage: React.FC = () => {
                     )
                   })()
                 ) : (
-                  /* Para Películas: Watchlist si no está vista */
+                  /* Movies: Watchlist if not watched */
                   userEstado !== 'vista' && (
                     <button
                       onClick={handleWatchlistToggle}
@@ -630,22 +731,22 @@ export const TitleDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Contenido Detallado */}
+      {/* Detailed Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
-        {/* Sinopsis */}
+        {/* Synopsis */}
         {title.sinopsis && (
           <section className="space-y-3">
-            <h2 className="text-xl font-bold text-white tracking-tight">Sinopsis</h2>
+            <h2 className="text-xl font-bold text-white tracking-tight">Synopsis</h2>
             <p className="text-sm sm:text-base text-gray-300 leading-relaxed max-w-4xl">
               {title.sinopsis}
             </p>
           </section>
         )}
 
-        {/* Elenco Principal */}
+        {/* Top Cast */}
         {title.elenco && title.elenco.length > 0 && (
           <section className="space-y-4">
-            <h2 className="text-xl font-bold text-white tracking-tight">Reparto Principal</h2>
+            <h2 className="text-xl font-bold text-white tracking-tight">Top Cast</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {title.elenco.slice(0, 12).map((actor) => (
                 <Link
@@ -671,7 +772,7 @@ export const TitleDetailPage: React.FC = () => {
         )}
 
         {/* Acordeón y Gestión de Temporadas / Episodios (Solo Series) */}
-        {title.tipo === 'tv' && title.temporadas && title.temporadas.length > 0 && (
+        {title.tipo === 'tv' && visibleSeasons.length > 0 && (
           <section className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
@@ -679,9 +780,9 @@ export const TitleDetailPage: React.FC = () => {
               </h2>
 
               {/* Selector de Temporadas Híbrido: Tabs si <= 5 temporadas, Combobox con stepper si > 5 */}
-              {title.temporadas.length <= 5 ? (
+              {visibleSeasons.length <= 5 ? (
                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-                  {title.temporadas.map((t) => {
+                  {visibleSeasons.map((t) => {
                     const isActive = t.numero === selectedSeason
                     return (
                       <button
@@ -711,7 +812,7 @@ export const TitleDetailPage: React.FC = () => {
                       onChange={(e) => setSelectedSeason(Number(e.target.value))}
                       className="appearance-none pl-3.5 pr-8 py-2 rounded-xl bg-[#141414] border border-[#262626] text-xs font-bold text-white hover:border-amber-500 focus:outline-none focus:border-amber-500 transition-colors cursor-pointer shadow-sm"
                     >
-                      {title.temporadas.map((t) => (
+                      {visibleSeasons.map((t) => (
                         <option key={t.id} value={t.numero} className="bg-[#141414] text-white">
                           Season {t.numero} {t.temporada_vista ? '— ✓ WATCHED' : `(${t.episodios_vistos || 0}/${t.cantidad_episodios})`}
                         </option>
@@ -720,28 +821,28 @@ export const TitleDetailPage: React.FC = () => {
                     <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 pointer-events-none" />
                   </div>
 
-                  {/* Botones de navegación rápida anterior / siguiente */}
+                  {/* Previous / next season quick nav buttons */}
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => {
-                        const seasons = title.temporadas.map((t) => t.numero)
+                        const seasons = visibleSeasons.map((t) => t.numero)
                         const currIdx = seasons.indexOf(selectedSeason)
                         if (currIdx > 0) setSelectedSeason(seasons[currIdx - 1])
                       }}
-                      disabled={selectedSeason === title.temporadas[0].numero}
-                      title="Temporada anterior"
+                      disabled={selectedSeason === visibleSeasons[0]?.numero}
+                      title="Previous season"
                       className="p-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-300 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => {
-                        const seasons = title.temporadas.map((t) => t.numero)
+                        const seasons = visibleSeasons.map((t) => t.numero)
                         const currIdx = seasons.indexOf(selectedSeason)
                         if (currIdx < seasons.length - 1) setSelectedSeason(seasons[currIdx + 1])
                       }}
-                      disabled={selectedSeason === title.temporadas[title.temporadas.length - 1].numero}
-                      title="Temporada siguiente"
+                      disabled={selectedSeason === visibleSeasons[visibleSeasons.length - 1]?.numero}
+                      title="Next season"
                       className="p-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-300 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -751,7 +852,7 @@ export const TitleDetailPage: React.FC = () => {
               )}
             </div>
 
-            {/* Notificación de aviso al usuario (ej. episodio futuro) */}
+            {/* Notice banner */}
             {episodeNotice && (
               <div className="p-3.5 rounded-xl bg-amber-950/60 border border-amber-600/60 text-amber-200 text-xs flex items-center gap-2.5 animate-fadeIn shadow-lg">
                 <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
@@ -759,12 +860,12 @@ export const TitleDetailPage: React.FC = () => {
               </div>
             )}
 
-            {/* Cabecera y botón de temporada completa */}
+            {/* Header and mark season watched button */}
             {currentSeasonData && (
               <div className="p-4 rounded-xl bg-gray-900/60 border border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-white">
-                    Temporada {currentSeasonData.numero} ({currentSeasonData.cantidad_episodios} episodios)
+                    Season {currentSeasonData.numero} ({currentSeasonData.cantidad_episodios} episodes)
                   </h3>
                   {currentSeasonData.sinopsis && (
                     <p className="text-xs text-gray-400 mt-1 max-w-3xl leading-relaxed">
@@ -805,15 +906,15 @@ export const TitleDetailPage: React.FC = () => {
                     <CheckCheck className="w-4 h-4" />
                     <span>
                       {currentSeasonData.temporada_vista
-                        ? 'Temporada Vista'
-                        : 'Marcar toda la temporada'}
+                        ? 'Season Watched'
+                        : 'Mark Entire Season'}
                     </span>
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Lista de Episodios de la Temporada Seleccionada */}
+            {/* Episode List */}
             {currentSeasonData && currentSeasonData.episodios && (
               episodesCollapsed ? (
                 <div
@@ -855,10 +956,10 @@ export const TitleDetailPage: React.FC = () => {
                             }
                             title={
                               isEpWatched
-                                ? 'Marcar como no visto'
+                                ? 'Mark as unwatched'
                                 : isUnreleased
-                                ? `No estrenado (estreno: ${ep.fecha_estreno})`
-                                : 'Marcar como visto'
+                                ? `Unreleased (air date: ${ep.fecha_estreno})`
+                                : 'Mark as watched'
                             }
                             className={`mt-0.5 p-1 rounded-full transition-colors ${
                               isEpWatched
@@ -879,7 +980,7 @@ export const TitleDetailPage: React.FC = () => {
                               </h4>
                               {isUnreleased && !isEpWatched && (
                                 <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-semibold flex items-center gap-1">
-                                  <Clock className="w-3 h-3" /> No estrenado
+                                  <Clock className="w-3 h-3" /> Unreleased
                                 </span>
                               )}
                             </div>
@@ -887,10 +988,10 @@ export const TitleDetailPage: React.FC = () => {
                             <div className="flex items-center gap-3 text-[11px] text-gray-500">
                               {ep.fecha_estreno ? (
                                 <span className={isUnreleased ? 'text-amber-400/80 font-medium' : ''}>
-                                  Estreno: {ep.fecha_estreno}
+                                  Air Date: {ep.fecha_estreno}
                                 </span>
                               ) : (
-                                <span>Estreno: -</span>
+                                <span>Air Date: -</span>
                               )}
                               <span>• {ep.duracion && ep.duracion > 0 ? `${ep.duracion} min` : '-'}</span>
                             </div>
@@ -1017,7 +1118,7 @@ export const TitleDetailPage: React.FC = () => {
                         onChange={(e) => setIncludeScore(e.target.checked)}
                         className="w-4 h-4 rounded border-[#333333] bg-[#0d0d0d] text-amber-500 focus:ring-amber-500"
                       />
-                      <span className="font-medium">Include rating / Calificar con puntaje</span>
+                      <span className="font-medium">Include rating score</span>
                     </label>
 
                     {includeScore && (

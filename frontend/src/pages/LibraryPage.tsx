@@ -81,21 +81,21 @@ export const LibraryPage: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Encabezado */}
+      {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-          <Bookmark className="w-7 h-7 text-purple-400" /> Mi Biblioteca
+          <Bookmark className="w-7 h-7 text-amber-400" /> My Library
         </h1>
-        <p className="text-xs text-gray-400 mt-1">Gestiona tus películas y series guardadas</p>
+        <p className="text-xs text-gray-400 mt-1">Manage your saved movies and series</p>
       </div>
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-gray-800 pb-3 mb-8 overflow-x-auto no-scrollbar">
         {[
-          { id: 'favoritos', label: `Favoritos (${data?.favorites?.length || 0})`, icon: Heart },
-          { id: 'watchlist', label: `Por Ver (${data?.watchlist?.length || 0})`, icon: Bookmark },
-          { id: 'siguiendo', label: `Siguiendo (${data?.following?.length || 0})`, icon: Play },
-          { id: 'vistas', label: `Vistas (${data?.recently_watched?.length || 0})`, icon: CheckCircle2 },
+          { id: 'favoritos', label: `Favorites (${data?.favorites?.length || 0})`, icon: Heart },
+          { id: 'watchlist', label: `Watchlist (${data?.watchlist?.length || 0})`, icon: Bookmark },
+          { id: 'siguiendo', label: `Following (${data?.following?.length || 0})`, icon: Play },
+          { id: 'vistas', label: `Watched (${data?.recently_watched?.length || 0})`, icon: CheckCircle2 },
         ].map((t) => {
           const Icon = t.icon
           const active = tab === t.id
@@ -105,7 +105,7 @@ export const LibraryPage: React.FC = () => {
               onClick={() => setTab(t.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
                 active
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+                  ? 'bg-amber-500 text-black font-bold shadow-md shadow-amber-500/20'
                   : 'bg-gray-900 text-gray-400 hover:text-white hover:bg-gray-800'
               }`}
             >
@@ -116,11 +116,11 @@ export const LibraryPage: React.FC = () => {
         })}
       </div>
 
-      {/* Contenido */}
+      {/* Content */}
       {loading ? (
         <div className="flex flex-col items-center justify-center min-h-[40vh] gap-3">
-          <div className="w-10 h-10 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" />
-          <p className="text-xs text-gray-400">Cargando títulos de tu biblioteca...</p>
+          <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+          <p className="text-xs text-gray-400">Loading titles from your library...</p>
         </div>
       ) : error ? (
         <div className="p-8 text-center bg-gray-900/50 rounded-2xl border border-gray-800">
@@ -130,15 +130,15 @@ export const LibraryPage: React.FC = () => {
       ) : currentItems.length === 0 ? (
         <div className="p-16 text-center bg-gray-900/30 rounded-2xl border border-gray-800/60 max-w-lg mx-auto">
           <Bookmark className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-white mb-1">No tienes títulos en esta sección</h3>
+          <h3 className="text-base font-bold text-white mb-1">No titles in this section</h3>
           <p className="text-xs text-gray-400 mb-6">
-            Explora el catálogo o las tendencias para agregar producciones a tu lista.
+            Explore the catalog or trending titles to add movies and series to your library.
           </p>
           <Link
             to="/catalog"
-            className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-lg shadow-purple-600/30"
+            className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all"
           >
-            Explorar Catálogo
+            Explore Catalog
           </Link>
         </div>
       ) : (

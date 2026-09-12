@@ -9,9 +9,9 @@ describe('CineTrack Frontend App', () => {
     expect(brandElements.length).toBeGreaterThan(0)
   })
 
-  it('renders navigation links for Películas and Series', () => {
+  it('renders navigation links for Movies and Series', () => {
     render(<App />)
-    const moviesLinks = screen.getAllByText(/Películas/i)
+    const moviesLinks = screen.getAllByText(/Movies/i)
     const seriesLinks = screen.getAllByText(/Series/i)
     expect(moviesLinks.length).toBeGreaterThan(0)
     expect(seriesLinks.length).toBeGreaterThan(0)

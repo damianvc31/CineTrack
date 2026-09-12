@@ -426,19 +426,14 @@ class TMDBSyncService:
                 if s_num is None or s_num < 1:  # Ignorar especiales (temporada 0)
                     continue
 
+                s_details = {}
                 try:
                     s_details = await self.client.get_season_details(tmdb_id, s_num)
                 except Exception as e:
-                    logger.warning(f"No se pudo obtener temporada {s_num} de serie {tmdb_id}: {e}")
-                    continue
-
-                episodes_list = s_details.get("episodes", [])
-                if not episodes_list:
-                    # Omitir temporadas vacías sin episodios emitidos o cargados
-                    continue
+                    logger.debug(f"Temporada {s_num} de serie {tmdb_id} sin detalles extendidos en TMDB: {e}")
 
                 s_air_date = None
-                s_ad_str = s_details.get("air_date")
+                s_ad_str = s_details.get("air_date") or s_info.get("air_date")
                 if s_ad_str:
                     try:
                         s_air_date = datetime.strptime(s_ad_str, "%Y-%m-%d").date()
@@ -461,21 +456,23 @@ class TMDBSyncService:
                     )
                 )
                 temporada = res_temp.scalar_one_or_none()
+                overview_text = s_details.get("overview") or s_info.get("overview")
                 if not temporada:
                     temporada = Temporada(
                         titulo_id=titulo.id,
                         numero=s_num,
-                        sinopsis=s_details.get("overview"),
+                        sinopsis=overview_text,
                         fecha_estreno=s_air_date,
                     )
                     self.db.add(temporada)
                     await self.db.flush()
                 else:
-                    temporada.sinopsis = s_details.get("overview", temporada.sinopsis)
+                    if overview_text:
+                        temporada.sinopsis = overview_text
                     if s_air_date:
                         temporada.fecha_estreno = s_air_date
 
-                # Episodios de la temporada
+                # Episodios de la temporada (si existen)
                 for ep_data in s_details.get("episodes", []):
                     ep_num = ep_data.get("episode_number")
                     if ep_num is None:

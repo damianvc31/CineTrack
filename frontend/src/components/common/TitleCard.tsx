@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Star, Heart, Bookmark, Eye, Play } from 'lucide-react'
+import { Star, Heart, Bookmark, Eye, Play, X } from 'lucide-react'
 import type { TitleCard as TitleCardType } from '@/types/catalog'
 import { catalogService } from '@/services/catalogService'
 import { useAuth } from '@/context/AuthContext'
@@ -85,6 +85,7 @@ export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOp
   const isWatched = userEstado === 'vista'
   const isSiguiendo = userEstado === 'siguiendo'
   const isWatchlist = userEstado === 'watchlist'
+  const isAbandonada = userEstado === 'abandonada'
 
   return (
     <div
@@ -139,13 +140,20 @@ export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOp
             <Eye className={`w-4 h-4 ${isWatched ? 'fill-current' : ''}`} />
           </button>
 
-          {/* Botón Watchlist / Siguiendo */}
+          {/* Botón Watchlist / Siguiendo / Abandonada */}
           {isSiguiendo ? (
             <span
               title="Following series"
               className="p-1.5 rounded-full text-blue-400 bg-blue-500/20"
             >
               <Play className="w-4 h-4 fill-current" />
+            </span>
+          ) : isAbandonada ? (
+            <span
+              title="Dropped series - Click to view details and resume"
+              className="p-1.5 rounded-full text-red-400 bg-red-500/20 hover:bg-red-500/30 transition-colors"
+            >
+              <X className="w-4 h-4" />
             </span>
           ) : !isWatched ? (
             <button

@@ -41,7 +41,8 @@ from app.schemas.catalog import (
 
 def _build_title_card(
     titulo: Titulo,
-    user_state: Optional[EstadoUsuarioTitulo] = None
+    user_state: Optional[EstadoUsuarioTitulo] = None,
+    is_abandoned: bool = False
 ) -> TitleCardResponse:
     total_seasons = len(titulo.temporadas) if titulo.tipo == "tv" and hasattr(titulo, "temporadas") and titulo.temporadas else None
     genres = [GenreResponse(id=g.id, nombre=g.nombre) for g in titulo.generos] if hasattr(titulo, "generos") and titulo.generos else []
@@ -51,6 +52,10 @@ def _build_title_card(
     if user_state:
         user_favorito = user_state.favorito
         user_estado = user_state.estado
+
+    # Si es serie de TV y tiene episodios vistos pero no está en siguiendo ni vista, su estado deducido es 'abandonada'
+    if titulo.tipo == "tv" and (user_estado is None or user_estado == "abandonada") and is_abandoned:
+        user_estado = "abandonada"
 
     return TitleCardResponse(
         id=titulo.id,
@@ -290,6 +295,7 @@ async def get_titles(
 
     # Cargar estados de usuario si está autenticado
     user_states_map = {}
+    tv_abandoned_ids = set()
     if usuario_id and titulos:
         title_ids = [t.id for t in titulos]
         st_res = await db.execute(
@@ -301,7 +307,28 @@ async def get_titles(
         for st in st_res.scalars().all():
             user_states_map[st.titulo_id] = st
 
-    items = [_build_title_card(t, user_states_map.get(t.id)) for t in titulos]
+        tv_ids = [t.id for t in titulos if t.tipo == "tv"]
+        if tv_ids:
+            w_res = await db.execute(
+                select(Temporada.titulo_id)
+                .join(Episodio, Episodio.temporada_id == Temporada.id)
+                .join(EpisodioVisto, EpisodioVisto.episodio_id == Episodio.id)
+                .where(
+                    EpisodioVisto.usuario_id == usuario_id,
+                    Temporada.titulo_id.in_(tv_ids)
+                )
+                .distinct()
+            )
+            watched_tv_ids = set(w_res.scalars().all())
+            for tid in watched_tv_ids:
+                st = user_states_map.get(tid)
+                if not st or st.estado not in ("siguiendo", "vista"):
+                    tv_abandoned_ids.add(tid)
+
+    items = [
+        _build_title_card(t, user_states_map.get(t.id), is_abandoned=(t.id in tv_abandoned_ids))
+        for t in titulos
+    ]
     return TitleListResponse(items=items, total=total, page=page, page_size=page_size)
 
 
@@ -509,6 +536,7 @@ async def get_home_sections(
         all_selected.extend(g_list)
 
     user_states_map = {}
+    tv_abandoned_ids = set()
     if usuario_id and all_selected:
         unique_ids = list({t.id for t in all_selected})
         st_res = await db.execute(
@@ -519,16 +547,37 @@ async def get_home_sections(
         )
         user_states_map = {st.titulo_id: st for st in st_res.scalars().all()}
 
+        tv_ids = [t.id for t in all_selected if t.tipo == "tv"]
+        if tv_ids:
+            w_res = await db.execute(
+                select(Temporada.titulo_id)
+                .join(Episodio, Episodio.temporada_id == Temporada.id)
+                .join(EpisodioVisto, EpisodioVisto.episodio_id == Episodio.id)
+                .where(
+                    EpisodioVisto.usuario_id == usuario_id,
+                    Temporada.titulo_id.in_(tv_ids)
+                )
+                .distinct()
+            )
+            watched_tv_ids = set(w_res.scalars().all())
+            for tid in watched_tv_ids:
+                st = user_states_map.get(tid)
+                if not st or st.estado not in ("siguiendo", "vista"):
+                    tv_abandoned_ids.add(tid)
+
+    def _build_card(t):
+        return _build_title_card(t, user_states_map.get(t.id), is_abandoned=(t.id in tv_abandoned_ids))
+
     return HomeSectionsResponse(
-        trending=[_build_title_card(t, user_states_map.get(t.id)) for t in trending_titulos],
-        new_releases=[_build_title_card(t, user_states_map.get(t.id)) for t in new_releases_titulos],
-        classics=[_build_title_card(t, user_states_map.get(t.id)) for t in classics_titulos],
-        top_rated=[_build_title_card(t, user_states_map.get(t.id)) for t in top_rated_titulos],
+        trending=[_build_card(t) for t in trending_titulos],
+        new_releases=[_build_card(t) for t in new_releases_titulos],
+        classics=[_build_card(t) for t in classics_titulos],
+        top_rated=[_build_card(t) for t in top_rated_titulos],
         by_genre={
-            gname: [_build_title_card(t, user_states_map.get(t.id)) for t in titles]
+            gname: [_build_card(t) for t in titles]
             for gname, titles in by_genre_titulos.items()
         },
-        others=[_build_title_card(t, user_states_map.get(t.id)) for t in others_titulos]
+        others=[_build_card(t) for t in others_titulos]
     )
 
 
@@ -630,7 +679,13 @@ async def get_title_detail(
             )
         )
 
-    card = _build_title_card(titulo, user_state)
+    total_vistos_serie = sum(s.episodios_vistos for s in temporadas_list) if titulo.tipo == "tv" else 0
+    is_abandoned = (
+        titulo.tipo == "tv"
+        and (user_state is None or user_state.estado not in ("siguiendo", "vista"))
+        and total_vistos_serie > 0
+    )
+    card = _build_title_card(titulo, user_state, is_abandoned=is_abandoned)
     return TitleDetailResponse(
         **card.model_dump(),
         director=titulo.director,
