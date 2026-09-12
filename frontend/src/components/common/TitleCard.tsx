@@ -147,7 +147,7 @@ export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOp
             >
               <Play className="w-4 h-4 fill-current" />
             </span>
-          ) : (
+          ) : !isWatched ? (
             <button
               onClick={(e) => handleQuickAction(e, 'watchlist')}
               disabled={isUpdating}
@@ -160,7 +160,7 @@ export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOp
             >
               <Bookmark className={`w-4 h-4 ${isWatchlist ? 'fill-current' : ''}`} />
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -173,19 +173,19 @@ export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOp
           {title.nombre}
         </h3>
 
-        <div className="flex items-center justify-between text-[11px] text-gray-400">
-          <div className="flex items-center gap-1.5 truncate max-w-[68%]">
+        <div className="flex items-center justify-between text-[11px] text-gray-400 gap-1">
+          <div className="flex items-center gap-1 min-w-0 flex-1">
             <CountryFlag code={title.pais} />
-            <span className="text-gray-600">•</span>
-            <span className="truncate">{subInfo || '-'}</span>
+            <span className="text-gray-600 text-[10px]">•</span>
+            <span className="truncate text-[10px] tracking-tight">{subInfo || '-'}</span>
           </div>
 
           {title.vote_average_tmdb > 0 && (
-            <div className="flex items-center gap-1 text-amber-400 font-semibold shrink-0">
+            <div className="flex items-center gap-1 text-amber-400 font-semibold shrink-0 text-[11px]">
               <Star className="w-3 h-3 fill-amber-400" />
               <span>{title.vote_average_tmdb.toFixed(1)}</span>
               {title.vote_count_tmdb > 0 && (
-                <span className="text-[10px] text-gray-500 font-normal">
+                <span className="text-[9px] text-gray-500 font-normal">
                   ({title.vote_count_tmdb >= 1000 ? `${(title.vote_count_tmdb / 1000).toFixed(1)}k` : title.vote_count_tmdb})
                 </span>
               )}
