@@ -1,4 +1,4 @@
-﻿# CATALOG_SPECS.md — Especificaciones del Catálogo y Reglas de Negocio
+# CATALOG_SPECS.md — Especificaciones del Catálogo y Reglas de Negocio
 
 Este documento define en detalle las reglas de negocio, criterios de curación, transiciones de estado y fórmulas de calificación de CineTrack, complementando las especificaciones iniciales del proyecto.
 
@@ -70,3 +70,48 @@ $$\text{Rating Unificado} = \frac{(\text{vote\_average\_tmdb} \times \text{vote\
 
 - **Reseñas de TMDB:** Cualitativas. Se importan hasta 20 reseñas externas por obra (`TMDB_REVIEWS_PER_TITLE_LIMIT = 20`) para dar riqueza testimonial sin alterar la ponderación numérica (sus calificaciones ya forman parte del `vote_average_tmdb`).
 - **Reseñas de CineTrack:** Cada usuario registrado puede emitir una reseña con puntaje de 1.0 a 10.0, recalculando de inmediato el rating consolidado en base de datos.
+
+---
+
+## 4. Ingesta Inicial del Catálogo
+
+La población inicial del catálogo (`--initial` o `/admin/sync/initial`) está diseñada para balancear obras populares contemporáneas con clásicos históricos:
+
+- **Cuotas Objetivo:** Parametrizables vía configuración (`TMDB_INGEST_MOVIES_TARGET = 1000`, `TMDB_INGEST_SERIES_TARGET = 1000`).
+- **Estrategias de Prioridad (`TMDB_INGEST_PRIORITY`):**
+  - `popular_first` (predeterminada): Ingesta primero la mitad de la cuota (500 títulos) ordenados por popularidad descendente para garantizar cartelera actual, y completa la mitad restante con los títulos mejor calificados históricamente que superen el umbral de representatividad (`vote_count >= 100`).
+  - `toprated_first`: Invierte la estrategia, priorizando las 500 obras maestras mejor calificadas y completando la cuota con títulos populares.
+- **Idempotencia y Tolerancia a Fallos:** Si un título ya existe en la base (mismo `tmdb_id` y `tipo`), actualiza sus datos sin duplicar. Si un título puntual falla durante la importación, se ejecuta un rollback aislado de esa obra y el bucle continúa paginando hasta alcanzar la cuota objetivo requerida.
+
+---
+
+## 5. Sincronización Diaria y Detección de Cambios
+
+El proceso de sincronización periódica (`--daily` o `/admin/sync/daily`) mantiene el catálogo al día con mínimo consumo de cuota de API externa mediante cuatro reglas de negocio:
+
+1. **Actualización Prioritaria de Series Seguidas:** Identifica todas las series que tengan al menos un usuario activo en estado `siguiendo`. Actualiza su estado de emisión (`Ended`, `Returning Series`, `Canceled`) y descarga atómicamente los nuevos episodios o temporadas recién emitidos.
+2. **Detección Desatendida de Cambios vía `/changes`:** Consulta los endpoints `/tv/changes` y `/movie/changes` dentro de una ventana temporal móvil (`TMDB_CHANGES_HOURS_WINDOW`, default 48 horas) para detectar y actualizar cualquier serie o película existente en el catálogo local que haya sufrido modificaciones en TMDB, incluso si ningún usuario la sigue todavía.
+3. **Ingesta Autónoma de Estrenos en Cartelera:** Detecta películas estrenadas en los últimos 15 días (`TMDB_DAILY_SYNC_DAYS_WINDOW = 15`) que superen un umbral de relevancia (`popularity >= 10.0`) y las incorpora al catálogo local.
+4. **Recálculo de Percentiles:** Tras actualizar el catálogo, se recalcula la distribución estadística de popularidad (`popularidad_percentil`) para todos los títulos.
+
+---
+
+## 6. Enriquecimiento de Metadatos y Créditos de Elenco
+
+Durante la importación o sincronización de cualquier título, se aplican reglas de filtrado y estructuración crediticia:
+
+- **Dirección y Guion:** Se deduplican directores y creadores. Para guionistas se concatenan hasta un máximo de 3 autores principales (`TMDB_CREW_WRITERS_LIMIT = 3`).
+- **Elenco Principal Jerarquizado:** Se limita el reparto a los 15 actores principales más relevantes (`TMDB_CAST_LIMIT = 15`), ordenados por la jerarquía crediticia oficial de TMDB (`orden`).
+- **Atributos de Personaje:** En la relación N:M (`titulos_elenco`) se persiste explícitamente el nombre del papel interpretado (`personaje`) y su número de orden para renderizar fichas de reparto fidedignas en la UI.
+- **Jerarquía Episódica:** En series de televisión se importan todas las temporadas y episodios regulares, persistiendo números de episodio, fecha de emisión exacta (`air_date`) y sinopsis individual.
+
+---
+
+## 7. Importación Manual por JSON con Búsqueda Inteligente
+
+El catálogo permite la incorporación manual de obras mediante archivos JSON estructurados (`--import-json <path>` o `/admin/sync/import-json`):
+
+- **Plantillas Estándar:** La estructura de entrada sigue los contratos definidos en `docs/templates/template_pelicula.json` y `template_serie.json`.
+- **Resolución Inteligente de Identificador:** Si el registro JSON omite el `id_tmdb`, el importador ejecuta una búsqueda por título y año en TMDB para descubrir y vincular el ID canónico oficial.
+- **Rechazo de Obras Huérfanas:** Si un título no cuenta con `id_tmdb` y no puede ser resuelto en TMDB, se rechaza con un error explícito. Esto previene la existencia de registros huérfanos que no puedan beneficiarse de la sincronización diaria, imágenes o metadatos de episodios.
+

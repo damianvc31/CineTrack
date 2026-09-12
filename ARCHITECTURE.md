@@ -20,13 +20,14 @@ Este documento define la arquitectura técnica de CineTrack tras la evaluación 
 ### 2.1. Estrategia de Herencia (Título / Película / Serie)
 Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 - Tabla `titulos`: contiene atributos comunes (nombre, sinopsis, portada, popularidad, vote_average, vote_count, percentil, status de emisión, etc.) con discriminador `tipo` (`'movie' | 'tv'`).
+- **Clave candidata compuesta:** Restricción `UNIQUE (tmdb_id, tipo)` que permite la coexistencia de películas y series con identificadores idénticos en TMDB sin colisión, manteniendo como clave primaria interna un entero simple auto-incremental (`id`).
 - Las películas aprovechan campos específicos (como `duracion`).
 - Las series se relacionan 1:N con `temporadas` y a su vez 1:N con `episodios`.
 - **Beneficio:** Elimina `JOINs` costosos en las pantallas principales y de exploración ("Todos", "Trending", "Estrenos") donde se presentan películas y series de forma unificada.
 
 ### 2.2. Esquema Relacional Principal
 1. **`usuarios`**: Autenticación mínima (login/password con hash `bcrypt`/`argon2`), perfil (país, ciudad, biografía, avatar, fecha_registro, flag `es_admin`).
-2. **`titulos`**: Catálogo de películas y series con metadatos técnicos y de TMDB. Utiliza campos exactos tipo `Date` (`fecha_estreno` y `fecha_fin`), exponiendo propiedades calculadas `@property anio_estreno` y `anio_fin` con setters para retrocompatibilidad total.
+2. **`titulos`**: Catálogo de películas y series con metadatos técnicos y de TMDB. Utiliza campos exactos tipo `Date` (`fecha_estreno` y `fecha_fin`), exponiendo propiedades calculadas `@property anio_estreno` y `anio_fin` con setters para retrocompatibilidad total. Columna indexada y persistida `rating_unificado`.
 3. **`generos`** & **`titulos_generos`**: Clasificación N:M (un título pertenece a múltiples géneros).
 4. **`actores`** & **`titulos_elenco`**: Reparto principal N:M con columnas `personaje` y `orden`.
 5. **`temporadas`** & **`episodios`**: Jerarquía episódica de series con duraciones por episodio y fechas de emisión.
@@ -34,37 +35,32 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 7. **`episodios_vistos`**: Historial atómico de episodios vistos por usuario y fecha.
 8. **`resenas`**: Reseñas y puntajes. Diseñado con autor polimórfico: `usuario_id` (FK nullable a `usuarios`) o `autor_tmdb` (texto) con identificador externo `tmdb_review_id` para deduplicación.
 
-### 2.3. Lógica de Catálogo y Reglas de Negocio
-La curación de las colecciones de exploración de inicio (`/api/v1/home`), los criterios de selección por ventanas y pools (New Releases, Trending, Classics, Top Rated, By Genre y Others), la exclusión de vistos, las transiciones de la máquina de estados por episodios y la fórmula ponderada de calificación unificada se encuentran formalmente especificadas y desacopladas en [docs/CATALOG_SPECS.md](docs/CATALOG_SPECS.md).
+### 2.3. Desacoplamiento de Reglas de Negocio
+> *Las especificaciones funcionales y de dominio —incluyendo los criterios de curación de la Home, ventanas temporales, pools dinámicos, máquina de estados por episodios, fórmula de calificación unificada, políticas de ingesta inicial, sincronización diaria y reglas de créditos de elenco— están formalmente desacopladas en [docs/CATALOG_SPECS.md](docs/CATALOG_SPECS.md).*
 
 ### 2.4. Almacenamiento de Avatares
 - **Versión Mínima:** Selección de avatares predeterminados locales (identicons/SVGs) o URLs externas. Subida de avatares guardando una miniatura optimizada directamente en la base de datos (`BYTEA` / Base64 limitada a <300 KB), evitando la pérdida de archivos en filesystems efímeros de hosting PaaS.
 
 ---
 
-## 3. Integración Externa y Procesos en Background
+## 3. Integración Externa y Arquitectura de Tareas Asíncronas
 
-1. **TMDB API y Motor de Sincronización:**
-   - **Cliente HTTP Asíncrono (`TMDBClient`):** Basado en `httpx.AsyncClient` con cabecera `Authorization: Bearer <TMDB_API_KEY>` (formato v4) y soporte para api_key v3. Implementa limitación de concurrencia mediante `asyncio.Semaphore(10)` y reintentos automáticos con retroceso exponencial ante errores 429 o de conectividad.
-   - **Ingesta Inicial Parametrizable:** Sincronización de cuotas configurables (`TMDB_INGEST_MOVIES_TARGET`, `TMDB_INGEST_SERIES_TARGET`, 1000 títulos cada una) con switch de estrategia (`TMDB_INGEST_PRIORITY: "popular_first" | "toprated_first"`):
-     - `popular_first`: Asegura primero las tendencias actuales (500 títulos) y completa el cupo restante con clásicos de alto puntaje (`vote_count >= 100`).
-     - `toprated_first`: Prioriza las obras maestras mejor calificadas históricamente y completa la cuota restante con títulos populares.
-   - **Enriquecimiento de Metadatos y Elenco:** Deduplicación de directores, concatenación de hasta 3 guionistas (`TMDB_CREW_WRITERS_LIMIT = 3`) y limitación de elenco a los 15 actores principales (`TMDB_CAST_LIMIT = 15`) ordenados por importancia crediticia, vinculados en la tabla `titulos_elenco` persistiendo `personaje` (nombre del papel interpretado) y `orden` (jerarquía oficial de TMDB).
-   - **Sincronización de Reseñas Externas y Rating Unificado:**
-     - Importación de hasta 20 reseñas externas de TMDB (`TMDB_REVIEWS_PER_TITLE_LIMIT = 20`) por título para contextualizar el catálogo base con opiniones reales.
-     - Columna persistida e indexada `rating_unificado` en la tabla `titulos`, recalculada automáticamente en cada sincronización y cuando los usuarios agregan/modifican reseñas con puntaje:
-       $$\text{Rating Unificado} = \frac{(\text{vote\_average\_tmdb} \times \text{vote\_count\_tmdb}) + \sum \text{puntajes\_usuarios}}{\text{vote\_count\_tmdb} + N}$$
-       Las reseñas de TMDB son cualitativas (sus votos ya están absorbidos en `vote_average_tmdb`); los votos de usuarios locales de CineTrack modifican el promedio ponderado.
-   - **Sincronización Diaria (`run_daily_sync`):**
-     - Detecta series en seguimiento (`siguiendo`) por cualquier usuario para refrescar su estado (`Ended`, `Canceled`) e insertar atómicamente nuevos episodios o temporadas recién estrenadas.
-     - Ingesta automáticamente nuevos estrenos cinematográficos en una ventana móvil de 15 días con umbral de popularidad calibrado (`popularity >= 10.0`).
-     - Consulta los endpoints `/tv/changes` y `/movie/changes` dentro de una ventana parametrizada (`TMDB_CHANGES_HOURS_WINDOW`, default 48 horas) para detectar cambios y emisiones de episodios de cualquier título local, independientemente de si los usuarios lo siguen activamente.
-   - **Importación Manual por JSON con Búsqueda Inteligente:** Carga modular (`--import-json <path>`) usando plantillas en `docs/templates/`. Si no se especifica `id_tmdb`, busca en TMDB por título y año para resolver el identificador canónico y vincularlo a las sincronizaciones futuras; si no se encuentra coincidencia en TMDB, el registro es rechazado con error explícito para evitar títulos huérfanos sin posibilidad de actualización.
-   - **Recálculo de Métricas y Percentiles:** Función analítica `PERCENT_RANK() OVER (ORDER BY popularidad ASC)` con fallback algorítmico en memoria y recálculo global de ratings unificados.
-   - **Endpoints Administrativos de Sincronización (`/api/v1/admin/sync`):**
-     - Exposición de endpoints HTTP asíncronos protegidos para disparar ingestas (`/initial`, `/daily`, `/genres`, `/percentiles`, `/reviews`, `/import-tmdb`, `/import-json`) usando `BackgroundTasks` de FastAPI (`HTTP 202 Accepted`) para evitar timeouts de red.
-     - Autenticación dual administrativa: por token JWT de usuario con rol `es_admin=True` o por header `X-Admin-Key` validado contra `ADMIN_API_KEY`.
-2. **Recomendador de IA Embebido:**
+1. **Cliente HTTP y Comunicación con TMDB:**
+   - **Cliente Asíncrono (`TMDBClient`):** Basado en `httpx.AsyncClient` con cabecera `Authorization: Bearer <TMDB_API_KEY>` (formato v4) y fallback a query param `api_key` v3.
+   - **Control de Flujo y Resiliencia:** Pool de conexiones asíncrono con control de concurrencia mediante `asyncio.Semaphore(10)` y mecanismo de reintentos automáticos con retroceso exponencial ante errores transitorios de red o límites de tasa (`HTTP 429 Too Many Requests`).
+
+2. **Procesamiento en Background y Ejecución Desacoplada:**
+   - **API Asíncrona (`BackgroundTasks`):** Los endpoints administrativos de sincronización e importación (`/api/v1/admin/sync/*`) delegan la ejecución pesada a `fastapi.BackgroundTasks` respondiendo inmediatamente con `HTTP 202 Accepted`. Esto previene el bloqueo del hilo de peticiones y evita timeouts de clientes o proxies inversos.
+   - **Módulo CLI (`app.jobs.sync_tmdb`):** Interfaz por línea de comandos desacoplada del ciclo de vida del servidor web para ejecuciones masivas iniciales, tareas cron o mantenimiento en terminal.
+
+3. **Seguridad y Autenticación Administrativa Dual:**
+   - **JWT de Administrador:** Dependencia de autorización que valida tokens JWT de usuarios registrados con el flag booleano `es_admin == True`.
+   - **API Key M2M (`X-Admin-Key`):** Cabecera HTTP estática validada contra `ADMIN_API_KEY` para permitir invocaciones directas desde cron jobs, scripts externos o pipelines de CI/CD sin necesidad de mantener sesiones interactivas de usuario.
+
+4. **Cálculo de Percentiles y Métricas Estadísticas:**
+   - Uso de la función analítica SQL `PERCENT_RANK() OVER (ORDER BY popularidad ASC)` con fallback algorítmico en memoria para bases de datos que carezcan de soporte nativo para funciones de ventana.
+   - Recálculo atómico disparado tras la incorporación o actualización de lotes en el catálogo.
+5. **Recomendador de IA Embebido:**
    - Desacoplado de los hubs del entorno de desarrollo.
    - **Versión Mínima:** Recomendador simple sin function calling (implementado como última pieza del flujo núcleo según `spec.md`). Conexión vía API a modelo gratuito/eficiente (Google Gemini API / Groq API) con un prompt directo estructurado que combina el texto del usuario con sus preferencias de perfil (favoritos, vistos, reseñas) y puntajes de comunidad.
    - **Versión Superior:** Evolución planificada a *function calling* estructurado (herramientas de búsqueda exacta + similitud semántica con embeddings vectoriales), con la arquitectura de FastAPI ya preparada para soportar ambas modalidades.
