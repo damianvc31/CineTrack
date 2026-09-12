@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class GenreResponse(BaseModel):
@@ -70,6 +70,8 @@ class TitleCardResponse(BaseModel):
     total_seasons: int | None = None
     user_favorito: bool = False
     user_estado: str | None = None
+    pais: str | None = None
+    idioma_original: str | None = None
 
 
 class TitleDetailResponse(TitleCardResponse):
@@ -100,8 +102,43 @@ class ReviewResponse(BaseModel):
 
 
 class ReviewCreate(BaseModel):
-    puntaje: float | None = Field(default=None, ge=1.0, le=10.0, description="Calificación de 1.0 a 10.0")
+    puntaje: float | None = Field(default=None, ge=0.0, le=10.0, description="Calificación opcional de 0.0 a 10.0 en saltos de 0.5")
     texto: str = Field(..., min_length=5, max_length=5000, description="Texto de la reseña")
+
+    @field_validator("puntaje")
+    @classmethod
+    def validate_half_steps(cls, v: float | None) -> float | None:
+        if v is None:
+            return None
+        if not abs(v * 2 - round(v * 2)) < 1e-6:
+            raise ValueError("El puntaje debe ser un número entre 0.0 y 10.0 en saltos de 0.5 (ej. 7.0, 7.5, 8.0).")
+        return round(v * 2) / 2
+
+
+class UserReviewItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    titulo_id: int
+    titulo_nombre: str
+    titulo_tipo: str
+    titulo_portada_url: str | None = None
+    titulo_fecha_estreno: date | None = None
+    puntaje: float | None = None
+    texto: str
+    fecha: datetime
+
+
+class UserReviewsListResponse(BaseModel):
+    items: list[UserReviewItemResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class UnreviewedWatchedResponse(BaseModel):
+    items: list[TitleCardResponse]
+    total: int
 
 
 class TitleListResponse(BaseModel):

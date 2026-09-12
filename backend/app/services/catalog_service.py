@@ -70,6 +70,8 @@ def _build_title_card(
         total_seasons=total_seasons,
         user_favorito=user_favorito,
         user_estado=user_estado,
+        pais=titulo.pais,
+        idioma_original=titulo.idioma_original,
     )
 
 
@@ -192,10 +194,22 @@ async def get_titles(
             .scalar_subquery()
         )
         tv_date_expr = func.coalesce(latest_ep_subq, Titulo.fecha_estreno)
+        trending_base_cond = or_(
+            and_(Titulo.tipo == "movie", Titulo.fecha_estreno >= tr_cutoff, Titulo.fecha_estreno <= today),
+            and_(Titulo.tipo == "tv", tv_date_expr >= tr_cutoff, tv_date_expr <= today)
+        )
+        top10_subq = (
+            select(Titulo.id)
+            .where(trending_base_cond)
+            .order_by(desc(Titulo.popularidad), desc(Titulo.id))
+            .limit(settings.HOME_SECTION_SAMPLE_SIZE)
+            .scalar_subquery()
+        )
         query = query.where(
+            trending_base_cond,
             or_(
-                and_(Titulo.tipo == "movie", Titulo.fecha_estreno >= tr_cutoff, Titulo.fecha_estreno <= today),
-                and_(Titulo.tipo == "tv", tv_date_expr >= tr_cutoff, tv_date_expr <= today)
+                Titulo.popularidad_percentil >= settings.HOME_TRENDING_MIN_POPULARITY_PERCENTILE,
+                Titulo.id.in_(top10_subq)
             )
         )
     elif active_section == "classics":
@@ -211,15 +225,21 @@ async def get_titles(
     elif active_section == "top_rated":
         query = query.where(Titulo.vote_count_tmdb >= settings.HOME_TOP_RATED_MIN_VOTES)
     elif active_section == "others":
-        minor_subq = (
+        genre_count_subq = (
             select(titulos_generos.c.genero_id)
+            .join(Titulo, Titulo.id == titulos_generos.c.titulo_id)
+        )
+        if tipo and tipo in ("movie", "tv"):
+            genre_count_subq = genre_count_subq.where(Titulo.tipo == tipo)
+        genre_count_subq = (
+            genre_count_subq
             .group_by(titulos_generos.c.genero_id)
             .having(func.count(titulos_generos.c.titulo_id) < settings.HOME_GENRE_MIN_TITLES_FOR_CAROUSEL)
             .scalar_subquery()
         )
         titles_in_minor = (
             select(titulos_generos.c.titulo_id)
-            .where(titulos_generos.c.genero_id.in_(minor_subq))
+            .where(titulos_generos.c.genero_id.in_(genre_count_subq))
             .scalar_subquery()
         )
         query = query.where(Titulo.id.in_(titles_in_minor))
@@ -295,15 +315,11 @@ async def get_home_sections(
     - Top Rated (pool aleatorio de las mejores calificadas)
     - By Genre (carrusel propio para géneros con >= min_titles)
     - Others (pool aleatorio de géneros minoritarios con < min_titles)
-    Excluye títulos con estado 'vista' si usuario_id está autenticado.
     """
     today = date.today()
     sample_size = settings.HOME_SECTION_SAMPLE_SIZE
-    watched_ids = await _get_watched_title_ids(db, usuario_id)
 
     def _apply_base_filters(query):
-        if watched_ids:
-            query = query.where(Titulo.id.not_in(watched_ids))
         return query
 
     # -------------------------------------------------------------------------
@@ -427,8 +443,6 @@ async def get_home_sections(
     )
     if tipo in ("movie", "tv"):
         genre_count_q = genre_count_q.where(Titulo.tipo == tipo)
-    if watched_ids:
-        genre_count_q = genre_count_q.where(Titulo.id.not_in(watched_ids))
     genre_count_q = genre_count_q.group_by(Genero.id, Genero.nombre).order_by(desc("cnt"), Genero.nombre)
 
     genre_rows = (await db.execute(genre_count_q)).all()
@@ -592,8 +606,13 @@ async def get_title_detail(
                 )
             )
 
+        today_date = date.today()
+        eligible_eps_count = sum(
+            1 for ep in sea.episodios
+            if ep.fecha_estreno is None or ep.fecha_estreno <= today_date
+        )
         total_eps = len(episodes_list)
-        temp_vista = total_eps > 0 and vistos_en_temp == total_eps
+        temp_vista = eligible_eps_count > 0 and vistos_en_temp >= eligible_eps_count
         temporadas_list.append(
             SeasonResponse(
                 id=sea.id,
@@ -613,8 +632,6 @@ async def get_title_detail(
         **card.model_dump(),
         director=titulo.director,
         guionista=titulo.guionista,
-        pais=titulo.pais,
-        idioma_original=titulo.idioma_original,
         status_tmdb=titulo.status_tmdb,
         proximo_episodio_fecha=titulo.proximo_episodio_fecha,
         elenco=elenco_list,

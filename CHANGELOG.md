@@ -2,6 +2,31 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.6.0] - 2026-09-12
+### Agregado
+- **Alineación Visual y Estructural con Wireframes de Figma AI (`home-logged.png`, `series-detail.png`):**
+  - Paleta cinematográfica en negro carbón puro (`#0d0d0d`), paneles y superficies en `#141414` con bordes `#262626`, y acentos cálidos dorado/ámbar (`#f59e0b` / `#eab308`).
+  - Distribución de Home en 3 columnas: columna izquierda con widget interactivo de Asistente IA (sticky en desktop), columna central con selector rápido y carruseles curados, y columna derecha con panel personal de accesos rápidos del usuario.
+  - Unificación completa de la interfaz de usuario al idioma inglés (*Trending Now, New Releases, Classics, Top Rated, AI Assistant, Explore, Favorites & Lists, Watchlist, Watch History, Following, Reviews, Settings, Sign Out*).
+  - Banderita de país en todas las tarjetas (`TitleCard`) y en la ficha de detalle (`TitleDetailPage`) con componente `<CountryFlag />` (imagen nítida y fallback automático a emoji unicode).
+  - Nombres completos de país (ej. `United States`, `Argentina`) e idioma original (ej. `English`, `Español`) en la ficha técnica generados mediante `Intl.DisplayNames`.
+  - Manejo seguro de datos nulos y duración de 0 minutos, mostrando guión (`-`) en películas y episodios en lugar de imprimir un 0 numérico literal.
+  - Botón de limpieza rápida `X` en todos los inputs de búsqueda (Header y `/catalog`).
+  - Logotipo oficial de CineTrack (claqueta cinematográfica negra y dorada) como favicon del navegador y en el encabezado global.
+  - Selector de temporadas híbrido en detalle de series: pestañas individuales si hay $\le 5$ temporadas y combobox desplegable estilizado si supera las 5 temporadas.
+  - Configuración normalizada en backend: `HOME_TRENDING_MIN_POPULARITY_PERCENTILE = 0.80` (con fallback a top 10) y `HOME_NEW_RELEASES_DAYS = 30` en `config.py`, `.env` y `.env.example`.
+  - Preservación de títulos vistos en las secciones de Home para evitar que usuarios activos vacíen o desvirtúen los carruseles.
+  - Corrección de subquery para sección `others` en `catalog_service.py` filtrando por `tipo` de producción.
+- **Atribución oficial obligatoria de TMDB (Términos de Uso, Cláusula 3):**
+  - Monograma vectorial `Alt short (blue)` en SVG con degradé corporativo (`#90cea1` -> `#01b4e4`) ubicado en `Header` y `Footer`.
+  - Píldora *"Powered by TMDB"* con enlace en barra superior.
+  - Leyenda legal requerida en Footer: *"This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB."*
+- **Soporte Mobile & PWA:**
+  - `manifest.json` y meta tags para instalación directa en teléfonos (`standalone`, `theme-color: #0d0d0d`).
+  - Diseño 100% responsive con breakpoints fluidos desde 360px hasta 4K.
+- **Pruebas Automatizadas:**
+  - Suite de 46 pruebas en backend (`pytest`) y tests unitarios de frontend en `vitest` (100% pasando).
+
 ## [v0.5.4] - 2026-09-12
 ### Agregado
 - Exposición de `popularidad_percentil` en los esquemas `TitleCardResponse` y `TitleDetailResponse` para alimentar el badge visual de popularidad (🔥 xx%) en las tarjetas de la UI.

@@ -21,12 +21,16 @@
   - Sincronización periódica/diaria e importación manual por JSON con plantillas y búsqueda inteligente.
   - Cálculo de percentiles de popularidad (`PERCENT_RANK`).
   - Mocks y suite automatizada de tests de integración con cero consumo de cuota (23 tests pasando).
-- [ ] **Fase 5: Frontend UI (Consumo de API Real)**
-  - Home con secciones (Trending, Estrenos, Clásicos, Recomendados, Géneros) y toggle Películas/Series/Todos.
-  - Detalle de Película y Serie con temporadas, episodios y selector interactivo de estados.
-  - Perfil de usuario con secciones por estado (Favoritos, Watchlist, Siguiendo, Vista, Reseñas).
+- [x] **Fase 5: Frontend UI y Alineación con Wireframes Figma AI (v0.6.0)**
+  - Home en 3 columnas (Asistente IA, catálogo curado central y panel personal del usuario).
+  - Look & feel cinematográfico dorado/carbón (`#0d0d0d`, `#141414`, `#262626`, `#f59e0b`).
+  - Explorador y catálogo con filtros multidimensionales (`/catalog`).
+  - Detalle de título (`/titles/:id`) con temporadas, episodios y selector interactivo de estados.
+  - Soporte de banderas de país, nombres completos e idiomas originales con `Intl.DisplayNames`.
+  - Mi Biblioteca (`/library`) y Perfil de usuario (`/profile`).
+  - Suite de tests de integración con Vitest y build sin errores en Vite 8.
 - [ ] **Fase 6: Recomendador Inteligente con IA Embebida**
-  - Integración de API (Google Gemini / Groq) con prompt estructurado y contexto de perfil.
+  - Integración de API (Google Gemini / Groq / Ollama) con prompt estructurado y contexto de perfil.
   - Verificación y política de incertidumbre.
 
 ---

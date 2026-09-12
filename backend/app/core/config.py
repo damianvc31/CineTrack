@@ -57,8 +57,9 @@ class Settings(BaseSettings):
 
     # Home Sections & Pools Configuration
     HOME_SECTION_SAMPLE_SIZE: int = 10
-    HOME_NEW_RELEASES_DAYS: int = 60
+    HOME_NEW_RELEASES_DAYS: int = 30
     HOME_TRENDING_DAYS: int = 90
+    HOME_TRENDING_MIN_POPULARITY_PERCENTILE: float = 0.80
     HOME_CLASSICS_MIN_YEARS: int = 20
     HOME_CLASSICS_MIN_RATING: float = 7.5
     HOME_CLASSICS_MIN_VOTES: int = 500

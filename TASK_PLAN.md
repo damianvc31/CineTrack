@@ -58,10 +58,42 @@
 
 ---
 
-## Próximos Hitos: Frontend UI (Fase 5)
-- [ ] **Hito 5.2:** Setup de Tailwind CSS en Vite, routing (`react-router-dom`), iconografía (`lucide-react`) y `AuthContext`.
-- [ ] **Hito 5.3:** Pantalla 1 — Home (Header, Carruseles por categoría/género, Panel de IA, Drawer de accesos de usuario).
-- [ ] **Hito 5.4:** Pantalla 2 — Detalle de Título (Películas y Series según wireframe).
-- [ ] **Hito 5.5:** Pantalla 3 — Perfil de Usuario y Estadísticas.
-- [ ] **Hito 5.6:** Pantallas complementarias (Favoritos, Watchlist, Following, History, Reviews, Settings, "Ver más").
-- [ ] **Fase 6:** Recomendador Inteligente por IA.
+  - [x] **Hito 5.2:** Setup de Tailwind CSS v4 en Vite 8, routing (`react-router-dom`), iconografía (`lucide-react`) y `AuthContext` con almacenamiento JWT.
+  - [x] **Hito 5.3:** Pantalla 1 — Home (Header con branding + atribución oficial TMDB, Hero banner, carruseles horizontales con snap scroll para móvil y flechas desktop, banner de IA).
+  - [x] **Hito 5.4:** Pantalla 2 — Detalle de Título (Backdrop, sinopsis, elenco con fotos, temporadas/episodios con checklist atómico y progreso, reseñas TMDB y locales con formulario).
+  - [x] **Hito 5.5:** Pantalla 3 — Perfil de Usuario y Estadísticas (Tiempo total en horas/días, desglose cine vs. TV, colecciones).
+  - [x] **Hito 5.6:** Pantallas complementarias:
+    - Explorador y filtrado de catálogo (`/catalog`) con búsqueda abierta, géneros, secciones, actores y ordenamiento.
+    - Mi Biblioteca (`/library`) con pestañas para Favoritos, Watchlist, Siguiendo y Vistas.
+    - Previsualización del Recomendador IA (`/recommendations`).
+    - Soporte PWA (`manifest.json` y meta tags para instalación en móvil) y suite de tests en Vitest.
+  - [x] **Hito 5.7:** Rediseño inicial de distribución en 3 columnas y desduplicación de buscador.
+  - [x] **Fase 1: Estética Real Dorado/Carbón, Inglés y Ajustes de Catálogo**
+    - [x] Paleta cromática exacta de wireframes en `index.css` (negro carbón `#0d0d0d`, paneles `#141414`/`#181818`, acentos dorados `#f59e0b` y `#eab308`).
+    - [x] Unificación de interfaz al inglés per wireframes (*Trending, New Releases, Classics, All/Movies/Series, AI Assistant, etc.*).
+    - [x] Backend: `HOME_TRENDING_MIN_POPULARITY_PERCENTILE = 0.80` y `HOME_NEW_RELEASES_DAYS = 30` en `config.py`, `.env` y `.env.example`.
+    - [x] Backend: Corregir discrepancia de filtro `section == 'others'` en `catalog_service.py`.
+    - [x] Backend: Preservar títulos vistos en Home para no desvirtuar ni vaciar carruseles.
+    - [x] Ícono `Gem` para Classics e íconos temáticos para géneros principales.
+    - [x] Header: botón `X` de limpieza en inputs de búsqueda, ocultar botón "Explore" en `/catalog`, y avatar condicional (limpio en Home logueado, activo con campana en otras páginas).
+    - [x] Retirar enlaces redundantes sueltos de catálogo en Home.
+    - [x] Banderita de país en cards y detalle (con nombre completo de país e idioma original en detalle, y guión '-' para datos faltantes o duración 0).
+  - [ ] **Fase 2: Motor Integral de Reseñas**
+    - [ ] Endpoints para crear (1 por usuario por título), editar, eliminar y recalcular rating unificado.
+    - [ ] Soporte de reseña sin puntaje (`puntaje = None` / `-`) y escala de 0 a 10 con saltos de 0.5.
+    - [ ] Visualización de reseñas de TMDB y locales.
+    - [ ] Pantalla dedicada `/reviews` para gestionar y redactar reseñas de títulos vistos.
+  - [ ] **Fase 3: Progreso de Siguiendo, Orden Cronológico, Perfil y Settings**
+    - [ ] Barra segmentada por temporada en Siguiendo (episodios estrenados).
+    - [ ] Orden `updated_at DESC` en listas de usuario.
+    - [ ] Pantalla de Perfil fiel a `user-profile.png` con edición de usuario (lápiz).
+    - [ ] Pantalla dedicada de Configuración `/settings`.
+
+---
+
+## Próximos Hitos:
+- [ ] **Fase 6: Recomendador Inteligente por IA (Ollama / Hubs)**
+  - [ ] Enriquecimiento de contexto y vectorización semántica de catálogo.
+  - [ ] Agente de recomendación con selección por estado de ánimo y análisis de preferencias del usuario.
+
+

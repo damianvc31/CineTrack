@@ -26,7 +26,7 @@ Variables clave requeridas:
 - `ADMIN_API_KEY`: Clave secreta para endpoints y tareas administrativas automatizadas
 - `TMDB_API_KEY`: Read Access Token o API Key de The Movie Database (TMDB)
 - `AI_PROVIDER_API_KEY`: API Key para el servicio de IA del recomendador (Google Gemini o Groq)
-- `HOME_*`: Parámetros de ajuste de ventanas temporales, pools y umbrales de Home (`HOME_NEW_RELEASES_DAYS=60`, `HOME_TRENDING_DAYS=90`, etc.)
+- `HOME_*`: Parámetros de ajuste de ventanas temporales, pools y umbrales de Home (`HOME_NEW_RELEASES_DAYS=30`, `HOME_TRENDING_DAYS=90`, `HOME_TRENDING_MIN_POPULARITY_PERCENTILE=0.80`, etc.)
 
 ---
 
@@ -149,13 +149,35 @@ Para mantener actualizado el catálogo automáticamente en un servidor o contene
 0 3 * * * curl -X POST http://localhost:8000/api/v1/admin/sync/daily -H "X-Admin-Key: cinetrack-dev-admin-secret-key" -H "Content-Type: application/json" -d "{}"
 ```
 
-### Frontend
+### Frontend (SPA React 19 + TypeScript + Vite 8 + Tailwind CSS v4)
 ```powershell
 cd frontend
 npm install
+
+# Ejecutar suite de pruebas unitarias
 npm test
+
+# Iniciar servidor de desarrollo en http://localhost:5173
 npm run dev
+
+# Compilar para producción (carpeta dist/)
+npm run build
 ```
+
+#### Variables de Entorno del Frontend
+En `frontend/.env` (o `.env.local`):
+```env
+VITE_API_URL=http://localhost:8000/api/v1
+```
+
+#### Pantallas Principales de la Aplicación
+- `/`: **Home** con Hero banner, botón de recomendador IA y carruseles con snap-scroll para móvil y desktop.
+- `/catalog`: **Catálogo completo** con filtros multidimensionales (sección, género, actor, tipo, ordenamiento y paginación).
+- `/titles/:id`: **Ficha de Título** con backdrop, sinopsis, reparto con fotos, seguimiento de temporadas/episodios y reseñas.
+- `/library`: **Mi Biblioteca** con pestañas de Favoritos, Watchlist, Siguiendo y Vistas.
+- `/profile`: **Perfil de Usuario** con desglose de estadísticas de tiempo invertido (horas/días) y colecciones.
+- `/recommendations`: **Recomendador Inteligente** por estado de ánimo y preferencias guiadas (previsualización Fase 6).
+- **PWA Instalable:** Acceso directo como app nativa en teléfonos móviles gracias al soporte de `manifest.json`.
 
 ---
 

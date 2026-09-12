@@ -259,7 +259,7 @@ async def test_user_library_and_stats(async_client: AsyncClient, sample_catalog)
 
 @pytest.mark.asyncio
 async def test_home_watched_exclusion_and_type_toggle(async_client: AsyncClient, sample_catalog, db_session: AsyncSession):
-    """Verifica exclusión de títulos vistos en Home para usuario autenticado y comportamiento de toggles tipo=tv/movie."""
+    """Verifica que los títulos vistos se mantengan en Home (evitando vaciar o desvirtuar carruseles) y el comportamiento de toggles tipo=tv/movie."""
     uid, token = await create_user_and_token(async_client, "home_user")
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -272,7 +272,7 @@ async def test_home_watched_exclusion_and_type_toggle(async_client: AsyncClient,
     # 2. Marcar Top Gun como visto
     await async_client.post("/api/v1/titles/1/watched", headers=headers)
 
-    # 3. Después de marcar como visto: Top Gun no debe aparecer en ninguna sección de Home
+    # 3. Después de marcar como visto: Top Gun se mantiene en Home (no se vacían ni desvirtúan listas)
     res_after = await async_client.get("/api/v1/home", headers=headers)
     data_after = res_after.json()
     all_home_ids = (
@@ -284,7 +284,7 @@ async def test_home_watched_exclusion_and_type_toggle(async_client: AsyncClient,
     )
     for g_items in data_after["by_genre"].values():
         all_home_ids.extend([t["id"] for t in g_items])
-    assert 1 not in all_home_ids
+    assert 1 in all_home_ids
 
     # 4. Toggle tipo=tv: Classics debe ser lista vacía
     res_tv = await async_client.get("/api/v1/home?tipo=tv")

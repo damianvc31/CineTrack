@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 from fastapi import HTTPException, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.episodio import Episodio
@@ -137,34 +137,44 @@ async def toggle_watched(
             estado_obj.fecha_estado = _now()
             mensaje = "Película marcada como vista."
     else:
-        # Es una serie: obtener todos los IDs de episodios de esta serie
+        # Es una serie: obtener los IDs de episodios emitidos hasta la fecha
+        today = date.today()
         ep_query = (
             select(Episodio.id)
             .join(Temporada, Episodio.temporada_id == Temporada.id)
-            .where(Temporada.titulo_id == titulo_id)
+            .where(
+                Temporada.titulo_id == titulo_id,
+                or_(Episodio.fecha_estreno.is_(None), Episodio.fecha_estreno <= today)
+            )
         )
         ep_res = await db.execute(ep_query)
-        episode_ids = [row[0] for row in ep_res.all()]
+        eligible_episode_ids = [row[0] for row in ep_res.all()]
 
         if estado_obj.estado == "vista":
             # Desmarcar serie completa: borrar todos los episodios vistos de esta serie (empezar de cero)
-            if episode_ids:
+            all_ep_query = (
+                select(Episodio.id)
+                .join(Temporada, Episodio.temporada_id == Temporada.id)
+                .where(Temporada.titulo_id == titulo_id)
+            )
+            all_ep_res = await db.execute(all_ep_query)
+            all_episode_ids = [row[0] for row in all_ep_res.all()]
+            if all_episode_ids:
                 await db.execute(
                     delete(EpisodioVisto).where(
                         EpisodioVisto.usuario_id == usuario_id,
-                        EpisodioVisto.episodio_id.in_(episode_ids)
+                        EpisodioVisto.episodio_id.in_(all_episode_ids)
                     )
                 )
             estado_obj.estado = None
             estado_obj.fecha_estado = None
             mensaje = "Serie desmarcada por completo (progreso reiniciado)."
         else:
-            # Marcar serie completa: marcar todos los episodios como vistos
-            if episode_ids:
-                # Buscar cuáles ya estaban vistos para no duplicar
+            # Marcar serie completa: marcar todos los episodios emitidos como vistos
+            if eligible_episode_ids:
                 vistos_query = select(EpisodioVisto.episodio_id).where(
                     EpisodioVisto.usuario_id == usuario_id,
-                    EpisodioVisto.episodio_id.in_(episode_ids)
+                    EpisodioVisto.episodio_id.in_(eligible_episode_ids)
                 )
                 vistos_res = await db.execute(vistos_query)
                 already_watched = {row[0] for row in vistos_res.all()}
@@ -172,7 +182,7 @@ async def toggle_watched(
                 now_ts = _now()
                 new_vistos = [
                     EpisodioVisto(usuario_id=usuario_id, episodio_id=eid, fecha_visto=now_ts)
-                    for eid in episode_ids if eid not in already_watched
+                    for eid in eligible_episode_ids if eid not in already_watched
                 ]
                 db.add_all(new_vistos)
 
@@ -242,12 +252,8 @@ async def toggle_episode_watched(
 
     episodio, titulo_id = row[0], row[1]
 
-    # Regla: Bloquear episodios futuros
-    if episodio.fecha_estreno and episodio.fecha_estreno > date.today():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se puede marcar como visto un episodio con fecha de estreno futura."
-        )
+    today = date.today()
+    is_future = episodio.fecha_estreno is not None and episodio.fecha_estreno > today
 
     # Verificar si ya está visto
     visto_query = select(EpisodioVisto).where(
@@ -258,11 +264,17 @@ async def toggle_episode_watched(
     visto_obj = visto_res.scalar_one_or_none()
 
     if visto_obj:
-        # Desmarcar episodio
+        # Desmarcar episodio (siempre permitido, incluso para episodios futuros marcados previamente)
         await db.delete(visto_obj)
         visto = False
         fecha_visto = None
     else:
+        # Regla: Bloquear marcado de episodios futuros
+        if is_future:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se puede marcar como visto un episodio con fecha de estreno futura."
+            )
         # Marcar episodio
         now_ts = _now()
         visto_obj = EpisodioVisto(
@@ -276,11 +288,14 @@ async def toggle_episode_watched(
 
     await db.flush()
 
-    # Recalcular progreso de la serie
+    # Recalcular progreso de la serie (solo episodios emitidos / disponibles)
     total_episodes_query = (
         select(func.count(Episodio.id))
         .join(Temporada, Episodio.temporada_id == Temporada.id)
-        .where(Temporada.titulo_id == titulo_id)
+        .where(
+            Temporada.titulo_id == titulo_id,
+            or_(Episodio.fecha_estreno.is_(None), Episodio.fecha_estreno <= today)
+        )
     )
     total_res = await db.execute(total_episodes_query)
     total_episodios = total_res.scalar() or 0
@@ -291,7 +306,8 @@ async def toggle_episode_watched(
         .join(Temporada, Episodio.temporada_id == Temporada.id)
         .where(
             Temporada.titulo_id == titulo_id,
-            EpisodioVisto.usuario_id == usuario_id
+            EpisodioVisto.usuario_id == usuario_id,
+            or_(Episodio.fecha_estreno.is_(None), Episodio.fecha_estreno <= today)
         )
     )
     watched_res = await db.execute(watched_query)
@@ -301,12 +317,11 @@ async def toggle_episode_watched(
     estado_obj = await get_or_create_title_state(db, usuario_id, titulo_id)
 
     if total_episodios > 0 and episodios_vistos == total_episodios:
-        # Completó todos los episodios
+        # Completó todos los episodios emitidos a la fecha
         estado_obj.estado = "vista"
         estado_obj.fecha_estado = _now()
     elif episodios_vistos > 0:
-        # Tiene episodios vistos pero no todos:
-        # Si estaba en Vista (desmarcó uno), o en Watchlist / SinEstado (marcó el primero) -> pasa a Siguiendo
+        # Tiene episodios vistos pero no todos los emitidos
         if estado_obj.estado in (None, "watchlist", "vista"):
             estado_obj.estado = "siguiendo"
             estado_obj.fecha_estado = _now()
@@ -350,10 +365,14 @@ async def get_title_user_state(
     episodios_vistos = 0
 
     if titulo.tipo == "tv":
+        today = date.today()
         total_query = (
             select(func.count(Episodio.id))
             .join(Temporada, Episodio.temporada_id == Temporada.id)
-            .where(Temporada.titulo_id == titulo_id)
+            .where(
+                Temporada.titulo_id == titulo_id,
+                or_(Episodio.fecha_estreno.is_(None), Episodio.fecha_estreno <= today)
+            )
         )
         tot_res = await db.execute(total_query)
         total_episodios = tot_res.scalar() or 0
@@ -364,7 +383,8 @@ async def get_title_user_state(
             .join(Temporada, Episodio.temporada_id == Temporada.id)
             .where(
                 Temporada.titulo_id == titulo_id,
-                EpisodioVisto.usuario_id == usuario_id
+                EpisodioVisto.usuario_id == usuario_id,
+                or_(Episodio.fecha_estreno.is_(None), Episodio.fecha_estreno <= today)
             )
         )
         w_res = await db.execute(watched_query)
@@ -486,11 +506,15 @@ async def toggle_season_watched(
 
     await db.flush()
 
-    # Recalcular el progreso general de la serie
+    # Recalcular el progreso general de la serie (solo episodios emitidos / disponibles)
+    today = date.today()
     total_query = (
         select(func.count(Episodio.id))
         .join(Temporada, Episodio.temporada_id == Temporada.id)
-        .where(Temporada.titulo_id == titulo_id)
+        .where(
+            Temporada.titulo_id == titulo_id,
+            or_(Episodio.fecha_estreno.is_(None), Episodio.fecha_estreno <= today)
+        )
     )
     tot_res = await db.execute(total_query)
     total_episodios = tot_res.scalar() or 0
@@ -501,7 +525,8 @@ async def toggle_season_watched(
         .join(Temporada, Episodio.temporada_id == Temporada.id)
         .where(
             Temporada.titulo_id == titulo_id,
-            EpisodioVisto.usuario_id == usuario_id
+            EpisodioVisto.usuario_id == usuario_id,
+            or_(Episodio.fecha_estreno.is_(None), Episodio.fecha_estreno <= today)
         )
     )
     watched_res = await db.execute(watched_query)

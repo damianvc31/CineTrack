@@ -315,3 +315,40 @@ async def test_toggle_season_watch(async_client: AsyncClient, db_session: AsyncS
     assert data_unwatch["episodios_afectados"] == 3
     assert data_unwatch["episodios_vistos_serie"] == 0
     assert data_unwatch["nuevo_estado_serie"] is None
+
+
+@pytest.mark.asyncio
+async def test_series_with_future_episodes_only_marks_released(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica que marcar una serie con episodios futuros como vista solo marque los emitidos y quede en Vista."""
+    serie = Titulo(tmdb_id=8801, tipo="tv", nombre="Ongoing Hit")
+    temp = Temporada(titulo=serie, numero=1)
+    past_date = date.today() - timedelta(days=10)
+    future_date = date.today() + timedelta(days=30)
+    ep_released = Episodio(temporada=temp, numero=1, nombre="Ep 1 Released", fecha_estreno=past_date)
+    ep_unreleased = Episodio(temporada=temp, numero=2, nombre="Ep 2 Future", fecha_estreno=future_date)
+
+    db_session.add_all([serie, temp, ep_released, ep_unreleased])
+    await db_session.commit()
+    await db_session.refresh(serie)
+
+    token = await create_user_and_get_token(async_client, "user_future_series")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Marcar serie completa como vista (👁)
+    res = await async_client.post(f"/api/v1/titles/{serie.id}/watched", headers=headers)
+    assert res.status_code == 200
+    assert res.json()["nuevo_estado"] == "vista"
+
+    # 2. Verificar detalle: solo el episodio emitido está visto
+    detail_res = await async_client.get(f"/api/v1/titles/{serie.id}", headers=headers)
+    assert detail_res.status_code == 200
+    detail = detail_res.json()
+    assert detail["user_estado"] == "vista"
+    episodes = detail["temporadas"][0]["episodios"]
+    assert episodes[0]["visto"] is True
+    assert episodes[1]["visto"] is False
+
+    # 3. Intentar marcar el episodio futuro individualmente -> bloqueado
+    unreleased_ep_id = episodes[1]["id"]
+    err_res = await async_client.post(f"/api/v1/episodes/{unreleased_ep_id}/watch", headers=headers)
+    assert err_res.status_code == 400

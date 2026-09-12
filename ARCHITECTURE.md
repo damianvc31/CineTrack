@@ -67,28 +67,50 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 
 ---
 
-## 4. Estructura del Repositorio
+## 4. Arquitectura de Frontend (React 19 + Vite 8 + Tailwind CSS v4)
+
+1. **Estructura y Principios de Diseño:**
+   - **Alineación con Wireframes Figma AI:** Distribución en 3 columnas en desktop (Asistente IA, catálogo curado central y panel personal), optimizado para mobile con carruseles de snap-scroll horizontal.
+   - **Sistema de Tokens Cinemático:** Fondo carbón profundo `#0d0d0d`, superficies `#141414`, bordes sobrios `#262626` y acentos cálidos dorado/ámbar (`#f59e0b` / `#eab308`).
+   - **Internacionalización y Resiliencia:** Interfaz unificada en inglés per wireframes, componente `<CountryFlag />` para banderas con fallback unicode, y renderizado de nombres completos de país e idioma original mediante el estándar ECMAScript `Intl.DisplayNames`.
+   - **PWA Ready:** Archivo `manifest.json` y meta tags de visualización `standalone` con `theme-color: #0d0d0d` para instalación nativa directa.
+
+2. **Atribución Legal Obligatoria de TMDB (Sección 3 de Términos de Uso):**
+   - Integración del logotipo oficial `Alt short (blue)` en SVG con gradiente corporativo (`#90cea1` -> `#01b4e4`) en el `Header` (píldora *"Powered by TMDB"*) y en el `Footer`.
+   - Inclusión del deslinde de responsabilidad legal exigido: *"This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB."*
+
+3. **Capa de Comunicación y Estado:**
+   - **Cliente API Tipado (`services/api.ts`):** Envoltorio sobre `fetch` nativo con intercepción automática del token JWT almacenado en `localStorage`, manejo tipado de errores (`ApiError`) y soporte para query params serializados.
+   - **Autenticación Global (`context/AuthContext.tsx`):** Estado de sesión reactivo con persistencia local, hidratación al arranque vía `/api/v1/auth/me` y modal unificado (`AuthModal`) accesible desde cualquier pantalla sin recarga.
+
+---
+
+## 5. Estructura del Repositorio
 
 ```
 / (raíz del proyecto)
 ├── docs/                   # UMLs, wireframes y especificaciones visuales
 ├── backend/                # API FastAPI, modelos SQLAlchemy, servicios
 │   ├── app/
-│   │   ├── api/            # Routers (v1)
+│   │   ├── api/            # Routers (v1: auth, titles, home, admin, users)
 │   │   ├── core/           # Configuración, JWT, variables de entorno
 │   │   ├── db/             # Conexión DB, sesión async, Base
 │   │   ├── models/         # Modelos de dominio ORM
 │   │   ├── schemas/        # Esquemas Pydantic v2
-│   │   ├── services/       # Lógica de estados, TMDB, recomendador IA
+│   │   ├── services/       # Lógica de catálogo, TMDB, estados
 │   │   └── main.py         # Entrypoint de FastAPI
-│   ├── tests/              # Suite de pruebas Pytest
+│   ├── tests/              # Suite de 45 pruebas Pytest
 │   └── alembic/            # Migraciones de esquema
-├── frontend/               # SPA React + Vite + TypeScript
+├── frontend/               # SPA React 19 + Vite 8 + TypeScript
+│   ├── public/             # Estáticos directos (manifest.json, favicon, logo TMDB)
 │   ├── src/
-│   │   ├── components/     # Componentes reutilizables
-│   │   ├── pages/          # Vistas (Home, Detalle, Perfil)
-│   │   ├── services/       # Conexión con API backend
-│   │   └── App.tsx
+│   │   ├── assets/         # Branding SVG (CineTrack, TMDB) y placeholders
+│   │   ├── components/     # Header, Footer, TitleCard, CarouselRow, AuthModal
+│   │   ├── context/        # AuthContext y hook useAuth
+│   │   ├── pages/          # Home, Catalog, TitleDetail, Library, Profile, Recommendations
+│   │   ├── services/       # api.ts, catalogService.ts, authService.ts
+│   │   ├── types/          # Contratos TypeScript de catálogo, usuario y auth
+│   │   └── App.tsx         # Router SPA y providers
 │   └── tests/              # Suite de pruebas Vitest
 ├── TASK_PLAN.md            # Plan de tareas activo y estado de avance
 ├── ARCHITECTURE.md         # Este documento
