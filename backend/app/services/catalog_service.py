@@ -1,9 +1,11 @@
-from datetime import date, datetime
-from typing import Any, Dict, List, Optional
-from sqlalchemy import desc, func, select
+import random
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional, Set
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.models import (
     Actor,
     Episodio,
@@ -53,6 +55,8 @@ def _build_title_card(
         nombre=titulo.nombre,
         sinopsis=titulo.sinopsis,
         portada_url=titulo.portada_url,
+        fecha_estreno=titulo.fecha_estreno,
+        fecha_fin=titulo.fecha_fin,
         anio_estreno=titulo.anio_estreno,
         anio_fin=titulo.anio_fin,
         duracion=titulo.duracion,
@@ -67,6 +71,18 @@ def _build_title_card(
     )
 
 
+async def _get_watched_title_ids(db: AsyncSession, usuario_id: Optional[int]) -> Set[int]:
+    if not usuario_id:
+        return set()
+    res = await db.execute(
+        select(EstadoUsuarioTitulo.titulo_id).where(
+            EstadoUsuarioTitulo.usuario_id == usuario_id,
+            EstadoUsuarioTitulo.estado == "vista"
+        )
+    )
+    return set(res.scalars().all())
+
+
 async def get_titles(
     db: AsyncSession,
     tipo: Optional[str] = None,
@@ -75,7 +91,8 @@ async def get_titles(
     sort_by: str = "popularity",  # 'popularity', 'rating', 'newest', 'classics'
     page: int = 1,
     page_size: int = 20,
-    usuario_id: Optional[int] = None
+    usuario_id: Optional[int] = None,
+    exclude_watched: bool = False
 ) -> TitleListResponse:
     query = (
         select(Titulo)
@@ -98,17 +115,35 @@ async def get_titles(
             (Titulo.guionista.ilike(search_pattern))
         )
 
+    if exclude_watched and usuario_id:
+        watched_subq = (
+            select(EstadoUsuarioTitulo.titulo_id)
+            .where(
+                EstadoUsuarioTitulo.usuario_id == usuario_id,
+                EstadoUsuarioTitulo.estado == "vista"
+            )
+            .scalar_subquery()
+        )
+        query = query.where(Titulo.id.not_in(watched_subq))
+
     # Ordenamiento
     if sort_by == "popularity":
         query = query.order_by(desc(Titulo.popularidad), desc(Titulo.id))
-    elif sort_by == "rating":
-        query = query.order_by(desc(Titulo.rating_unificado), desc(Titulo.vote_count_tmdb))
-    elif sort_by == "newest":
-        query = query.order_by(desc(Titulo.anio_estreno), desc(Titulo.popularidad))
-    elif sort_by == "classics":
-        query = query.where(Titulo.vote_average_tmdb >= 8.0, Titulo.anio_estreno < 2010).order_by(
-            desc(Titulo.rating_unificado)
+    elif sort_by in ("rating", "top_rated"):
+        query = query.where(Titulo.vote_count_tmdb >= settings.HOME_TOP_RATED_MIN_VOTES).order_by(
+            desc(Titulo.rating_unificado), desc(Titulo.vote_count_tmdb)
         )
+    elif sort_by == "newest":
+        query = query.order_by(desc(Titulo.fecha_estreno), desc(Titulo.popularidad))
+    elif sort_by == "classics":
+        current_year = date.today().year
+        cutoff_date = date(current_year - settings.HOME_CLASSICS_MIN_YEARS, 12, 31)
+        query = query.where(
+            Titulo.tipo == "movie",
+            Titulo.fecha_estreno <= cutoff_date,
+            Titulo.rating_unificado >= settings.HOME_CLASSICS_MIN_RATING,
+            Titulo.vote_count_tmdb >= settings.HOME_CLASSICS_MIN_VOTES,
+        ).order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad))
     else:
         query = query.order_by(desc(Titulo.popularidad))
 
@@ -144,36 +179,230 @@ async def get_home_sections(
     tipo: Optional[str] = None,
     usuario_id: Optional[int] = None
 ) -> HomeSectionsResponse:
-    """Devuelve las secciones curadas para la Home (Trending, New Releases, Classics y Géneros populares)."""
-    # 1. Trending (top popularidad)
-    trending_res = await get_titles(db, tipo=tipo, sort_by="popularity", page=1, page_size=10, usuario_id=usuario_id)
-    # 2. New Releases (últimos años)
-    new_res = await get_titles(db, tipo=tipo, sort_by="newest", page=1, page_size=10, usuario_id=usuario_id)
-    # 3. Classics
-    classics_res = await get_titles(db, tipo=tipo, sort_by="classics", page=1, page_size=10, usuario_id=usuario_id)
+    """
+    Devuelve las secciones curadas para la Home:
+    - New Releases (últimos N días, configurable)
+    - Trending (últimos N días por popularidad, extensible con última temporada en series)
+    - Classics (películas con > N años y alto rating, pool aleatorio)
+    - Top Rated (pool aleatorio de las mejores calificadas)
+    - By Genre (carrusel propio para géneros con >= min_titles)
+    - Others (pool aleatorio de géneros minoritarios con < min_titles)
+    Excluye títulos con estado 'vista' si usuario_id está autenticado.
+    """
+    today = date.today()
+    sample_size = settings.HOME_SECTION_SAMPLE_SIZE
+    watched_ids = await _get_watched_title_ids(db, usuario_id)
 
-    # 4. By Genre (obtener los 4 géneros con más títulos)
-    genre_counts_q = (
+    def _apply_base_filters(query):
+        if watched_ids:
+            query = query.where(Titulo.id.not_in(watched_ids))
+        return query
+
+    # -------------------------------------------------------------------------
+    # 1. New Releases (últimos HOME_NEW_RELEASES_DAYS días, ordenados por fecha desc)
+    # Series entran si su propio estreno fue en esa ventana.
+    # -------------------------------------------------------------------------
+    nr_cutoff = today - timedelta(days=settings.HOME_NEW_RELEASES_DAYS)
+    nr_query = (
+        select(Titulo)
+        .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
+        .where(
+            Titulo.fecha_estreno.isnot(None),
+            Titulo.fecha_estreno >= nr_cutoff,
+            Titulo.fecha_estreno <= today
+        )
+    )
+    if tipo in ("movie", "tv"):
+        nr_query = nr_query.where(Titulo.tipo == tipo)
+    nr_query = _apply_base_filters(nr_query)
+    nr_query = nr_query.order_by(desc(Titulo.fecha_estreno), desc(Titulo.popularidad)).limit(sample_size)
+    new_releases_titulos = (await db.execute(nr_query)).scalars().all()
+
+    # -------------------------------------------------------------------------
+    # 2. Trending (últimos HOME_TRENDING_DAYS días, ordenados por popularidad desc)
+    # Series entran si su fecha de estreno o la de su última temporada entra en la ventana.
+    # -------------------------------------------------------------------------
+    tr_cutoff = today - timedelta(days=settings.HOME_TRENDING_DAYS)
+    latest_season_subq = (
+        select(func.max(Temporada.fecha_estreno))
+        .where(Temporada.titulo_id == Titulo.id)
+        .scalar_subquery()
+    )
+    tv_date_expr = func.coalesce(latest_season_subq, Titulo.fecha_estreno)
+
+    tr_query = (
+        select(Titulo)
+        .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
+    )
+    if tipo == "movie":
+        tr_query = tr_query.where(
+            Titulo.tipo == "movie",
+            Titulo.fecha_estreno.isnot(None),
+            Titulo.fecha_estreno >= tr_cutoff,
+            Titulo.fecha_estreno <= today
+        )
+    elif tipo == "tv":
+        tr_query = tr_query.where(
+            Titulo.tipo == "tv",
+            tv_date_expr.isnot(None),
+            tv_date_expr >= tr_cutoff,
+            tv_date_expr <= today
+        )
+    else:
+        tr_query = tr_query.where(
+            or_(
+                (Titulo.tipo == "movie") & Titulo.fecha_estreno.isnot(None) & (Titulo.fecha_estreno >= tr_cutoff) & (Titulo.fecha_estreno <= today),
+                (Titulo.tipo == "tv") & tv_date_expr.isnot(None) & (tv_date_expr >= tr_cutoff) & (tv_date_expr <= today)
+            )
+        )
+    tr_query = _apply_base_filters(tr_query)
+    tr_query = tr_query.order_by(desc(Titulo.popularidad), desc(Titulo.id)).limit(sample_size)
+    trending_titulos = (await db.execute(tr_query)).scalars().all()
+
+    # -------------------------------------------------------------------------
+    # 3. Classics (solo películas con > HOME_CLASSICS_MIN_YEARS, rating >= 7.5, votos >= 500)
+    # Pool de 50 más populares -> muestra aleatoria de sample_size (10)
+    # -------------------------------------------------------------------------
+    classics_titulos = []
+    if tipo != "tv":
+        classics_cutoff_year = today.year - settings.HOME_CLASSICS_MIN_YEARS
+        classics_cutoff_date = date(classics_cutoff_year, 12, 31)
+        cl_query = (
+            select(Titulo)
+            .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
+            .where(
+                Titulo.tipo == "movie",
+                Titulo.fecha_estreno.isnot(None),
+                Titulo.fecha_estreno <= classics_cutoff_date,
+                Titulo.rating_unificado >= settings.HOME_CLASSICS_MIN_RATING,
+                Titulo.vote_count_tmdb >= settings.HOME_CLASSICS_MIN_VOTES
+            )
+        )
+        cl_query = _apply_base_filters(cl_query)
+        cl_query = cl_query.order_by(desc(Titulo.popularidad), desc(Titulo.id)).limit(settings.HOME_CLASSICS_POOL_SIZE)
+        cl_pool = (await db.execute(cl_query)).scalars().all()
+        if len(cl_pool) > sample_size:
+            classics_titulos = random.sample(cl_pool, sample_size)
+        else:
+            classics_titulos = list(cl_pool)
+
+    # -------------------------------------------------------------------------
+    # 4. Top Rated (pool de 100 mejores calificadas con >= 100 votos -> muestra aleatoria de 10)
+    # -------------------------------------------------------------------------
+    tr_pool_query = (
+        select(Titulo)
+        .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
+        .where(
+            Titulo.vote_count_tmdb >= settings.HOME_TOP_RATED_MIN_VOTES
+        )
+    )
+    if tipo in ("movie", "tv"):
+        tr_pool_query = tr_pool_query.where(Titulo.tipo == tipo)
+    tr_pool_query = _apply_base_filters(tr_pool_query)
+    tr_pool_query = tr_pool_query.order_by(desc(Titulo.rating_unificado), desc(Titulo.vote_count_tmdb)).limit(settings.HOME_TOP_RATED_POOL_SIZE)
+    tr_pool = (await db.execute(tr_pool_query)).scalars().all()
+    if len(tr_pool) > sample_size:
+        top_rated_titulos = random.sample(tr_pool, sample_size)
+    else:
+        top_rated_titulos = list(tr_pool)
+
+    # -------------------------------------------------------------------------
+    # 5. By Genre y Others
+    # - Géneros con >= HOME_GENRE_MIN_TITLES_FOR_CAROUSEL (10): Carrusel propio (muestra de 10 de pool 100)
+    # - Géneros con < 10 títulos: agrupados en 'others' (muestra de 10 de pool)
+    # -------------------------------------------------------------------------
+    genre_count_q = (
         select(Genero.id, Genero.nombre, func.count(titulos_generos.c.titulo_id).label("cnt"))
         .join(titulos_generos, titulos_generos.c.genero_id == Genero.id)
-        .group_by(Genero.id, Genero.nombre)
-        .order_by(desc("cnt"))
-        .limit(4)
+        .join(Titulo, Titulo.id == titulos_generos.c.titulo_id)
     )
-    g_res = await db.execute(genre_counts_q)
-    top_genres = g_res.all()
+    if tipo in ("movie", "tv"):
+        genre_count_q = genre_count_q.where(Titulo.tipo == tipo)
+    if watched_ids:
+        genre_count_q = genre_count_q.where(Titulo.id.not_in(watched_ids))
+    genre_count_q = genre_count_q.group_by(Genero.id, Genero.nombre).order_by(desc("cnt"), Genero.nombre)
 
-    by_genre = {}
-    for gid, gname, _ in top_genres:
-        g_titles = await get_titles(db, tipo=tipo, genero_id=gid, sort_by="popularity", page=1, page_size=10, usuario_id=usuario_id)
-        if g_titles.items:
-            by_genre[gname] = g_titles.items
+    genre_rows = (await db.execute(genre_count_q)).all()
+
+    major_genres = []
+    minor_genre_ids = []
+    for gid, gname, cnt in genre_rows:
+        if cnt >= settings.HOME_GENRE_MIN_TITLES_FOR_CAROUSEL:
+            major_genres.append((gid, gname))
+        elif cnt > 0:
+            minor_genre_ids.append(gid)
+
+    by_genre_titulos = {}
+    for gid, gname in major_genres:
+        g_q = (
+            select(Titulo)
+            .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
+            .join(titulos_generos, titulos_generos.c.titulo_id == Titulo.id)
+            .where(titulos_generos.c.genero_id == gid)
+        )
+        if tipo in ("movie", "tv"):
+            g_q = g_q.where(Titulo.tipo == tipo)
+        g_q = _apply_base_filters(g_q)
+        g_q = g_q.order_by(desc(Titulo.popularidad), desc(Titulo.id)).limit(settings.HOME_GENRE_POOL_SIZE)
+        g_pool = (await db.execute(g_q)).scalars().all()
+        if len(g_pool) > sample_size:
+            by_genre_titulos[gname] = random.sample(g_pool, sample_size)
+        else:
+            by_genre_titulos[gname] = list(g_pool)
+
+    others_titulos = []
+    if minor_genre_ids:
+        oth_q = (
+            select(Titulo)
+            .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
+            .join(titulos_generos, titulos_generos.c.titulo_id == Titulo.id)
+            .where(titulos_generos.c.genero_id.in_(minor_genre_ids))
+            .distinct()
+        )
+        if tipo in ("movie", "tv"):
+            oth_q = oth_q.where(Titulo.tipo == tipo)
+        oth_q = _apply_base_filters(oth_q)
+        oth_q = oth_q.order_by(desc(Titulo.popularidad), desc(Titulo.id)).limit(settings.HOME_GENRE_POOL_SIZE)
+        oth_pool = (await db.execute(oth_q)).scalars().all()
+        if len(oth_pool) > sample_size:
+            others_titulos = random.sample(oth_pool, sample_size)
+        else:
+            others_titulos = list(oth_pool)
+
+    # -------------------------------------------------------------------------
+    # Estados de usuario consolidados (1 sola consulta para todos los títulos)
+    # -------------------------------------------------------------------------
+    all_selected = (
+        trending_titulos
+        + new_releases_titulos
+        + classics_titulos
+        + top_rated_titulos
+        + others_titulos
+    )
+    for g_list in by_genre_titulos.values():
+        all_selected.extend(g_list)
+
+    user_states_map = {}
+    if usuario_id and all_selected:
+        unique_ids = list({t.id for t in all_selected})
+        st_res = await db.execute(
+            select(EstadoUsuarioTitulo).where(
+                EstadoUsuarioTitulo.usuario_id == usuario_id,
+                EstadoUsuarioTitulo.titulo_id.in_(unique_ids)
+            )
+        )
+        user_states_map = {st.titulo_id: st for st in st_res.scalars().all()}
 
     return HomeSectionsResponse(
-        trending=trending_res.items,
-        new_releases=new_res.items,
-        classics=classics_res.items,
-        by_genre=by_genre
+        trending=[_build_title_card(t, user_states_map.get(t.id)) for t in trending_titulos],
+        new_releases=[_build_title_card(t, user_states_map.get(t.id)) for t in new_releases_titulos],
+        classics=[_build_title_card(t, user_states_map.get(t.id)) for t in classics_titulos],
+        top_rated=[_build_title_card(t, user_states_map.get(t.id)) for t in top_rated_titulos],
+        by_genre={
+            gname: [_build_title_card(t, user_states_map.get(t.id)) for t in titles]
+            for gname, titles in by_genre_titulos.items()
+        },
+        others=[_build_title_card(t, user_states_map.get(t.id)) for t in others_titulos]
     )
 
 

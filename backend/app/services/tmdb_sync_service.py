@@ -249,12 +249,12 @@ class TMDBSyncService:
                 logger.error(f"Error al obtener detalle de película {tmdb_id}: {e}")
                 return None
 
-        # Parsear año de estreno
-        anio_estreno = None
+        # Parsear fecha de estreno
+        fecha_estreno = None
         rd_str = details.get("release_date")
         if rd_str:
             try:
-                anio_estreno = datetime.strptime(rd_str, "%Y-%m-%d").year
+                fecha_estreno = datetime.strptime(rd_str, "%Y-%m-%d").date()
             except ValueError:
                 pass
 
@@ -277,7 +277,7 @@ class TMDBSyncService:
                 nombre=details.get("title", ""),
                 sinopsis=details.get("overview"),
                 portada_url=portada,
-                anio_estreno=anio_estreno,
+                fecha_estreno=fecha_estreno,
                 duracion=details.get("runtime"),
                 director=director,
                 guionista=guionista,
@@ -295,7 +295,7 @@ class TMDBSyncService:
             titulo.nombre = details.get("title", titulo.nombre)
             titulo.sinopsis = details.get("overview", titulo.sinopsis)
             titulo.portada_url = portada or titulo.portada_url
-            titulo.anio_estreno = anio_estreno or titulo.anio_estreno
+            titulo.fecha_estreno = fecha_estreno or titulo.fecha_estreno
             titulo.duracion = details.get("runtime", titulo.duracion)
             titulo.director = director or titulo.director
             titulo.guionista = guionista or titulo.guionista
@@ -330,21 +330,21 @@ class TMDBSyncService:
                 logger.error(f"Error al obtener detalle de serie {tmdb_id}: {e}")
                 return None
 
-        # Parsear año de estreno y año de fin
-        anio_estreno = None
+        # Parsear fecha de estreno y fecha de fin
+        fecha_estreno = None
         fad_str = details.get("first_air_date")
         if fad_str:
             try:
-                anio_estreno = datetime.strptime(fad_str, "%Y-%m-%d").year
+                fecha_estreno = datetime.strptime(fad_str, "%Y-%m-%d").date()
             except ValueError:
                 pass
 
-        anio_fin = None
+        fecha_fin = None
         status = details.get("status")
         lad_str = details.get("last_air_date")
         if status in ("Ended", "Canceled") and lad_str:
             try:
-                anio_fin = datetime.strptime(lad_str, "%Y-%m-%d").year
+                fecha_fin = datetime.strptime(lad_str, "%Y-%m-%d").date()
             except ValueError:
                 pass
 
@@ -378,8 +378,8 @@ class TMDBSyncService:
                 nombre=details.get("name", ""),
                 sinopsis=details.get("overview"),
                 portada_url=portada,
-                anio_estreno=anio_estreno,
-                anio_fin=anio_fin,
+                fecha_estreno=fecha_estreno,
+                fecha_fin=fecha_fin,
                 duracion=details.get("episode_run_time", [None])[0] if details.get("episode_run_time") else None,
                 director=director,
                 guionista=guionista,
@@ -398,8 +398,8 @@ class TMDBSyncService:
             titulo.nombre = details.get("name", titulo.nombre)
             titulo.sinopsis = details.get("overview", titulo.sinopsis)
             titulo.portada_url = portada or titulo.portada_url
-            titulo.anio_estreno = anio_estreno or titulo.anio_estreno
-            titulo.anio_fin = anio_fin
+            titulo.fecha_estreno = fecha_estreno or titulo.fecha_estreno
+            titulo.fecha_fin = fecha_fin
             titulo.director = director or titulo.director
             titulo.guionista = guionista or titulo.guionista
             titulo.pais = pais or titulo.pais

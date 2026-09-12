@@ -56,6 +56,8 @@ class TitleCardResponse(BaseModel):
     nombre: str
     sinopsis: str | None = None
     portada_url: str | None = None
+    fecha_estreno: date | None = None
+    fecha_fin: date | None = None
     anio_estreno: int | None = None
     anio_fin: int | None = None
     duracion: int | None = None
@@ -111,8 +113,10 @@ class TitleListResponse(BaseModel):
 class HomeSectionsResponse(BaseModel):
     trending: list[TitleCardResponse]
     new_releases: list[TitleCardResponse]
-    classics: list[TitleCardResponse]
+    classics: list[TitleCardResponse] = Field(default_factory=list)
+    top_rated: list[TitleCardResponse] = Field(default_factory=list)
     by_genre: dict[str, list[TitleCardResponse]] = Field(default_factory=dict)
+    others: list[TitleCardResponse] = Field(default_factory=list)
 
 
 class UserLibraryResponse(BaseModel):

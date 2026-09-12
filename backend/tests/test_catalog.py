@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,8 @@ async def create_user_and_token(client: AsyncClient, username: str) -> tuple[int
 
 @pytest.fixture
 async def sample_catalog(db_session: AsyncSession):
+    today = date.today()
+
     # Generos
     g_action = Genero(id=28, nombre="Action")
     g_drama = Genero(id=18, nombre="Drama")
@@ -28,13 +31,13 @@ async def sample_catalog(db_session: AsyncSession):
     db_session.add_all([act1, act2])
     await db_session.flush()
 
-    # Película
+    # Película (estreno reciente dentro de los 60 días para New Releases / Trending)
     m1 = Titulo(
         id=1,
         tmdb_id=101,
         tipo="movie",
         nombre="Top Gun",
-        anio_estreno=2022,
+        fecha_estreno=today - timedelta(days=10),
         duracion=130,
         popularidad=150.0,
         vote_average_tmdb=8.3,
@@ -47,8 +50,8 @@ async def sample_catalog(db_session: AsyncSession):
         tmdb_id=202,
         tipo="tv",
         nombre="Breaking Bad",
-        anio_estreno=2008,
-        anio_fin=2013,
+        fecha_estreno=date(2008, 1, 20),
+        fecha_fin=date(2013, 9, 29),
         popularidad=250.0,
         vote_average_tmdb=8.9,
         vote_count_tmdb=1200,
@@ -99,8 +102,13 @@ async def test_get_home_sections(async_client: AsyncClient, sample_catalog):
     assert "trending" in data
     assert "new_releases" in data
     assert "classics" in data
+    assert "top_rated" in data
     assert "by_genre" in data
+    assert "others" in data
     assert len(data["trending"]) >= 1
+    assert len(data["new_releases"]) >= 1
+    assert len(data["top_rated"]) >= 1
+
 
 
 @pytest.mark.asyncio
@@ -198,3 +206,96 @@ async def test_user_library_and_stats(async_client: AsyncClient, sample_catalog)
     assert stats["episodes_watched_count"] == 1
     assert stats["total_hours"] > 0
     assert "Action" in stats["genres_distribution"]
+
+
+@pytest.mark.asyncio
+async def test_home_watched_exclusion_and_type_toggle(async_client: AsyncClient, sample_catalog, db_session: AsyncSession):
+    """Verifica exclusión de títulos vistos en Home para usuario autenticado y comportamiento de toggles tipo=tv/movie."""
+    uid, token = await create_user_and_token(async_client, "home_user")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Antes de marcar como visto: Top Gun (id=1) aparece en new_releases y trending
+    res_before = await async_client.get("/api/v1/home", headers=headers)
+    assert res_before.status_code == 200
+    ids_before = [t["id"] for t in res_before.json()["new_releases"]]
+    assert 1 in ids_before
+
+    # 2. Marcar Top Gun como visto
+    await async_client.post("/api/v1/titles/1/watched", headers=headers)
+
+    # 3. Después de marcar como visto: Top Gun no debe aparecer en ninguna sección de Home
+    res_after = await async_client.get("/api/v1/home", headers=headers)
+    data_after = res_after.json()
+    all_home_ids = (
+        [t["id"] for t in data_after["trending"]]
+        + [t["id"] for t in data_after["new_releases"]]
+        + [t["id"] for t in data_after["classics"]]
+        + [t["id"] for t in data_after["top_rated"]]
+        + [t["id"] for t in data_after["others"]]
+    )
+    for g_items in data_after["by_genre"].values():
+        all_home_ids.extend([t["id"] for t in g_items])
+    assert 1 not in all_home_ids
+
+    # 4. Toggle tipo=tv: Classics debe ser lista vacía
+    res_tv = await async_client.get("/api/v1/home?tipo=tv")
+    assert res_tv.status_code == 200
+    assert res_tv.json()["classics"] == []
+
+    # 5. Toggle tipo=movie: Solo películas
+    res_mv = await async_client.get("/api/v1/home?tipo=movie")
+    assert res_mv.status_code == 200
+    assert all(t["tipo"] == "movie" for t in res_mv.json()["new_releases"])
+
+
+@pytest.mark.asyncio
+async def test_home_classics_filtering(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica que Classics filtre por >20 años, rating >= 7.5 y votos >= 500."""
+    # Película clásica válida (> 20 años, rating 8.2, votos 600)
+    classic_valid = Titulo(
+        id=90,
+        tmdb_id=9001,
+        tipo="movie",
+        nombre="Pulp Fiction",
+        fecha_estreno=date(1994, 10, 14),
+        duracion=154,
+        popularidad=180.0,
+        vote_average_tmdb=8.5,
+        vote_count_tmdb=600,
+        rating_unificado=8.5
+    )
+    # Película antigua pero con pocos votos (< 500)
+    classic_low_votes = Titulo(
+        id=91,
+        tmdb_id=9002,
+        tipo="movie",
+        nombre="Rare Indie 1990",
+        fecha_estreno=date(1990, 5, 10),
+        popularidad=40.0,
+        vote_average_tmdb=8.8,
+        vote_count_tmdb=50,
+        rating_unificado=8.8
+    )
+    # Película reciente con buen rating (no es clásico)
+    recent_movie = Titulo(
+        id=92,
+        tmdb_id=9003,
+        tipo="movie",
+        nombre="Oppenheimer",
+        fecha_estreno=date.today() - timedelta(days=20),
+        popularidad=300.0,
+        vote_average_tmdb=8.9,
+        vote_count_tmdb=1500,
+        rating_unificado=8.9
+    )
+    db_session.add_all([classic_valid, classic_low_votes, recent_movie])
+    await db_session.commit()
+
+    res = await async_client.get("/api/v1/home")
+    assert res.status_code == 200
+    data = res.json()
+    classic_ids = [t["id"] for t in data["classics"]]
+    assert 90 in classic_ids
+    assert 91 not in classic_ids
+    assert 92 not in classic_ids
+

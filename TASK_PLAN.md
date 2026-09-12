@@ -35,13 +35,18 @@
   - [x] Migración Alembic `0002_technical_adjustments.py`.
   - [x] Suite de tests ampliada a 32 tests (100% pasando en verde).
 
-- [x] **Fase 5: Endpoints de Catálogo, Biblioteca y Reseñas (v0.5.0)**
+- [x] **Fase 5: Endpoints de Catálogo, Biblioteca y Reseñas (v0.5.0 - v0.5.1)**
   - [x] Esquemas Pydantic v2 en `backend/app/schemas/catalog.py`.
   - [x] Servicio de catálogo `backend/app/services/catalog_service.py`.
   - [x] Endpoints `/api/v1/home`, `/api/v1/titles`, `/api/v1/titles/{id}`, `/api/v1/genres`.
   - [x] Endpoints de reseñas `/api/v1/titles/{id}/reviews` (GET y POST) con recálculo de rating unificado.
   - [x] Endpoints de usuario `/api/v1/users/me/library` y `/api/v1/users/me/stats`.
   - [x] Suite de tests unitarios e integración en `backend/tests/test_catalog.py` (40 tests totales pasando en verde).
+  - [x] Migración de `anio_estreno` y `anio_fin` a `fecha_estreno` y `fecha_fin` (`Date`) con Alembic `0003_dates_and_home_specs.py` (v0.5.1).
+  - [x] Refactorización de secciones Home (`/api/v1/home`): New Releases (60d), Trending (90d con fecha de última temporada en series), Classics (películas >20a, rating $\ge 7.5$, votos $\ge 500$, pool 50 aleatorio), Top Rated (pool 100 aleatorio), By Genre ($\ge 10$ títulos) y Others ($< 10$ títulos).
+  - [x] Exclusión automática de títulos vistos (`vista`) para usuarios autenticados en Home.
+  - [x] Optimización de tests (mock de BackgroundTasks en `test_admin.py`, suite de 42 tests en < 5s).
+
 
 ---
 

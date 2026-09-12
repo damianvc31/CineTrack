@@ -24,9 +24,31 @@ class Titulo(Base):
     nombre: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     sinopsis: Mapped[str | None] = mapped_column(Text, nullable=True)
     portada_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    anio_estreno: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
-    anio_fin: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fecha_estreno: Mapped[date | None] = mapped_column(Date, index=True, nullable=True)
+    fecha_fin: Mapped[date | None] = mapped_column(Date, nullable=True)
     duracion: Mapped[int | None] = mapped_column(Integer, nullable=True)  # solo peliculas (minutos)
+
+    @property
+    def anio_estreno(self) -> int | None:
+        return self.fecha_estreno.year if self.fecha_estreno else None
+
+    @anio_estreno.setter
+    def anio_estreno(self, val: int | None) -> None:
+        if val is not None:
+            self.fecha_estreno = date(val, 1, 1)
+        else:
+            self.fecha_estreno = None
+
+    @property
+    def anio_fin(self) -> int | None:
+        return self.fecha_fin.year if self.fecha_fin else None
+
+    @anio_fin.setter
+    def anio_fin(self, val: int | None) -> None:
+        if val is not None:
+            self.fecha_fin = date(val, 1, 1)
+        else:
+            self.fecha_fin = None
     director: Mapped[str | None] = mapped_column(String(150), index=True, nullable=True)
     guionista: Mapped[str | None] = mapped_column(String(150), index=True, nullable=True)
     pais: Mapped[str | None] = mapped_column(String(100), nullable=True)

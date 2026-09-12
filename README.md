@@ -36,8 +36,33 @@ cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+
+# Aplicar migraciones de Base de Datos (Alembic)
+alembic upgrade head
+
+# Correr tests
 pytest
+
+# Iniciar servidor de desarrollo
 uvicorn app.main:app --reload --port 8000
+```
+
+#### Comandos de Migraciones (Alembic)
+```powershell
+# Aplicar todas las migraciones pendientes
+alembic upgrade head
+
+# Ver la revisión/migración actual de la base de datos
+alembic current
+
+# Ver el historial de migraciones
+alembic history --verbose
+
+# Generar una nueva migración automáticamente tras modificar modelos
+alembic revision --autogenerate -m "descripcion_del_cambio"
+
+# Revertir la última migración aplicada (rollback de 1 paso)
+alembic downgrade -1
 ```
 
 #### Comandos de Ingesta y Sincronización TMDB

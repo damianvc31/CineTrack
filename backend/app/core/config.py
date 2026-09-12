@@ -47,6 +47,19 @@ class Settings(BaseSettings):
 
     AI_PROVIDER_API_KEY: str = ""
 
+    # Home Sections & Pools Configuration
+    HOME_SECTION_SAMPLE_SIZE: int = 10
+    HOME_NEW_RELEASES_DAYS: int = 60
+    HOME_TRENDING_DAYS: int = 90
+    HOME_CLASSICS_MIN_YEARS: int = 20
+    HOME_CLASSICS_MIN_RATING: float = 7.5
+    HOME_CLASSICS_MIN_VOTES: int = 500
+    HOME_CLASSICS_POOL_SIZE: int = 50
+    HOME_TOP_RATED_MIN_VOTES: int = 100
+    HOME_TOP_RATED_POOL_SIZE: int = 100
+    HOME_GENRE_POOL_SIZE: int = 100
+    HOME_GENRE_MIN_TITLES_FOR_CAROUSEL: int = 10
+
     model_config = SettingsConfigDict(
         env_file=(".env", ".env.local"),
         env_file_encoding="utf-8",

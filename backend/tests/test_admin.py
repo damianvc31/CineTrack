@@ -5,6 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import create_access_token
 from app.models.usuario import Usuario
+from fastapi import BackgroundTasks
+
+
+@pytest.fixture(autouse=True)
+def prevent_real_background_tasks(monkeypatch):
+    """Evita que los endpoints administrativos ejecuten jobs reales de TMDB contra internet durante los tests."""
+    monkeypatch.setattr(BackgroundTasks, "add_task", lambda self, *args, **kwargs: None)
+
 
 
 @pytest.mark.asyncio
