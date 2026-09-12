@@ -25,16 +25,25 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 - **Beneficio:** Elimina `JOINs` costosos en las pantallas principales y de exploración ("Todos", "Trending", "Estrenos") donde se presentan películas y series de forma unificada.
 
 ### 2.2. Esquema Relacional Principal
-1. **`usuarios`**: Autenticación mínima (login/password con hash `bcrypt`/`argon2`), perfil (país, ciudad, biografía, avatar, fecha_registro).
-2. **`titulos`**: Catálogo de películas y series con metadatos técnicos y de TMDB.
+1. **`usuarios`**: Autenticación mínima (login/password con hash `bcrypt`/`argon2`), perfil (país, ciudad, biografía, avatar, fecha_registro, flag `es_admin`).
+2. **`titulos`**: Catálogo de películas y series con metadatos técnicos y de TMDB. Utiliza campos exactos tipo `Date` (`fecha_estreno` y `fecha_fin`), exponiendo propiedades calculadas `@property anio_estreno` y `anio_fin` con setters para retrocompatibilidad total.
 3. **`generos`** & **`titulos_generos`**: Clasificación N:M (un título pertenece a múltiples géneros).
-4. **`actores`** & **`titulos_elenco`**: Reparto principal N:M.
+4. **`actores`** & **`titulos_elenco`**: Reparto principal N:M con columnas `personaje` y `orden`.
 5. **`temporadas`** & **`episodios`**: Jerarquía episódica de series con duraciones por episodio y fechas de emisión.
 6. **`estados_usuario_titulos`**: Estado granular por usuario (`favorito` booleano independiente, y `estado` mutuamente excluyente: `watchlist`, `siguiendo`, `vista`, o `null`), con sus respectivas marcas temporales para ordenamiento.
 7. **`episodios_vistos`**: Historial atómico de episodios vistos por usuario y fecha.
 8. **`resenas`**: Reseñas y puntajes. Diseñado con autor polimórfico: `usuario_id` (FK nullable a `usuarios`) o `autor_tmdb` (texto) con identificador externo `tmdb_review_id` para deduplicación.
 
-### 2.3. Almacenamiento de Avatares
+### 2.3. Lógica del Catálogo de Inicio (Home) y Exploración
+El endpoint `/api/v1/home` y la capa `catalog_service.py` curan las colecciones respetando las siguientes reglas de negocio:
+- **New Releases:** Títulos estrenados en los últimos 60 días (`fecha_estreno >= hoy - 60 días`). Para series, solo aquellas cuya fecha de estreno propia entra en la ventana.
+- **Trending:** Títulos más populares de los últimos 90 días. Para series, se considera la fecha de estreno más reciente entre la propia serie y su última temporada emitida (`MAX(Temporada.fecha_estreno)`).
+- **Classics:** Exclusivo de películas (`tipo == 'movie'`). Antigüedad superior a 20 años, con `rating_unificado >= 7.5` y al menos 500 votos. Selecciona una muestra aleatoria de 10 títulos de un pool de 50. Se omite (lista vacía) si el filtro es `tipo=tv`.
+- **Top Rated:** Muestra aleatoria de 10 títulos de un pool de 100 de las producciones con mayor `rating_unificado` y al menos 100 votos.
+- **By Genre y Others:** Carruseles independientes para cada género con al menos 10 títulos asociados (muestra aleatoria de pool de 100 más populares). Aquellos géneros minoritarios con menos de 10 obras se consolidan en el carrusel `others`.
+- **Exclusión de Vistos:** Para usuarios autenticados, se omiten automáticamente en todos los carruseles exploratorios los títulos que tengan `estado == 'vista'`.
+
+### 2.4. Almacenamiento de Avatares
 - **Versión Mínima:** Selección de avatares predeterminados locales (identicons/SVGs) o URLs externas. Subida de avatares guardando una miniatura optimizada directamente en la base de datos (`BYTEA` / Base64 limitada a <300 KB), evitando la pérdida de archivos en filesystems efímeros de hosting PaaS.
 
 ---
