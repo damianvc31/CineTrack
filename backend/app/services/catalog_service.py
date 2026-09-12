@@ -806,6 +806,13 @@ async def get_user_unreviewed_watched_titles(
     """Retorna títulos marcados como 'vista' por el usuario que aún no tienen reseña suya."""
     reviewed_ids_subq = select(Resena.titulo_id).where(Resena.usuario_id == usuario_id)
 
+    series_with_watched_eps = (
+        select(Temporada.titulo_id)
+        .join(Episodio, Episodio.temporada_id == Temporada.id)
+        .join(EpisodioVisto, EpisodioVisto.episodio_id == Episodio.id)
+        .where(EpisodioVisto.usuario_id == usuario_id)
+    )
+
     q = (
         select(Titulo, EstadoUsuarioTitulo)
         .join(EstadoUsuarioTitulo, EstadoUsuarioTitulo.titulo_id == Titulo.id)
@@ -816,7 +823,10 @@ async def get_user_unreviewed_watched_titles(
                 EstadoUsuarioTitulo.estado == "vista",
                 and_(
                     Titulo.tipo == "tv",
-                    EstadoUsuarioTitulo.estado.in_(["siguiendo", "abandonada"])
+                    or_(
+                        EstadoUsuarioTitulo.estado.in_(["siguiendo", "abandonada"]),
+                        Titulo.id.in_(series_with_watched_eps)
+                    )
                 )
             ),
             ~Titulo.id.in_(reviewed_ids_subq)
@@ -827,7 +837,13 @@ async def get_user_unreviewed_watched_titles(
     res = await db.execute(q)
     rows = res.all()
 
-    items = [_build_title_card(t, st) for t, st in rows]
+    items = []
+    for t, st in rows:
+        card = _build_title_card(t, st)
+        if t.tipo == "tv" and (card.user_estado is None or card.user_estado == "abandonada"):
+            card.user_estado = "abandonada"
+        items.append(card)
+
     return UnreviewedWatchedResponse(items=items, total=len(items))
 
 

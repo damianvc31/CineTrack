@@ -181,6 +181,20 @@ async def test_review_optional_score_and_pending(async_client: AsyncClient, db_s
 
     # Debe aparecer en /users/me/unreviewed-watched porque ya se vio al menos un episodio
     res_unrev3 = await async_client.get("/api/v1/users/me/unreviewed-watched", headers=headers)
-    pending_ids3 = [p["id"] for p in res_unrev3.json()["items"]]
+    pending_items3 = res_unrev3.json()["items"]
+    pending_ids3 = [p["id"] for p in pending_items3]
     assert 3 in pending_ids3
+    s3_item = next(p for p in pending_items3 if p["id"] == 3)
+    assert s3_item["user_estado"] == "siguiendo"
+
+    # 8. Abandonar la serie (unfollow) -> debe seguir apareciendo en unreviewed-watched pero con estado 'abandonada'
+    res_abandon = await async_client.post("/api/v1/titles/3/unfollow", headers=headers)
+    assert res_abandon.status_code == 200
+
+    res_unrev4 = await async_client.get("/api/v1/users/me/unreviewed-watched", headers=headers)
+    pending_items4 = res_unrev4.json()["items"]
+    pending_ids4 = [p["id"] for p in pending_items4]
+    assert 3 in pending_ids4
+    s3_abandoned_item = next(p for p in pending_items4 if p["id"] == 3)
+    assert s3_abandoned_item["user_estado"] == "abandonada"
 
