@@ -99,29 +99,62 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   }
 
   // Re-encuadrar imagen existente
-  const handleRecenter = (url: string) => {
-    const canonical = getAvatarUrl(url) || url
-    const tempImg = new Image()
-    tempImg.crossOrigin = 'anonymous'
-    tempImg.onload = () => {
-      const nw = tempImg.naturalWidth || 200
-      const nh = tempImg.naturalHeight || 200
-      setNaturalSize({ w: nw, h: nh })
-      const baseScale = 200 / Math.max(nw, nh)
-      setBaseDimensions({
-        w: Math.max(1, nw * baseScale),
-        h: Math.max(1, nh * baseScale),
-      })
-      setZoom(1.0)
-      setPan({ x: 0, y: 0 })
-      setImageToCrop(canonical)
-      setCropMode(true)
-      setError(null)
+  const handleRecenter = async (url: string) => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const canonical = getAvatarUrl(url) || url
+
+      // Si no es Data URI, descargarlo y convertirlo a Data URI local para evitar tainted canvas
+      let safeDataUri = canonical
+      if (!canonical.startsWith('data:')) {
+        const response = await fetch(canonical, { mode: 'cors' })
+        if (!response.ok) throw new Error('Could not fetch avatar image')
+        const blob = await response.blob()
+        safeDataUri = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(blob)
+        })
+      }
+
+      const tempImg = new Image()
+      tempImg.crossOrigin = 'anonymous'
+      tempImg.onload = () => {
+        const nw = tempImg.naturalWidth || 200
+        const nh = tempImg.naturalHeight || 200
+        setNaturalSize({ w: nw, h: nh })
+        const baseScale = 200 / Math.max(nw, nh)
+        setBaseDimensions({
+          w: Math.max(1, nw * baseScale),
+          h: Math.max(1, nh * baseScale),
+        })
+        setZoom(1.0)
+        setPan({ x: 0, y: 0 })
+        setImageToCrop(safeDataUri)
+        setCropMode(true)
+        setError(null)
+        setLoading(false)
+      }
+      tempImg.onerror = () => {
+        setLoading(false)
+        setError(
+          language === 'es'
+            ? 'No se pudo cargar la imagen para re-encuadrar.'
+            : 'Could not load image to re-center.'
+        )
+      }
+      tempImg.src = safeDataUri
+    } catch {
+      setLoading(false)
+      setError(
+        language === 'es'
+          ? 'No se pudo cargar la imagen para re-encuadrar.'
+          : 'Could not load image to re-center.'
+      )
     }
-    tempImg.onerror = () => {
-      setError(language === 'es' ? 'No se pudo cargar la imagen para re-encuadrar.' : 'Could not load image to re-center.')
-    }
-    tempImg.src = canonical
   }
 
   // Restablecer al avatar por defecto
@@ -315,6 +348,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   ref={imageRef}
                   src={imageToCrop}
                   alt="Crop preview"
+                  crossOrigin="anonymous"
                   draggable={false}
                   className="absolute max-w-none pointer-events-none select-none"
                   style={{
