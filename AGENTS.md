@@ -18,8 +18,8 @@ Este archivo define cómo debe comportarse el agente en **cualquier proyecto** d
 | Google Gemini (vía hub) | `gemini-3.6-flash` | Distinto del Gemini nativo de Antigravity — este es una llamada de herramienta, no el motor del agente |
 | Hugging Face | `meta-llama/Llama-3.3-70B-Instruct` (default, se puede pedir otro modelo puntual del catálogo) | Bueno para instrucciones estructuradas |
 | NVIDIA | `mistralai/mistral-nemotron` (default, se puede pedir otro modelo puntual del catálogo) | Optimizado para instruction-following, workflows agénticos y function calling — reemplazó a `meta/llama-3.1-70b-instruct`, que dejó de estar disponible en el catálogo |
-| OpenRouter — Slot 1 | `openrouter/free` (router automático, **modelo variable en cada llamada**) | No usar como default para tareas que necesiten consistencia — es el que menos control da |
-| OpenRouter — Slot 2 | `google/gemma-4-31b-it:free` | Modelo fijo, más predecible que el slot 1 |
+| OpenRouter — Slot 1 | `nex-agi/nex-n2.5-pro:free` | Modelo agéntico de Nex AGI, orientado específicamente a coding agéntico, uso de herramientas y bucles de auto-corrección (explora código, ejecuta comandos, prueba resultados, corrige si falla) — buen fit para tareas de desarrollo vía hub. Publicado muy recientemente, por debajo de los modelos top de pago en benchmarks de código, pero competente para un modelo gratuito. Ya no es el router variable de antes — modelo fijo, mismo nivel de consistencia que los otros slots. |
+| OpenRouter — Slot 2 | `google/gemma-4-31b-it:free` | Modelo fijo |
 | OpenRouter — Slot 3 | `cohere/north-mini-code:free` | Modelo fijo, orientado a código |
 
 **Hubs inactivos — PROHIBIDO llamar (sin saldo, no reintentar):**
@@ -47,7 +47,7 @@ Gemini Flash nativo (motor del agente en Antigravity) se usa solo para coordinar
 - **Preferí lo local para tareas repetitivas o de bajo riesgo** (ediciones chicas, consultas rápidas, cosas que no dependen de razonamiento profundo) — cuida cuota de hubs sin sacrificar calidad real.
 - **Usá un hub cuando la tarea se beneficie claramente de más capacidad**: refactors grandes, razonamiento complejo de varios pasos, mucho contexto simultáneo, o cuando el modelo local ya mostró señales de fallar o dar resultados de baja calidad en el intento anterior.
 - **Nunca upgrades "por las dudas"** — si lo local resuelve bien, no hay razón para gastar cuota de hub.
-- Groq/HF/NVIDIA/Gemini(hub)/OpenRouter (slots 2 y 3) son opciones igual de válidas entre sí para tareas que requieran nube — elegí según disponibilidad y el tipo de tarea, no hay un orden fijo de preferencia entre ellos. El slot 1 de OpenRouter, por su modelo variable, usarlo con moderación.
+- Groq/HF/NVIDIA/Gemini(hub)/OpenRouter (los 3 slots) son opciones igual de válidas entre sí para tareas que requieran nube — elegí según disponibilidad y el tipo de tarea, no hay un orden fijo de preferencia entre ellos.
 - **Si un hub falla (error 500/503, timeout, o cualquier otro), no reintentes infinitamente** — máximo 1 reintento con una breve espera, y si vuelve a fallar, tratalo como no disponible por ahora. Antes de caer a local, probá con **otro hub de la lista** (son interconectables entre sí, ver punto anterior) — recién si varios hubs fallan seguido, o ninguno es apropiado, seguí trabajando con los modelos locales sin más insistencia.
 
 **Concurrencia local:** a diferencia de los hubs de nube (que atienden varias consultas en paralelo), Ollama en esta PC solo puede tener un modelo generando activamente a la vez. Si una tarea necesita varias consultas seguidas, preferí quedarte con el mismo modelo local durante ese bloque en vez de saltar entre modelos para cada paso — alternar tiene un costo real de recarga.

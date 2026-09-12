@@ -56,6 +56,23 @@ async def get_current_user(
     return user
 
 
+async def get_optional_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[Usuario]:
+    """Retorna el usuario si el token es válido, o None si no hay token o es inválido."""
+    if not credentials:
+        return None
+    payload = decode_access_token(credentials.credentials)
+    if not payload or not payload.get("sub"):
+        return None
+    try:
+        user_id = int(payload["sub"])
+        return await get_user_by_id(db, user_id=user_id)
+    except Exception:
+        return None
+
+
 async def get_current_admin(
     x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),

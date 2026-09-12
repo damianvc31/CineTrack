@@ -35,9 +35,20 @@
   - [x] Migración Alembic `0002_technical_adjustments.py`.
   - [x] Suite de tests ampliada a 32 tests (100% pasando en verde).
 
+- [x] **Fase 5: Endpoints de Catálogo, Biblioteca y Reseñas (v0.5.0)**
+  - [x] Esquemas Pydantic v2 en `backend/app/schemas/catalog.py`.
+  - [x] Servicio de catálogo `backend/app/services/catalog_service.py`.
+  - [x] Endpoints `/api/v1/home`, `/api/v1/titles`, `/api/v1/titles/{id}`, `/api/v1/genres`.
+  - [x] Endpoints de reseñas `/api/v1/titles/{id}/reviews` (GET y POST) con recálculo de rating unificado.
+  - [x] Endpoints de usuario `/api/v1/users/me/library` y `/api/v1/users/me/stats`.
+  - [x] Suite de tests unitarios e integración en `backend/tests/test_catalog.py` (40 tests totales pasando en verde).
+
 ---
 
-## Próximas Fases (No iniciar sin aprobación previa del usuario)
-- **Fase 4:** Clientes y servicios de integración con TMDB (con mocks para testing).
-- **Fase 5:** Frontend UI conectada a los endpoints reales (Home, Detalle, Perfil).
-- **Fase 6:** Recomendador inteligente por IA.
+## Próximos Hitos: Frontend UI (Fase 5)
+- [ ] **Hito 5.2:** Setup de Tailwind CSS en Vite, routing (`react-router-dom`), iconografía (`lucide-react`) y `AuthContext`.
+- [ ] **Hito 5.3:** Pantalla 1 — Home (Header, Carruseles por categoría/género, Panel de IA, Drawer de accesos de usuario).
+- [ ] **Hito 5.4:** Pantalla 2 — Detalle de Título (Películas y Series según wireframe).
+- [ ] **Hito 5.5:** Pantalla 3 — Perfil de Usuario y Estadísticas.
+- [ ] **Hito 5.6:** Pantallas complementarias (Favoritos, Watchlist, Following, History, Reviews, Settings, "Ver más").
+- [ ] **Fase 6:** Recomendador Inteligente por IA.
