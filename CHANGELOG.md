@@ -2,6 +2,19 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.7.4] - 2026-09-12
+### Agregado & Mejorado
+- **Sincronización de Temporadas Confirmadas (con o sin fecha):** `upsert_series` y el nuevo job `repopulate_seasons` ahora persisten temporadas futuras confirmadas en TMDB (incluso si tienen 0 episodios en TMDB al momento). Se procesaron las 1002 series del catálogo incorporando 180 nuevas temporadas confirmadas y actualizando 436 fechas de emisión.
+- **Insignias Semánticas de Emisión en 6 Estados:** En la cabecera de `TitleDetailPage`, las series cuentan con un badge de estado de alta precisión:
+  - 🟢 **Currently Airing:** Temporada en curso con episodios emitidos y próximos episodios (`Next ep on {date}`).
+  - 🔵 **Renewed (con fecha):** Temporada confirmada con fecha futura programada (`Season {N} on {date}`).
+  - 🟣 **Renewed (TBA / In Production):** Temporada confirmada por productora / TMDB sin fecha exacta de estreno cargada todavía (ej. *Landman Season 3*, *House of the Dragon Season 3*).
+  - 🟡 **Pending Renewal (Between Seasons):** Series en pausa donde concluyeron los episodios actuales y no hay registro de renovación aún.
+  - ⚪ **Ended:** Serie finalizada oficialmente.
+  - 🔴 **Canceled:** Serie cancelada.
+- **Regla Visual para Temporadas Futuras en Detalle:** Las temporadas sin fecha confirmada y sin episodios aún no saturan el selector de temporadas ni el acordeón; solo se exponen en los tabs/selectores aquellas temporadas que ya tienen episodios o una fecha de estreno certera.
+- **Localización Completa al Inglés en UI:** Localización íntegra al idioma inglés de todos los textos, menús y acciones restantes en `TitleDetailPage`, tarjetas `TitleCard`, pie de página `Footer`, biblioteca `LibraryPage` y perfil `ProfilePage`.
+
 ## [v0.7.3] - 2026-09-12
 ### Agregado & Mejorado
 - **Modelo de Estado 'Abandonada' Deducido (Invariante Zero-Redundancy):** Al presionar *Abandonar* (`POST /api/v1/titles/{id}/unfollow`), la serie pasa limpiamente a `SinEstado` (`estado = null` en BD) manteniendo intacto su historial de episodios vistos en `EpisodioVisto`. El estado de "abandonada" se deduce de manera pura y reactiva (`estado == null && episodios_vistos > 0`).
@@ -11,6 +24,7 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 - **Detección Estructural del Estado de Emisión de Series:** Sustitución de heurísticas rígidas por detección reactiva basada en el progreso real de la temporada: si una temporada tiene episodios ya emitidos y episodios futuros pendientes se clasifica como **Currently Airing** (con fecha del próximo episodio); si la temporada concluyó pero hay una nueva entrega en calendario se exhibe como **Renewed** (indicando temporada y fecha de estreno); si concluyó y aún no hay fecha cargada se muestra con precisión como **On Hiatus (Between Seasons)**, reservando **Ended** y **Canceled** para sus estados terminales correspondientes.
 - **Internacionalización Completa al Inglés en UI:** Localización íntegra al idioma inglés de todos los textos, menús y acciones restantes en `TitleDetailPage` (botones de acción *Favorite, Watched / Mark Watched, Following, Drop Series, Dropped Series, Resume / Follow*, cabeceras de sección *Synopsis, Top Cast*, estados de temporada y emisión de episodios *Season Watched, Mark Entire Season, Unreleased, Air Date*), tarjetas `TitleCard`, pie de página `Footer`, biblioteca `LibraryPage` y perfil `ProfilePage`.
 - **Suite de Pruebas Automatizadas:** 50 tests pasando en backend (`pytest`), cubriendo el ciclo completo de abandono, reanudación y validaciones de borde, y tests de frontend en `vitest` actualizados al inglés.
+- **Actualización de Especificaciones de Catálogo (`CATALOG_SPECS.md`):** New Releases formalizado a los últimos 30 días y Trending con popularidad mínima de 80%.
 
 ## [v0.7.2] - 2026-09-12
 ### Agregado & Mejorado
