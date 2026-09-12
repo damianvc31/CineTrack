@@ -35,7 +35,7 @@ import type { HomeSections } from '@/types/catalog'
 import { CarouselRow } from '@/components/common/CarouselRow'
 
 interface OutletContextType {
-  openAuth: () => void
+  openAuth: (mode?: 'login' | 'register') => void
 }
 
 export const HomePage: React.FC = () => {
@@ -451,12 +451,20 @@ export const HomePage: React.FC = () => {
                   Sign in to save favorites, build your watchlist, and track series episodes.
                 </p>
               </div>
-              <button
-                onClick={openAuth}
-                className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all active:scale-98"
-              >
-                Sign In / Register
-              </button>
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  onClick={() => openAuth('register')}
+                  className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all active:scale-98"
+                >
+                  Create Account
+                </button>
+                <button
+                  onClick={() => openAuth('login')}
+                  className="w-full py-2 px-4 rounded-xl bg-[#1a1a1a] hover:bg-[#222222] border border-[#333333] text-gray-200 text-xs font-semibold transition-all active:scale-98"
+                >
+                  Log In
+                </button>
+              </div>
             </div>
           )}
         </aside>

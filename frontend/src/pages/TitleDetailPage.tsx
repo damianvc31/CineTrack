@@ -32,7 +32,7 @@ import { CountryFlag } from '@/components/common/CountryFlag'
 import { getLanguageName } from '@/utils/countryUtils'
 
 interface OutletContextType {
-  openAuth: () => void
+  openAuth: (mode?: 'login' | 'register') => void
 }
 
 export const TitleDetailPage: React.FC = () => {
@@ -1200,7 +1200,7 @@ export const TitleDetailPage: React.FC = () => {
             <div className="p-6 rounded-2xl bg-[#141414] border border-[#262626] text-center space-y-2">
               <p className="text-xs text-gray-400">Sign in to rate and leave a review.</p>
               <button
-                onClick={openAuth}
+                onClick={() => openAuth('login')}
                 className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md transition-all"
               >
                 Sign In to Review

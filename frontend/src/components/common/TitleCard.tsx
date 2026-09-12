@@ -11,7 +11,7 @@ import { SeasonProgressBar } from '@/components/profile/SeasonProgressBar'
 interface TitleCardProps {
   title: TitleCardType
   onStateChange?: (action: 'favorite' | 'watchlist' | 'watched', titleId: number) => void
-  onOpenAuth?: () => void
+  onOpenAuth?: (mode?: 'login' | 'register') => void
 }
 
 export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOpenAuth }) => {

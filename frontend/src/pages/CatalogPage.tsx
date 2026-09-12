@@ -5,7 +5,7 @@ import { catalogService, type TitlesResponse } from '@/services/catalogService'
 import { TitleCard } from '@/components/common/TitleCard'
 
 interface OutletContextType {
-  openAuth: () => void
+  openAuth: (mode?: 'login' | 'register') => void
 }
 
 export const CatalogPage: React.FC = () => {

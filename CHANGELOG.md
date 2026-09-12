@@ -23,7 +23,8 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
   - Formulario seguro de cambio de contraseña con validación de contraseña actual y repetición de nueva clave (`POST /api/v1/users/me/change-password`).
   - Selector de preferencia de idioma de interfaz (English / Español) con diccionario local en frontend para nombres de géneros (`genreTranslations.ts`) sin alterar la base de datos.
 - **Armonización Estética y UX Cinemática:**
-  - `AuthModal` adaptado a paleta carbón/dorado con localización íntegra al inglés y campos completos de perfil (país, ciudad, bio, avatar) durante el registro.
+  - `AuthModal` adaptado a paleta carbón/dorado con localización íntegra al inglés, soporte de modo inicial dinámico (`initialMode?: 'login' | 'register'`) y campos completos de perfil (país, ciudad, bio, avatar) durante el registro.
+  - **Separación de Botones de Autenticación con Significado Propio:** Reemplazo de accesos ambiguos por dos botones diferenciados de **Log In** y **Sign Up / Create Account** (en cabecera desktop, menú móvil, panel lateral de Home y estados deslogueados de Library y Reviews), abriendo directamente el formulario correspondiente pero permitiendo la alternancia ágil entre inicio de sesión y registro dentro del modal.
   - Ampliación de avatares en Home (`w-14 h-14` / `w-16 h-16`), Header (`w-10 h-10`) y Perfil (`w-32 h-32`).
   - Menú desplegable de usuario y menú móvil con acceso directo a las 7 secciones clave de la biblioteca (Profile, Favorites, Watchlist, Watch History, Following, Reviews, Settings).
   - Notificaciones toast en inglés estricto en `ReviewsPage` y simplificación de etiqueta a "Favorites" en el panel lateral de Home.

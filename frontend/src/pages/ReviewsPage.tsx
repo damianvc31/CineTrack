@@ -20,7 +20,7 @@ import type { UserReviewItem, TitleCard as TitleCardType } from '@/types/catalog
 import posterFallback from '@/assets/placeholders/poster-empty.svg'
 
 interface OutletContextType {
-  openAuth: () => void
+  openAuth: (mode?: 'login' | 'register') => void
 }
 
 export const ReviewsPage: React.FC = () => {
@@ -187,12 +187,20 @@ export const ReviewsPage: React.FC = () => {
         <p className="text-xs text-gray-400">
           Track all your written opinions, edit ratings, and review titles you have already watched.
         </p>
-        <button
-          onClick={openAuth}
-          className="px-6 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all"
-        >
-          Sign In
-        </button>
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button
+            onClick={() => openAuth('login')}
+            className="px-5 py-2.5 rounded-xl bg-[#1a1a1a] hover:bg-[#222222] border border-[#333333] text-gray-200 text-xs font-semibold transition-all active:scale-95"
+          >
+            Log In
+          </button>
+          <button
+            onClick={() => openAuth('register')}
+            className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all active:scale-95"
+          >
+            Create Account
+          </button>
+        </div>
       </div>
     )
   }

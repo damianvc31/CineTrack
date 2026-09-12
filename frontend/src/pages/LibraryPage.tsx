@@ -7,7 +7,7 @@ import { TitleCard } from '@/components/common/TitleCard'
 import type { UserLibrary, TitleCard as TitleCardType } from '@/types/catalog'
 
 interface OutletContextType {
-  openAuth: () => void
+  openAuth: (mode?: 'login' | 'register') => void
 }
 
 export const LibraryPage: React.FC = () => {
@@ -54,18 +54,26 @@ export const LibraryPage: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="max-w-md mx-auto my-24 p-8 bg-[#111827] border border-gray-800 rounded-2xl text-center space-y-4">
-        <Bookmark className="w-12 h-12 text-purple-400 mx-auto" />
-        <h2 className="text-xl font-bold text-white">Inicia sesión para ver tu biblioteca</h2>
-        <p className="text-xs text-gray-400">
-          Guarda tus títulos favoritos, administra tus listas de seguimiento y sincroniza tu progreso en todos tus dispositivos.
+      <div className="max-w-md mx-auto my-24 p-8 bg-[#141414] border border-[#262626] rounded-2xl text-center space-y-4 shadow-xl">
+        <Bookmark className="w-12 h-12 text-amber-400 mx-auto" />
+        <h2 className="text-xl font-bold text-white">Sign in to view your library</h2>
+        <p className="text-xs text-gray-400 leading-relaxed">
+          Save your favorite titles, manage watchlists, and track series episode progress across devices.
         </p>
-        <button
-          onClick={openAuth}
-          className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-lg shadow-purple-600/30"
-        >
-          Iniciar Sesión
-        </button>
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button
+            onClick={() => openAuth('login')}
+            className="px-5 py-2.5 rounded-xl bg-[#1a1a1a] hover:bg-[#222222] border border-[#333333] text-gray-200 text-xs font-semibold transition-all active:scale-95"
+          >
+            Log In
+          </button>
+          <button
+            onClick={() => openAuth('register')}
+            className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all active:scale-95"
+          >
+            Create Account
+          </button>
+        </div>
       </div>
     )
   }

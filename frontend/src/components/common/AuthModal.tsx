@@ -1,15 +1,16 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { X, Lock, User as UserIcon, MapPin, FileText, Image as ImageIcon, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
 interface AuthModalProps {
   isOpen: boolean
   onClose: () => void
+  initialMode?: 'login' | 'register'
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'login' }) => {
   const { login, register } = useAuth()
-  const [isRegisterMode, setIsRegisterMode] = useState(false)
+  const [isRegisterMode, setIsRegisterMode] = useState(initialMode === 'register')
   const [nombreUsuario, setNombreUsuario] = useState('')
   const [password, setPassword] = useState('')
   const [pais, setPais] = useState('')
@@ -18,6 +19,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [avatarUrl, setAvatarUrl] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsRegisterMode(initialMode === 'register')
+      setError(null)
+    }
+  }, [isOpen, initialMode])
 
   if (!isOpen) return null
 

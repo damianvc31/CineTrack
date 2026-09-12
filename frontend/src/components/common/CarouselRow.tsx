@@ -10,7 +10,7 @@ interface CarouselRowProps {
   icon?: React.ReactNode
   titles: TitleCardType[]
   viewMoreLink?: string
-  onOpenAuth?: () => void
+  onOpenAuth?: (mode?: 'login' | 'register') => void
   onStateChange?: (action: 'favorite' | 'watchlist' | 'watched', titleId: number) => void
 }
 

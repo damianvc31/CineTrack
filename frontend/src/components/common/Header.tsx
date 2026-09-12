@@ -6,7 +6,7 @@ import tmdbLogo from '@/assets/branding/tmdb-logo.svg'
 import cinetrackLogo from '@/assets/branding/cinetrack-logo.svg'
 
 interface HeaderProps {
-  onOpenAuth?: () => void
+  onOpenAuth?: (mode?: 'login' | 'register') => void
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
@@ -206,12 +206,20 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                 </div>
               ) : null
             ) : (
-              <button
-                onClick={onOpenAuth}
-                className="px-4 py-1.5 text-xs font-semibold rounded-full bg-amber-500 hover:bg-amber-400 text-black shadow-md shadow-amber-500/20 transition-all active:scale-95"
-              >
-                Log In
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onOpenAuth?.('login')}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-full text-gray-300 hover:text-white hover:bg-[#181818] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-all active:scale-95"
+                >
+                  Log In
+                </button>
+                <button
+                  onClick={() => onOpenAuth?.('register')}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-full bg-amber-500 hover:bg-amber-400 text-black shadow-md shadow-amber-500/20 transition-all active:scale-95"
+                >
+                  Sign Up
+                </button>
+              </div>
             )}
 
             {/* Toggle mobile menu */}
@@ -338,6 +346,29 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   <LogOut className="w-4 h-4" /> Sign Out
                 </button>
               </>
+            )}
+
+            {!user && (
+              <div className="pt-2 border-t border-[#262626] flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false)
+                    onOpenAuth?.('login')
+                  }}
+                  className="w-full py-2 px-3 text-xs font-semibold rounded-xl text-gray-200 bg-[#171717] hover:bg-[#202020] border border-[#2e2e2e] text-center transition-colors"
+                >
+                  Log In
+                </button>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false)
+                    onOpenAuth?.('register')
+                  }}
+                  className="w-full py-2 px-3 text-xs font-semibold rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-center shadow-md shadow-amber-500/20 transition-colors"
+                >
+                  Sign Up / Register
+                </button>
+              </div>
             )}
           </nav>
 
