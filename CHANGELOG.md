@@ -2,6 +2,20 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.8.1] - 2026-09-12
+### Corregido & Mejorado
+- **Restricción de Reseñas para Títulos No Vistos (`TitleDetailPage`):**
+  - Se impide publicar una nueva reseña en películas o series que el usuario no haya marcado como vistas.
+  - Mensaje amigable e informativo que indica que se debe marcar la película como vista o registrar al menos un episodio visto de la serie para poder dejar una reseña.
+  - **Manejo de Caso Borde:** Si el usuario ya había escrito una reseña y posteriormente desmarca el título o episodios, la reseña se preserva intacta y puede ser consultada y editada sin restricciones. Si decide eliminarla, no podrá redactar una nueva a menos que vuelva a registrar progreso visto.
+- **Corrección de Persistencia y Caché de Avatar de Usuario (`EditProfileModal` & `users.py`):**
+  - **Eliminación del Error de URL Nativo de HTML5:** Se desvincula la ruta interna del servidor (`/api/v1/users/X/avatar`) del campo de texto de enlace directo, y se cambia el input a `type="text"`, evitando que el navegador bloquee el guardado del formulario con el mensaje nativo *"Please enter a URL"*.
+  - **Sobrescritura Inmediata e Invalidación de Caché:** El endpoint de subida de avatar (`POST /api/v1/users/me/avatar`) incorpora un timestamp de versión (`?v=...`) y el endpoint de servicio binario (`GET /{user_id}/avatar`) aplica cabeceras estrictas `Cache-Control: no-cache, no-store, must-revalidate`, garantizando que cada nuevo recorte se refleje instantáneamente sin retener la imagen anterior en caché del navegador.
+  - **Preservación de Avatar Binario en `PATCH /me`:** La actualización de perfil conserva el avatar binario local si no se ingresa una URL externa explícita, evitando que guardar datos de país, ciudad o bio elimine o sobreescriba accidentalmente la foto cargada.
+- **Localización Exhaustiva al Español en Detalle de Título y Modal de Perfil:**
+  - `TitleDetailPage`: Traducción completa reactiva de botones de acción (*"Favorito"*, *"Marcar Vista"* / *"Vista"*, *"Siguiendo"*, *"Abandonar Serie"*, *"Serie Abandonada"*, *"Reanudar / Seguir"*, *"Lista de seguimiento"*), tags (*"Película"*, *"Serie"*, *"Popularidad"*, *"votos"*), ficha técnica (*"Director"*, *"Creador"*, *"Guionista"*, *"País"*), badges de emisión (*"Finalizada"*, *"Cancelada"*, *"En Emisión"*, *"Renovada"*, *"Pendiente de Renovación"*), lista de episodios (*"Mostrar/Ocultar Episodios"*, *"Temporada Vista"*, *"Sin estrenar"*), formulario y tarjetas de reseñas.
+  - `EditProfileModal`: Localización íntegra de encabezado, campos de formulario (*"Nombre de usuario (no se puede modificar)"*, *"País"*, *"Ciudad"*, *"Biografía / Sobre ti"*), botones (*"Subir de mi PC"*, *"Re-encuadrar"*, *"Volver a Default"*, *"Guardar Cambios"*) y mensajes de estado.
+
 ## [v0.8.0] - 2026-09-12
 ### Agregado & Mejorado
 - **Barra de Progreso Segmentada por Temporada en Siguiendo (`SeasonProgressBar`):**

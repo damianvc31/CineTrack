@@ -292,7 +292,7 @@ export const TitleDetailPage: React.FC = () => {
 
   const handleDeleteReview = async () => {
     if (!user) return
-    if (!window.confirm('Are you sure you want to delete your review?')) {
+    if (!window.confirm(language === 'es' ? '¿Estás seguro de que deseas eliminar tu reseña?' : 'Are you sure you want to delete your review?')) {
       return
     }
     setDeletingReview(true)
@@ -337,7 +337,9 @@ export const TitleDetailPage: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] gap-3">
         <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-        <p className="text-xs text-gray-400">Loading title details...</p>
+        <p className="text-xs text-gray-400">
+          {language === 'es' ? 'Cargando detalles del título...' : 'Loading title details...'}
+        </p>
       </div>
     )
   }
@@ -346,13 +348,17 @@ export const TitleDetailPage: React.FC = () => {
     return (
       <div className="max-w-md mx-auto my-20 p-6 bg-[#141414] border border-[#262626] rounded-2xl text-center">
         <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
-        <h3 className="text-lg font-bold text-white mb-2">Title Not Found</h3>
-        <p className="text-xs text-gray-400 mb-6">{error || 'The requested title does not exist or was removed.'}</p>
+        <h3 className="text-lg font-bold text-white mb-2">
+          {language === 'es' ? 'Título No Encontrado' : 'Title Not Found'}
+        </h3>
+        <p className="text-xs text-gray-400 mb-6">
+          {error || (language === 'es' ? 'El título solicitado no existe o fue eliminado.' : 'The requested title does not exist or was removed.')}
+        </p>
         <Link
           to="/"
           className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md transition-all"
         >
-          Back to Home
+          {language === 'es' ? 'Volver al Inicio' : 'Back to Home'}
         </Link>
       </div>
     )
@@ -382,7 +388,8 @@ export const TitleDetailPage: React.FC = () => {
   const startYear = title.anio_estreno || (title.fecha_estreno ? title.fecha_estreno.substring(0, 4) : '')
   const endYear = title.anio_fin || (title.fecha_fin ? title.fecha_fin.substring(0, 4) : '')
   const yearRange = endYear ? `${startYear}-${endYear}` : `${startYear}-`
-  const seasonsLabel = `${visibleSeasons.length || 1} ${visibleSeasons.length === 1 ? 'season' : 'seasons'}`
+  const seasonsCount = visibleSeasons.length || 1
+  const seasonsLabel = `${seasonsCount} ${language === 'es' ? (seasonsCount === 1 ? 'temporada' : 'temporadas') : (seasonsCount === 1 ? 'season' : 'seasons')}`
 
   // Render semantic series status badge based on season progress and TMDB status
   const renderStatusBadge = () => {
@@ -392,7 +399,7 @@ export const TitleDetailPage: React.FC = () => {
     if (st.includes('ended') || st.includes('finaliz')) {
       return (
         <span className="px-3 py-1 rounded-full bg-gray-800/90 border border-gray-600 text-gray-300 text-xs font-semibold">
-          Ended
+          {language === 'es' ? 'Finalizada' : 'Ended'}
         </span>
       )
     }
@@ -400,7 +407,7 @@ export const TitleDetailPage: React.FC = () => {
     if (st.includes('cancel')) {
       return (
         <span className="px-3 py-1 rounded-full bg-red-950/80 border border-red-600/70 text-red-300 text-xs font-bold">
-          Canceled
+          {language === 'es' ? 'Cancelada' : 'Canceled'}
         </span>
       )
     }
@@ -469,12 +476,12 @@ export const TitleDetailPage: React.FC = () => {
     // State 1: Active season in progress -> Currently Airing (Green pulse)
     if (inProgressSeason) {
       const nextDateStr = inProgressSeason.nextEpDate
-        ? ` — Next ep on ${inProgressSeason.nextEpDate}`
+        ? (language === 'es' ? ` — Próximo ep. el ${inProgressSeason.nextEpDate}` : ` — Next ep on ${inProgressSeason.nextEpDate}`)
         : ''
       return (
         <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 text-xs font-bold shadow-sm">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>Currently Airing{nextDateStr}</span>
+          <span>{language === 'es' ? 'En Emisión' : 'Currently Airing'}{nextDateStr}</span>
         </span>
       )
     }
@@ -482,23 +489,29 @@ export const TitleDetailPage: React.FC = () => {
     // State 2: A new season is scheduled in the calendar with a known/estimated date -> Renewed (Blue)
     if (upcomingSeasonWithDate || nextDate) {
       const dateStr = upcomingSeasonWithDate?.startDate || nextDate
-      const label = upcomingSeasonWithDate ? `Season ${upcomingSeasonWithDate.seasonNum}` : 'New Season'
+      const label = upcomingSeasonWithDate
+        ? (language === 'es' ? `Temporada ${upcomingSeasonWithDate.seasonNum}` : `Season ${upcomingSeasonWithDate.seasonNum}`)
+        : (language === 'es' ? 'Nueva Temporada' : 'New Season')
       return (
         <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-950/80 border border-blue-500/60 text-blue-300 text-xs font-bold shadow-sm">
           <span className="w-2 h-2 rounded-full bg-blue-400" />
-          <span>Renewed — {label}{dateStr ? ` on ${dateStr}` : ''}</span>
+          <span>{language === 'es' ? 'Renovada' : 'Renewed'} — {label}{dateStr ? (language === 'es' ? ` el ${dateStr}` : ` on ${dateStr}`) : ''}</span>
         </span>
       )
     }
 
     // State 3: Confirmed renewal without a release date yet, or TMDB status In Production / Planned -> Renewed TBA (Purple/Violet)
     if (confirmedSeasonDateless || st.includes('production') || st.includes('planned')) {
-      const label = confirmedSeasonDateless ? `Season ${confirmedSeasonDateless.seasonNum}` : 'Next Season'
-      const statusSuffix = st.includes('production') ? 'In Production' : 'TBA'
+      const label = confirmedSeasonDateless
+        ? (language === 'es' ? `Temporada ${confirmedSeasonDateless.seasonNum}` : `Season ${confirmedSeasonDateless.seasonNum}`)
+        : (language === 'es' ? 'Próxima Temporada' : 'Next Season')
+      const statusSuffix = st.includes('production')
+        ? (language === 'es' ? 'En Producción' : 'In Production')
+        : (language === 'es' ? 'Por anunciar' : 'TBA')
       return (
         <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-500/60 text-purple-300 text-xs font-bold shadow-sm">
           <span className="w-2 h-2 rounded-full bg-purple-400" />
-          <span>Renewed — {label} ({statusSuffix})</span>
+          <span>{language === 'es' ? 'Renovada' : 'Renewed'} — {label} ({statusSuffix})</span>
         </span>
       )
     }
@@ -507,7 +520,7 @@ export const TitleDetailPage: React.FC = () => {
     return (
       <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/60 border border-amber-600/50 text-amber-300 text-xs font-semibold">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-        <span>Pending Renewal (Between Seasons)</span>
+        <span>{language === 'es' ? 'Pendiente de Renovación (Entre Temporadas)' : 'Pending Renewal (Between Seasons)'}</span>
       </span>
     )
   }
@@ -527,12 +540,12 @@ export const TitleDetailPage: React.FC = () => {
             <div className="flex-1 space-y-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-semibold uppercase text-[10px] tracking-wider">
-                  {title.tipo === 'movie' ? 'Movie' : 'TV Series'}
+                  {title.tipo === 'movie' ? (language === 'es' ? 'Película' : 'Movie') : (language === 'es' ? 'Serie' : 'TV Series')}
                 </span>
 
                 {percentilNum > 0 && (
                   <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-xs">
-                    <span>🔥</span> {percentilNum}% Popularity
+                    <span>🔥</span> {percentilNum}% {language === 'es' ? 'Popularidad' : 'Popularity'}
                   </span>
                 )}
 
@@ -550,7 +563,7 @@ export const TitleDetailPage: React.FC = () => {
                   <Star className="w-4 h-4 fill-amber-400" />
                   <span>{title.vote_average_tmdb.toFixed(1)}</span>
                   <span className="text-[11px] text-gray-400 font-normal">
-                    ({title.vote_count_tmdb} votes)
+                    ({title.vote_count_tmdb} {language === 'es' ? 'votos' : 'votes'})
                   </span>
                 </div>
 
@@ -579,18 +592,22 @@ export const TitleDetailPage: React.FC = () => {
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-gray-400 pt-1">
                 <div>
                   <span className="text-gray-500 font-medium">
-                    {title.tipo === 'movie' ? 'Director:' : 'Creator:'}
+                    {title.tipo === 'movie' ? (language === 'es' ? 'Director:' : 'Director:') : (language === 'es' ? 'Creador:' : 'Creator:')}
                   </span>{' '}
                   <strong className="text-gray-200">{title.director || '-'}</strong>
                 </div>
 
                 <div>
-                  <span className="text-gray-500 font-medium">Writer:</span>{' '}
+                  <span className="text-gray-500 font-medium">
+                    {language === 'es' ? 'Guionista:' : 'Writer:'}
+                  </span>{' '}
                   <strong className="text-gray-200">{title.guionista || '-'}</strong>
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  <span className="text-gray-500 font-medium">Country:</span>{' '}
+                  <span className="text-gray-500 font-medium">
+                    {language === 'es' ? 'País:' : 'Country:'}
+                  </span>{' '}
                   <CountryFlag code={title.pais} showName={true} />
                 </div>
 
@@ -634,7 +651,7 @@ export const TitleDetailPage: React.FC = () => {
                   }`}
                 >
                   <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
-                  <span>Favorite</span>
+                  <span>{language === 'es' ? 'Favorito' : 'Favorite'}</span>
                 </button>
 
                 {/* 2. Watched button */}
@@ -647,7 +664,11 @@ export const TitleDetailPage: React.FC = () => {
                   }`}
                 >
                   <Eye className="w-4 h-4" />
-                  <span>{userEstado === 'vista' ? 'Watched' : 'Mark Watched'}</span>
+                  <span>
+                    {userEstado === 'vista'
+                      ? (language === 'es' ? 'Vista' : 'Watched')
+                      : (language === 'es' ? 'Marcar Vista' : 'Mark Watched')}
+                  </span>
                 </button>
 
                 {/* 3 & 4. Series Logic: Following / Drop Series vs Watchlist */}
@@ -663,17 +684,17 @@ export const TitleDetailPage: React.FC = () => {
                             {/* Following Badge */}
                             <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-900/40 border border-blue-500 text-blue-300 cursor-default shadow-md">
                               <Play className="w-4 h-4 fill-current" />
-                              <span>Following</span>
+                              <span>{language === 'es' ? 'Siguiendo' : 'Following'}</span>
                             </span>
 
                             {/* Drop Series Button */}
                             <button
                               onClick={handleUnfollow}
-                              title="Drop series keeping watched episodes history"
+                              title={language === 'es' ? 'Abandonar serie manteniendo historial de episodios vistos' : 'Drop series keeping watched episodes history'}
                               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-950/40 border border-red-700/80 text-red-300 hover:bg-red-900/50 hover:border-red-500 transition-all"
                             >
                               <X className="w-4 h-4" />
-                              <span>Drop Series</span>
+                              <span>{language === 'es' ? 'Abandonar Serie' : 'Drop Series'}</span>
                             </button>
                           </>
                         )}
@@ -682,16 +703,16 @@ export const TitleDetailPage: React.FC = () => {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-950/40 border border-red-800/60 text-red-300">
                               <X className="w-4 h-4 text-red-400" />
-                              <span>Dropped Series</span>
+                              <span>{language === 'es' ? 'Serie Abandonada' : 'Dropped Series'}</span>
                             </span>
 
                             <button
                               onClick={handleFollow}
-                              title="Resume following series"
+                              title={language === 'es' ? 'Reanudar seguimiento de la serie' : 'Resume following series'}
                               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-blue-300 hover:text-white shadow-md transition-all"
                             >
                               <Play className="w-4 h-4 fill-current text-blue-400" />
-                              <span>Resume / Follow</span>
+                              <span>{language === 'es' ? 'Reanudar / Seguir' : 'Resume / Follow'}</span>
                             </button>
                           </div>
                         )}
@@ -707,7 +728,7 @@ export const TitleDetailPage: React.FC = () => {
                             }`}
                           >
                             <Bookmark className={`w-4 h-4 ${userEstado === 'watchlist' ? 'fill-current' : ''}`} />
-                            <span>Watchlist</span>
+                            <span>{language === 'es' ? 'Lista de seguimiento' : 'Watchlist'}</span>
                           </button>
                         )}
                       </>
@@ -725,7 +746,7 @@ export const TitleDetailPage: React.FC = () => {
                       }`}
                     >
                       <Bookmark className={`w-4 h-4 ${userEstado === 'watchlist' ? 'fill-current' : ''}`} />
-                      <span>Watchlist</span>
+                      <span>{language === 'es' ? 'Lista de seguimiento' : 'Watchlist'}</span>
                     </button>
                   )
                 )}
@@ -906,7 +927,7 @@ export const TitleDetailPage: React.FC = () => {
               <div className="p-4 rounded-xl bg-gray-900/60 border border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-white">
-                    Season {currentSeasonData.numero} ({currentSeasonData.cantidad_episodios} episodes)
+                    {language === 'es' ? `Temporada ${currentSeasonData.numero}` : `Season ${currentSeasonData.numero}`} ({currentSeasonData.cantidad_episodios} {language === 'es' ? 'episodios' : 'episodes'})
                   </h3>
                   {currentSeasonData.sinopsis && (
                     <p className="text-xs text-gray-400 mt-1 max-w-3xl leading-relaxed">
@@ -920,17 +941,17 @@ export const TitleDetailPage: React.FC = () => {
                     type="button"
                     onClick={() => setEpisodesCollapsed(!episodesCollapsed)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#141414] hover:bg-[#202020] text-gray-300 hover:text-white border border-[#262626] transition-colors"
-                    title={episodesCollapsed ? 'Expand episodes' : 'Collapse episodes'}
+                    title={episodesCollapsed ? (language === 'es' ? 'Mostrar episodios' : 'Expand episodes') : (language === 'es' ? 'Ocultar episodios' : 'Collapse episodes')}
                   >
                     {episodesCollapsed ? (
                       <>
                         <ChevronDown className="w-4 h-4 text-amber-400" />
-                        <span>Show Episodes</span>
+                        <span>{language === 'es' ? 'Mostrar Episodios' : 'Show Episodes'}</span>
                       </>
                     ) : (
                       <>
                         <ChevronUp className="w-4 h-4 text-amber-400" />
-                        <span>Hide Episodes</span>
+                        <span>{language === 'es' ? 'Ocultar Episodios' : 'Hide Episodes'}</span>
                       </>
                     )}
                   </button>
@@ -947,8 +968,8 @@ export const TitleDetailPage: React.FC = () => {
                     <CheckCheck className="w-4 h-4" />
                     <span>
                       {currentSeasonData.temporada_vista
-                        ? 'Season Watched'
-                        : 'Mark Entire Season'}
+                        ? (language === 'es' ? 'Temporada Vista' : 'Season Watched')
+                        : (language === 'es' ? 'Marcar Temporada Completa' : 'Mark Entire Season')}
                     </span>
                   </button>
                 </div>
@@ -963,9 +984,13 @@ export const TitleDetailPage: React.FC = () => {
                   className="p-4 text-center rounded-xl bg-[#141414] hover:bg-[#1c1c1c] border border-[#262626] text-xs text-gray-400 hover:text-amber-300 cursor-pointer transition-colors space-y-1"
                 >
                   <p className="font-semibold text-gray-300">
-                    {currentSeasonData.cantidad_episodios} episodes hidden for Season {currentSeasonData.numero}
+                    {language === 'es'
+                      ? `${currentSeasonData.cantidad_episodios} episodios ocultos de la Temporada ${currentSeasonData.numero}`
+                      : `${currentSeasonData.cantidad_episodios} episodes hidden for Season ${currentSeasonData.numero}`}
                   </p>
-                  <p className="text-[11px] text-amber-500/80">Click to expand episode list</p>
+                  <p className="text-[11px] text-amber-500/80">
+                    {language === 'es' ? 'Haz clic para ver la lista de episodios' : 'Click to expand episode list'}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2.5">
@@ -997,10 +1022,10 @@ export const TitleDetailPage: React.FC = () => {
                             }
                             title={
                               isEpWatched
-                                ? 'Mark as unwatched'
+                                ? (language === 'es' ? 'Marcar como no visto' : 'Mark as unwatched')
                                 : isUnreleased
-                                ? `Unreleased (air date: ${ep.fecha_estreno})`
-                                : 'Mark as watched'
+                                ? (language === 'es' ? `Sin estrenar (estreno: ${ep.fecha_estreno})` : `Unreleased (air date: ${ep.fecha_estreno})`)
+                                : (language === 'es' ? 'Marcar como visto' : 'Mark as watched')
                             }
                             className={`mt-0.5 p-1 rounded-full transition-colors ${
                               isEpWatched
@@ -1021,7 +1046,7 @@ export const TitleDetailPage: React.FC = () => {
                               </h4>
                               {isUnreleased && !isEpWatched && (
                                 <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-semibold flex items-center gap-1">
-                                  <Clock className="w-3 h-3" /> Unreleased
+                                  <Clock className="w-3 h-3" /> {language === 'es' ? 'Sin estrenar' : 'Unreleased'}
                                 </span>
                               )}
                             </div>
@@ -1029,10 +1054,10 @@ export const TitleDetailPage: React.FC = () => {
                             <div className="flex items-center gap-3 text-[11px] text-gray-500">
                               {ep.fecha_estreno ? (
                                 <span className={isUnreleased ? 'text-amber-400/80 font-medium' : ''}>
-                                  Air Date: {ep.fecha_estreno}
+                                  {language === 'es' ? 'Fecha de estreno:' : 'Air Date:'} {ep.fecha_estreno}
                                 </span>
                               ) : (
-                                <span>Air Date: -</span>
+                                <span>{language === 'es' ? 'Fecha de estreno: -' : 'Air Date: -'}</span>
                               )}
                               <span>• {ep.duracion && ep.duracion > 0 ? `${ep.duracion} min` : '-'}</span>
                             </div>
@@ -1093,17 +1118,19 @@ export const TitleDetailPage: React.FC = () => {
                             <span>{userReview.puntaje.toFixed(1)}/10</span>
                           </div>
                         ) : (
-                          <span className="text-xs text-gray-400 italic">No score rating</span>
+                          <span className="text-xs text-gray-400 italic">
+                            {language === 'es' ? 'Sin puntuación' : 'No score rating'}
+                          </span>
                         )}
 
                         <button
                           type="button"
                           onClick={() => handleStartEdit(userReview)}
                           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#222222] hover:bg-[#2c2c2c] text-gray-200 hover:text-white border border-[#333333] text-xs font-semibold transition-colors"
-                          title="Edit your review"
+                          title={language === 'es' ? 'Editar tu reseña' : 'Edit your review'}
                         >
                           <Pencil className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Edit</span>
+                          <span>{language === 'es' ? 'Editar' : 'Edit'}</span>
                         </button>
 
                         <button
@@ -1111,10 +1138,10 @@ export const TitleDetailPage: React.FC = () => {
                           onClick={handleDeleteReview}
                           disabled={deletingReview}
                           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-red-950/30 hover:bg-red-900/50 text-red-300 hover:text-red-200 border border-red-800/40 text-xs font-semibold transition-colors disabled:opacity-50"
-                          title="Delete review"
+                          title={language === 'es' ? 'Eliminar reseña' : 'Delete review'}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          <span>{deletingReview ? 'Deleting...' : 'Delete'}</span>
+                          <span>{deletingReview ? (language === 'es' ? 'Eliminando...' : 'Deleting...') : (language === 'es' ? 'Eliminar' : 'Delete')}</span>
                         </button>
                       </div>
                     </div>
@@ -1126,9 +1153,40 @@ export const TitleDetailPage: React.FC = () => {
                     <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 border-t border-[#262626]">
                       <span>
                         {userReview.fecha
-                          ? `Last updated: ${new Date(userReview.fecha).toLocaleDateString()}`
+                          ? `${language === 'es' ? 'Última actualización:' : 'Last updated:'} ${new Date(userReview.fecha).toLocaleDateString()}`
                           : ''}
                       </span>
+                    </div>
+                  </div>
+                )
+              }
+
+              // Si no tiene reseña previa, verificar si es elegible (ha visto la película o al menos un episodio de la serie)
+              const hasWatchedEpisodes = !!title.temporadas?.some((t) => t.episodios?.some((e) => e.visto))
+              const isEligibleToReview = title.tipo === 'movie'
+                ? userEstado === 'vista'
+                : userEstado === 'vista' || hasWatchedEpisodes
+
+              // Si no tiene reseña y no ha visto el título, mostrar mensaje informativo en lugar del formulario
+              if (!userReview && !isEligibleToReview) {
+                return (
+                  <div className="p-5 rounded-2xl bg-[#141414] border border-[#262626] flex items-center gap-4 text-xs text-gray-300 shadow-sm">
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
+                      <Eye className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-gray-200">
+                        {language === 'es' ? '¿Quieres dejar tu reseña?' : 'Want to leave a review?'}
+                      </p>
+                      <p className="text-gray-400">
+                        {language === 'es'
+                          ? title.tipo === 'movie'
+                            ? 'Debes marcar la película como vista para poder dejar una reseña.'
+                            : 'Debes marcar la serie como vista o al menos un episodio para poder dejar una reseña.'
+                          : title.tipo === 'movie'
+                            ? 'You must mark this movie as watched to leave a review.'
+                            : 'You must mark this series as watched or at least one episode to leave a review.'}
+                      </p>
                     </div>
                   </div>
                 )
@@ -1142,7 +1200,9 @@ export const TitleDetailPage: React.FC = () => {
                 >
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-semibold text-gray-200 uppercase tracking-wider">
-                      {isEditingReview ? 'Edit your review' : 'Leave your review'}
+                      {isEditingReview
+                        ? (language === 'es' ? 'Edita tu reseña' : 'Edit your review')
+                        : (language === 'es' ? 'Deja tu reseña' : 'Leave your review')}
                     </h3>
                     {isEditingReview && (
                       <button
@@ -1150,7 +1210,7 @@ export const TitleDetailPage: React.FC = () => {
                         onClick={handleCancelEdit}
                         className="text-xs text-gray-400 hover:text-white underline"
                       >
-                        Cancel
+                        {language === 'es' ? 'Cancelar' : 'Cancel'}
                       </button>
                     )}
                   </div>
@@ -1164,7 +1224,9 @@ export const TitleDetailPage: React.FC = () => {
                         onChange={(e) => setIncludeScore(e.target.checked)}
                         className="w-4 h-4 rounded border-[#333333] bg-[#0d0d0d] text-amber-500 focus:ring-amber-500"
                       />
-                      <span className="font-medium">Include rating score</span>
+                      <span className="font-medium">
+                        {language === 'es' ? 'Incluir puntuación' : 'Include rating score'}
+                      </span>
                     </label>
 
                     {includeScore && (
@@ -1216,7 +1278,11 @@ export const TitleDetailPage: React.FC = () => {
                     rows={3}
                     value={reviewText}
                     onChange={(e) => setReviewText(e.target.value)}
-                    placeholder="What did you think of this title? Share your thoughts without spoilers..."
+                    placeholder={
+                      language === 'es'
+                        ? '¿Qué te pareció este título? Comparte tu opinión sin spoilers...'
+                        : 'What did you think of this title? Share your thoughts without spoilers...'
+                    }
                     className="w-full p-3 text-sm bg-[#0d0d0d] border border-[#262626] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                   />
 
@@ -1227,7 +1293,7 @@ export const TitleDetailPage: React.FC = () => {
                         onClick={handleCancelEdit}
                         className="px-4 py-2 rounded-xl bg-[#222222] hover:bg-[#2c2c2c] text-gray-300 hover:text-white text-xs font-bold transition-all"
                       >
-                        Cancel
+                        {language === 'es' ? 'Cancelar' : 'Cancel'}
                       </button>
                     )}
                     <button
@@ -1236,7 +1302,11 @@ export const TitleDetailPage: React.FC = () => {
                       className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
                     >
                       <Send className="w-3.5 h-3.5" />
-                      {submittingReview ? 'Saving...' : isEditingReview ? 'Save Changes' : 'Post Review'}
+                      {submittingReview
+                        ? (language === 'es' ? 'Guardando...' : 'Saving...')
+                        : isEditingReview
+                        ? (language === 'es' ? 'Guardar Cambios' : 'Save Changes')
+                        : (language === 'es' ? 'Publicar Reseña' : 'Post Review')}
                     </button>
                   </div>
                 </form>
@@ -1244,12 +1314,14 @@ export const TitleDetailPage: React.FC = () => {
             })()
           ) : (
             <div className="p-6 rounded-2xl bg-[#141414] border border-[#262626] text-center space-y-2">
-              <p className="text-xs text-gray-400">Sign in to rate and leave a review.</p>
+              <p className="text-xs text-gray-400">
+                {language === 'es' ? 'Inicia sesión para calificar y dejar una reseña.' : 'Sign in to rate and leave a review.'}
+              </p>
               <button
                 onClick={() => openAuth('login')}
                 className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md transition-all"
               >
-                Sign In to Review
+                {language === 'es' ? 'Iniciar Sesión para Reseñar' : 'Sign In to Review'}
               </button>
             </div>
           )}
@@ -1264,8 +1336,8 @@ export const TitleDetailPage: React.FC = () => {
                 return (
                   <p className="text-xs text-gray-500 italic">
                     {hasUserReview
-                      ? 'No other reviews for this title yet.'
-                      : 'No reviews for this title yet. Be the first to share your thoughts!'}
+                      ? (language === 'es' ? 'Aún no hay otras reseñas para este título.' : 'No other reviews for this title yet.')
+                      : (language === 'es' ? 'Aún no hay reseñas para este título. ¡Sé el primero en compartir tu opinión!' : 'No reviews for this title yet. Be the first to share your thoughts!')}
                   </p>
                 )
               }
@@ -1287,11 +1359,11 @@ export const TitleDetailPage: React.FC = () => {
                               : 'U'}
                           </div>
                           <span className="text-xs font-semibold text-gray-200">
-                            {rev.nombre_usuario || rev.autor_tmdb || 'User'}
+                            {rev.nombre_usuario || rev.autor_tmdb || (language === 'es' ? 'Usuario' : 'User')}
                           </span>
                           {rev.autor_tmdb && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#202020] text-amber-400/90 border border-amber-500/30 font-semibold">
-                              TMDB Review
+                              {language === 'es' ? 'Reseña TMDB' : 'TMDB Review'}
                             </span>
                           )}
                         </div>
@@ -1322,7 +1394,9 @@ export const TitleDetailPage: React.FC = () => {
                         disabled={loadingMoreReviews}
                         className="px-5 py-2 rounded-xl bg-[#171717] hover:bg-[#202020] border border-[#262626] text-xs font-semibold text-gray-300 hover:text-white transition-all disabled:opacity-50"
                       >
-                        {loadingMoreReviews ? 'Loading more reviews...' : 'Load more reviews'}
+                        {loadingMoreReviews
+                          ? (language === 'es' ? 'Cargando más reseñas...' : 'Loading more reviews...')
+                          : (language === 'es' ? 'Cargar más reseñas' : 'Load more reviews')}
                       </button>
                     </div>
                   )}

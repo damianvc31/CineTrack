@@ -37,6 +37,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [city, setCity] = useState(user?.ciudad || '')
   const [bio, setBio] = useState(user?.descripcion || '')
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '')
+  const [customExternalUrl, setCustomExternalUrl] = useState(
+    user?.avatar_url && !user.avatar_url.includes('/avatar') ? user.avatar_url : ''
+  )
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [imgError, setImgError] = useState(false)
@@ -129,6 +132,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       const updated = await authService.deleteAvatar()
       updateUser(updated)
       setAvatarUrl('')
+      setCustomExternalUrl('')
       setImageToCrop(null)
       setCropMode(false)
       setImgError(false)
@@ -206,7 +210,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       // Guardar avatar vía endpoint dedicado
       const updated = await authService.uploadAvatar(croppedDataUri)
       updateUser(updated)
-      setAvatarUrl(updated.avatar_url || croppedDataUri)
+      setAvatarUrl(updated.avatar_url || '')
+      setCustomExternalUrl('')
       setCropMode(false)
       setImageToCrop(null)
       setImgError(false)
@@ -223,11 +228,16 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setLoading(true)
 
     try {
+      const ext = customExternalUrl.trim()
+      // Si el usuario ingresó una URL externa nueva (ej. https://...), se la enviamos al backend.
+      // Si no, preservamos el avatar actual del usuario (sea binario local o existente).
+      const finalAvatarUrl = ext ? ext : (avatarUrl || user.avatar_url || null)
+
       const updatedUser = await authService.updateProfile({
         pais: country.trim() || null,
         ciudad: city.trim() || null,
         descripcion: bio.trim() || null,
-        avatar_url: avatarUrl.trim() || null,
+        avatar_url: finalAvatarUrl,
       })
 
       updateUser(updatedUser)
@@ -237,14 +247,15 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       if (err instanceof Error) {
         setError(err.message)
       } else {
-        setError('Failed to update profile. Please try again.')
+        setError(language === 'es' ? 'Error al actualizar el perfil.' : 'Failed to update profile. Please try again.')
       }
     } finally {
       setLoading(false)
     }
   }
 
-  const canonicalCurrentAvatar = getAvatarUrl(avatarUrl)
+  const currentDisplayUrl = customExternalUrl.trim() || avatarUrl || user.avatar_url || ''
+  const canonicalCurrentAvatar = getAvatarUrl(currentDisplayUrl)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
@@ -252,8 +263,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
           <div>
-            <h3 className="text-xl font-bold text-white">Edit Profile</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Update your personal details and avatar</p>
+            <h3 className="text-xl font-bold text-white">
+              {language === 'es' ? 'Editar Perfil' : 'Edit Profile'}
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {language === 'es' ? 'Actualiza tus datos personales y foto de perfil' : 'Update your personal details and avatar'}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -456,11 +471,11 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                       <span>{language === 'es' ? 'Subir de mi PC' : 'Upload from PC'}</span>
                     </button>
 
-                    {avatarUrl && (
+                    {currentDisplayUrl && (
                       <>
                         <button
                           type="button"
-                          onClick={() => handleRecenter(avatarUrl)}
+                          onClick={() => handleRecenter(canonicalCurrentAvatar || currentDisplayUrl)}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-[#2a2a2a] text-gray-300 hover:text-white border border-[#333333] text-xs font-semibold transition-all"
                         >
                           <RotateCcw className="w-3 h-3" />
@@ -491,10 +506,13 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 <div className="relative">
                   <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                   <input
-                    type="url"
+                    type="text"
                     placeholder="https://example.com/your-photo.jpg"
-                    value={avatarUrl}
-                    onChange={(e) => setAvatarUrl(e.target.value)}
+                    value={customExternalUrl}
+                    onChange={(e) => {
+                      setCustomExternalUrl(e.target.value)
+                      setImgError(false)
+                    }}
                     className="w-full pl-9 pr-3 py-1.5 bg-[#181818] border border-[#333333] rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60"
                   />
                 </div>
@@ -504,7 +522,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           {/* Username (Locked / Non-editable) */}
           <div>
             <label className="block text-xs font-medium text-gray-400 mb-1">
-              Username <span className="text-[10px] text-gray-500">(cannot be modified)</span>
+              {language === 'es' ? 'Nombre de usuario' : 'Username'}{' '}
+              <span className="text-[10px] text-gray-500">
+                {language === 'es' ? '(no se puede modificar)' : '(cannot be modified)'}
+              </span>
             </label>
             <div className="relative">
               <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
@@ -520,12 +541,14 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           {/* Location: Country & City */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-300 mb-1">Country</label>
+              <label className="block text-xs font-medium text-gray-300 mb-1">
+                {language === 'es' ? 'País' : 'Country'}
+              </label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <input
                   type="text"
-                  placeholder="e.g. Argentina"
+                  placeholder={language === 'es' ? 'ej. Argentina' : 'e.g. Argentina'}
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-[#181818] border border-[#333333] rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60"
@@ -534,12 +557,14 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-300 mb-1">City</label>
+              <label className="block text-xs font-medium text-gray-300 mb-1">
+                {language === 'es' ? 'Ciudad' : 'City'}
+              </label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <input
                   type="text"
-                  placeholder="e.g. Buenos Aires"
+                  placeholder={language === 'es' ? 'ej. Buenos Aires' : 'e.g. Buenos Aires'}
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-[#181818] border border-[#333333] rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60"
@@ -550,12 +575,18 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
           {/* Bio / Description */}
           <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">Bio / About You</label>
+            <label className="block text-xs font-medium text-gray-300 mb-1">
+              {language === 'es' ? 'Biografía / Sobre ti' : 'Bio / About You'}
+            </label>
             <div className="relative">
               <FileText className="absolute left-3 top-3 w-4 h-4 text-gray-500" />
               <textarea
                 rows={3}
-                placeholder="Tell the community about your taste in movies and series..."
+                placeholder={
+                  language === 'es'
+                    ? 'Cuéntale a la comunidad sobre tus gustos en cine y series...'
+                    : 'Tell the community about your taste in movies and series...'
+                }
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 maxLength={500}
@@ -574,14 +605,16 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               onClick={onClose}
               className="px-4 py-2 rounded-xl text-xs font-medium text-gray-400 hover:text-white hover:bg-[#202020] transition-colors"
             >
-              Cancel
+              {language === 'es' ? 'Cancelar' : 'Cancel'}
             </button>
             <button
               type="submit"
               disabled={loading}
               className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
             >
-              {loading ? 'Saving...' : 'Save Changes'}
+              {loading
+                ? (language === 'es' ? 'Guardando...' : 'Saving...')
+                : (language === 'es' ? 'Guardar Cambios' : 'Save Changes')}
             </button>
           </div>
         </form>

@@ -109,7 +109,7 @@ async def test_upload_and_get_avatar(async_client: AsyncClient):
     })
     assert upload_resp.status_code == 200
     updated_user = upload_resp.json()
-    assert updated_user["avatar_url"] == f"/api/v1/users/{user_data['id']}/avatar"
+    assert updated_user["avatar_url"].startswith(f"/api/v1/users/{user_data['id']}/avatar")
 
     # Consultar la imagen binaria pública
     get_avatar_resp = await async_client.get(f"/api/v1/users/{user_data['id']}/avatar")

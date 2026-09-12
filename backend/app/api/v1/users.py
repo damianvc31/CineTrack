@@ -86,9 +86,14 @@ async def update_my_profile(
         current_user.descripcion = payload.descripcion.strip() or None
     if payload.avatar_url is not None:
         clean_url = payload.avatar_url.strip() or None
-        current_user.avatar_url = clean_url
         if clean_url is None:
+            current_user.avatar_url = None
             current_user.avatar_binario = None
+        elif clean_url.startswith("http://") or clean_url.startswith("https://"):
+            current_user.avatar_url = clean_url
+            current_user.avatar_binario = None
+        else:
+            current_user.avatar_url = clean_url
 
     await db.commit()
     await db.refresh(current_user)
@@ -139,8 +144,10 @@ async def upload_my_avatar(
             detail="La imagen excede el límite máximo de 3 MB."
         )
 
+    import time
+    ts = int(time.time())
     current_user.avatar_binario = binary_data
-    current_user.avatar_url = f"/api/v1/users/{current_user.id}/avatar"
+    current_user.avatar_url = f"/api/v1/users/{current_user.id}/avatar?v={ts}"
     await db.commit()
     await db.refresh(current_user)
     return current_user
@@ -162,6 +169,7 @@ async def delete_my_avatar(
 @router.get("/{user_id}/avatar")
 async def get_user_avatar(
     user_id: int,
+    v: str | None = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Retorna la imagen binaria del avatar del usuario con detección de formato."""
@@ -182,5 +190,9 @@ async def get_user_avatar(
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Cache-Control": "max-age=86400, public"}
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
     )
