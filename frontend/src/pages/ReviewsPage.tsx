@@ -130,7 +130,7 @@ export const ReviewsPage: React.FC = () => {
     try {
       const finalScore = editIncludeScore ? Math.round(editScore * 2) / 2 : null
       await catalogService.addReview(r.titulo_id, editText.trim(), finalScore)
-      showSuccess('Review updated successfully / Reseña actualizada con éxito.')
+      showSuccess('Review updated successfully.')
       setEditingReviewId(null)
       loadMyReviews(reviewPage)
     } catch (err) {
@@ -148,7 +148,7 @@ export const ReviewsPage: React.FC = () => {
     setDeletingId(r.id)
     try {
       await catalogService.deleteReview(r.titulo_id)
-      showSuccess('Review deleted successfully / Reseña eliminada.')
+      showSuccess('Review deleted successfully.')
       loadMyReviews(reviewPage)
       loadPendingTitles()
     } catch (err) {
@@ -165,7 +165,7 @@ export const ReviewsPage: React.FC = () => {
     try {
       const finalScore = newIncludeScore ? Math.round(newScore * 2) / 2 : null
       await catalogService.addReview(titleId, newText.trim(), finalScore)
-      showSuccess('Review submitted successfully / Reseña enviada con éxito.')
+      showSuccess('Review submitted successfully.')
       setWritingForTitleId(null)
       setNewText('')
       setNewScore(8.0)

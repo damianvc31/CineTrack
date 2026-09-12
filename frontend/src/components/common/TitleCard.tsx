@@ -6,6 +6,7 @@ import { catalogService } from '@/services/catalogService'
 import { useAuth } from '@/context/AuthContext'
 import posterFallback from '@/assets/placeholders/poster-empty.svg'
 import { CountryFlag } from '@/components/common/CountryFlag'
+import { SeasonProgressBar } from '@/components/profile/SeasonProgressBar'
 
 interface TitleCardProps {
   title: TitleCardType
@@ -200,6 +201,15 @@ export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOp
             </div>
           )}
         </div>
+
+        {title.seasons_progress && title.seasons_progress.length > 0 && (
+          <div className="pt-1.5 border-t border-[#262626]">
+            <SeasonProgressBar
+              seasons={title.seasons_progress}
+              statusText={title.following_status_text}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

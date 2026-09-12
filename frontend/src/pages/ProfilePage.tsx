@@ -1,183 +1,586 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
+  Clock,
   Film,
   Tv,
-  Clock,
-  LogOut,
+  Flame,
+  Star,
+  Award,
+  PieChart,
+  TrendingUp,
+  MapPin,
+  Pencil,
   AlertCircle,
-  Play,
+  ChevronRight,
+  ShieldCheck,
 } from 'lucide-react'
 import { catalogService } from '@/services/catalogService'
 import { useAuth } from '@/context/AuthContext'
-import type { UserStats } from '@/types/catalog'
+import type { UserLibrary, UserStats, TopTitleStatItem, TitleCard } from '@/types/catalog'
+import { EditProfileModal } from '@/components/profile/EditProfileModal'
+import { SeasonProgressBar } from '@/components/profile/SeasonProgressBar'
+import { DonutGenreChart } from '@/components/profile/DonutGenreChart'
 
 export const ProfilePage: React.FC = () => {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
+
   const [stats, setStats] = useState<UserStats | null>(null)
+  const [library, setLibrary] = useState<UserLibrary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const [statsData, libData] = await Promise.all([
+        catalogService.getStats(),
+        catalogService.getLibrary(),
+      ])
+      setStats(statsData)
+      setLibrary(libData)
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError('Failed to fetch profile information.')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!user) {
       navigate('/')
       return
     }
-
-    const fetchStats = async () => {
-      setLoading(true)
-      try {
-        const data = await catalogService.getStats()
-        setStats(data)
-      } catch (err: unknown) {
-        if (err instanceof Error) {
-          setError(err.message)
-        } else {
-          setError('Failed to fetch profile statistics')
-        }
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStats()
+    fetchData()
   }, [user, navigate])
 
   if (!user) return null
 
-  const horasTotales = stats ? Math.round(stats.total_hours) : 0
-  const diasTotales = (horasTotales / 24).toFixed(1)
+  const formatTitleSubtitle = (item: TopTitleStatItem): string => {
+    if (item.tipo === 'tv') {
+      const seasons = item.total_seasons
+        ? `${item.total_seasons} season${item.total_seasons > 1 ? 's' : ''}`
+        : '1 season'
+      const years = item.anio_fin && item.anio_fin !== item.anio_estreno
+        ? `${item.anio_estreno || '?'}-${item.anio_fin}`
+        : `${item.anio_estreno || ''}`
+      return `${seasons} | ${years}`
+    }
+    return item.anio_estreno ? `${item.anio_estreno}` : ''
+  }
+
+  const memberSinceText = user.fecha_registro
+    ? new Date(user.fecha_registro).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : 'Recently'
+
+  const totalWatchedTitles = (stats?.movies_watched_count || 0) + (stats?.series_watched_count || 0)
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
-      {/* Profile Header */}
-      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 p-6 sm:p-8 rounded-2xl bg-[#111827] border border-gray-800">
-        <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white text-3xl font-extrabold shadow-xl shadow-purple-900/30 shrink-0">
-          {user.nombre_usuario.charAt(0).toUpperCase()}
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+      {/* ========================================================= */}
+      {/* TOP SECTION: IDENTITY CARD & STATISTICS PANEL            */}
+      {/* ========================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: User Identity Card */}
+        <aside className="lg:col-span-4 bg-[#141414] border border-[#262626] rounded-2xl p-6 sm:p-8 space-y-6 text-center lg:text-left relative shadow-xl">
+          {/* Avatar Container */}
+          <div className="relative mx-auto lg:mx-0 w-32 h-32 sm:w-36 sm:h-36 rounded-full overflow-hidden border-2 border-amber-500/50 bg-[#181818] shadow-2xl flex items-center justify-center group">
+            {user.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt={user.nombre_usuario}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  ;(e.target as HTMLElement).style.display = 'none'
+                }}
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-black text-4xl sm:text-5xl font-black">
+                {user.nombre_usuario.charAt(0).toUpperCase()}
+              </div>
+            )}
+
+            {/* Pencil edit button on hover / touch */}
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-amber-400 gap-1 text-xs font-semibold"
+              title="Edit Profile"
+            >
+              <Pencil className="w-5 h-5" />
+              <span>Edit</span>
+            </button>
+          </div>
+
+          {/* User Name & Metadata */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-center lg:justify-start gap-2">
+              <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                {user.nombre_usuario}
+              </h1>
+              {user.es_admin && (
+                <span
+                  className="p-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                  title="Administrator"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-400">Member since {memberSinceText}</p>
+          </div>
+
+          {/* Bio text */}
+          <p className="text-xs text-gray-300 leading-relaxed italic">
+            {user.descripcion || 'Lover of cinema and series.'}
+          </p>
+
+          {/* Location */}
+          {(user.ciudad || user.pais) && (
+            <div className="flex items-center justify-center lg:justify-start gap-1.5 text-xs font-medium text-gray-400 pt-2 border-t border-[#262626]">
+              <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span>
+                {user.ciudad ? `${user.ciudad}, ` : ''}
+                {user.pais || ''}
+              </span>
+            </div>
+          )}
+
+          {/* Explicit Edit Button */}
+          <button
+            onClick={() => setIsEditModalOpen(true)}
+            className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-[#1c1c1c] hover:bg-[#252525] border border-[#2f2f2f] text-gray-300 hover:text-white text-xs font-semibold transition-colors"
+          >
+            <Pencil className="w-3.5 h-3.5 text-amber-400" />
+            <span>Edit Profile</span>
+          </button>
+        </aside>
+
+        {/* Right Column: Statistics Panel */}
+        <section className="lg:col-span-8 bg-[#141414] border border-[#262626] rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
+            <h2 className="text-xl font-bold text-white tracking-tight">Statistics</h2>
+            <span className="px-2.5 py-1 rounded-full bg-[#1e1e1e] border border-[#2c2c2c] text-[10px] font-bold uppercase tracking-wider text-gray-300">
+              All Time
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="py-16 text-center text-xs text-gray-400 animate-pulse">
+              Loading user metrics...
+            </div>
+          ) : error ? (
+            <div className="p-4 rounded-xl bg-red-950/40 border border-red-800/60 flex items-center gap-3 text-xs text-red-400">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          ) : stats ? (
+            <div className="space-y-6">
+              {/* Row 1: Top 3 Metric Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Total Hours */}
+                <div className="p-5 rounded-2xl bg-[#0d0d0d] border border-[#262626] space-y-1">
+                  <div className="flex items-center gap-2 text-gray-400 text-xs font-semibold uppercase tracking-wider">
+                    <Clock className="w-4 h-4 text-amber-500" />
+                    <span>Total Hours</span>
+                  </div>
+                  <div className="text-3xl sm:text-4xl font-black text-[#f59e0b] pt-1">
+                    {Math.round(stats.total_hours)}h
+                  </div>
+                  <p className="text-[11px] text-gray-400 pt-0.5">
+                    Movies: {Math.round(stats.movie_hours)}h • Series: {Math.round(stats.tv_hours)}h
+                  </p>
+                </div>
+
+                {/* Movies Watched */}
+                <div className="p-5 rounded-2xl bg-[#0d0d0d] border border-[#262626] space-y-1">
+                  <div className="flex items-center gap-2 text-gray-400 text-xs font-semibold uppercase tracking-wider">
+                    <Film className="w-4 h-4 text-amber-500" />
+                    <span>Movies Watched</span>
+                  </div>
+                  <div className="text-3xl sm:text-4xl font-black text-[#f59e0b] pt-1">
+                    {stats.movies_watched_count}
+                  </div>
+                  <p className="text-[11px] text-gray-400 pt-0.5">
+                    Avg: {stats.avg_movies_per_week?.toFixed(1) || '0.0'} movies / week
+                  </p>
+                </div>
+
+                {/* Series Watched */}
+                <div className="p-5 rounded-2xl bg-[#0d0d0d] border border-[#262626] space-y-1">
+                  <div className="flex items-center gap-2 text-gray-400 text-xs font-semibold uppercase tracking-wider">
+                    <Tv className="w-4 h-4 text-amber-500" />
+                    <span>Series Watched</span>
+                  </div>
+                  <div className="text-3xl sm:text-4xl font-black text-[#f59e0b] pt-1">
+                    {stats.series_watched_count}
+                  </div>
+                  <p className="text-[11px] text-gray-400 pt-0.5">
+                    Seasons: {stats.seasons_completed_count || 0} completed
+                  </p>
+                </div>
+              </div>
+
+              {/* Row 2: Sub-columns */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+                {/* Left Sub-column: Top 5 by Popularity & Genres Watched */}
+                <div className="space-y-6">
+                  {/* Top 5 by Popularity */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-300">
+                      <Flame className="w-4 h-4 text-amber-500" />
+                      <span>Top 5 Watched by Popularity</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {stats.top_by_popularity.length > 0 ? (
+                        stats.top_by_popularity.map((item, idx) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[#0d0d0d] border border-[#1f1f1f] text-xs hover:border-[#333333] transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="text-[11px] font-bold text-gray-500 w-4 text-right shrink-0">
+                                {idx + 1}
+                              </span>
+                              <Link
+                                to={`/titles/${item.id}`}
+                                className="font-semibold text-gray-200 hover:text-amber-400 transition-colors truncate"
+                              >
+                                {item.nombre}
+                                <span className="text-[11px] font-normal text-gray-400 ml-1.5">
+                                  · {formatTitleSubtitle(item)}
+                                </span>
+                              </Link>
+                            </div>
+
+                            <div className="flex items-center gap-1 text-emerald-400 text-[11px] font-bold shrink-0">
+                              <TrendingUp className="w-3 h-3" />
+                              <span>{Math.round(item.metric_value)}%</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-gray-500 italic">No watched titles yet.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-[#262626]" />
+
+                  {/* Genres Watched Donut Chart */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-300">
+                      <PieChart className="w-4 h-4 text-amber-500" />
+                      <span>Genres Watched</span>
+                    </div>
+
+                    <DonutGenreChart
+                      genresDistribution={stats.genres_distribution}
+                      totalTitles={totalWatchedTitles}
+                    />
+                  </div>
+                </div>
+
+                {/* Right Sub-column: Community Rating & Personal Rating */}
+                <div className="space-y-6">
+                  {/* Top 5 by Average Rating */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-300">
+                      <Award className="w-4 h-4 text-amber-500" />
+                      <span>Top 5 Watched by Average Rating</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {stats.top_by_community_rating.length > 0 ? (
+                        stats.top_by_community_rating.map((item, idx) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[#0d0d0d] border border-[#1f1f1f] text-xs hover:border-[#333333] transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="text-[11px] font-bold text-gray-500 w-4 text-right shrink-0">
+                                {idx + 1}
+                              </span>
+                              <Link
+                                to={`/titles/${item.id}`}
+                                className="font-semibold text-gray-200 hover:text-amber-400 transition-colors truncate"
+                              >
+                                {item.nombre}
+                                <span className="text-[11px] font-normal text-gray-400 ml-1.5">
+                                  · {formatTitleSubtitle(item)}
+                                </span>
+                              </Link>
+                            </div>
+
+                            <div className="flex items-center gap-1 text-amber-400 text-[11px] font-bold shrink-0">
+                              <Star className="w-3 h-3 fill-amber-400" />
+                              <span>{item.metric_value.toFixed(1)}</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-gray-500 italic">No watched titles yet.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Top 5 by My Rating (Personal verified scores) */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-300">
+                      <Star className="w-4 h-4 text-amber-500 fill-amber-500/20" />
+                      <span>Top 5 Watched by My Rating</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {stats.top_by_user_rating.length > 0 ? (
+                        stats.top_by_user_rating.map((item, idx) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[#0d0d0d] border border-[#1f1f1f] text-xs hover:border-[#333333] transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="text-[11px] font-bold text-gray-500 w-4 text-right shrink-0">
+                                {idx + 1}
+                              </span>
+                              <Link
+                                to={`/titles/${item.id}`}
+                                className="font-semibold text-gray-200 hover:text-amber-400 transition-colors truncate"
+                              >
+                                {item.nombre}
+                                <span className="text-[11px] font-normal text-gray-400 ml-1.5">
+                                  · {formatTitleSubtitle(item)}
+                                </span>
+                              </Link>
+                            </div>
+
+                            <div className="flex items-center gap-1 text-amber-400 text-[11px] font-bold shrink-0">
+                              <Star className="w-3 h-3 fill-amber-400" />
+                              <span>{item.metric_value.toFixed(1)}</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-gray-500 italic">
+                          You haven't reviewed any watched titles yet.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </section>
+      </div>
+
+      {/* ========================================================= */}
+      {/* SECTION 2: FOLLOWING (FULL WIDTH ROW)                     */}
+      {/* ========================================================= */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-xl font-bold text-white">Following</h2>
+            <span className="text-xs font-semibold text-gray-500">
+              ({library?.following.length || 0})
+            </span>
+          </div>
+
+          <Link
+            to="/library?tab=siguiendo"
+            className="flex items-center gap-1 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors"
+          >
+            <span>View All</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
 
-        <div className="flex-1 text-center sm:text-left space-y-2">
-          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">{user.nombre_usuario}</h1>
-            {user.es_admin && (
-              <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
-                Administrator
+        {library && library.following.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {library.following.slice(0, 3).map((item) => (
+              <div
+                key={item.id}
+                className="group relative rounded-2xl bg-[#141414] border border-[#262626] overflow-hidden hover:border-amber-500/40 transition-all flex flex-col shadow-lg"
+              >
+                {/* Backdrop / Landscape image */}
+                <Link to={`/titles/${item.id}`} className="relative aspect-video w-full overflow-hidden bg-[#1c1c1c] block">
+                  {item.portada_url ? (
+                    <img
+                      src={item.portada_url}
+                      alt={item.nombre}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-600">
+                      <Tv className="w-10 h-10" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-transparent to-transparent" />
+                </Link>
+
+                {/* Info & Progress */}
+                <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                  <Link
+                    to={`/titles/${item.id}`}
+                    className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors truncate block"
+                  >
+                    {item.nombre}
+                  </Link>
+
+                  <SeasonProgressBar
+                    seasons={item.seasons_progress}
+                    statusText={item.following_status_text}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-8 rounded-2xl bg-[#141414] border border-[#262626] text-center text-xs text-gray-400">
+            You are not following any active series. Browse the catalog to start tracking episodes!
+          </div>
+        )}
+      </section>
+
+      {/* ========================================================= */}
+      {/* SECTION 3: FAVORITES | WATCHLIST | RECENTLY WATCHED       */}
+      {/* ========================================================= */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Favorites */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-[#262626]">
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-base font-bold text-white">Favorites</h3>
+              <span className="text-xs font-semibold text-gray-500">
+                ({library?.favorites.length || 0})
               </span>
+            </div>
+            <Link
+              to="/library?tab=favoritos"
+              className="flex items-center gap-0.5 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors"
+            >
+              <span>View All</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            {library?.favorites.slice(0, 3).map((item) => (
+              <ProfilePosterCard key={item.id} item={item} />
+            ))}
+            {(!library || library.favorites.length === 0) && (
+              <p className="col-span-3 text-xs text-gray-500 italic py-4">No favorites saved yet.</p>
             )}
           </div>
-          <p className="text-xs sm:text-sm text-gray-400">
-            {user.pais ? `${user.ciudad ? `${user.ciudad}, ` : ''}${user.pais}` : 'Registered User'}
-          </p>
-          <p className="text-[11px] text-gray-500">
-            Member since {user.fecha_registro ? new Date(user.fecha_registro).toLocaleDateString() : 'recently'}
-          </p>
-        </div>
+        </section>
 
-        <button
-          onClick={() => {
-            logout()
-            navigate('/')
-          }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/50 border border-red-800/60 text-red-400 hover:text-red-300 text-xs font-semibold transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>Sign Out</span>
-        </button>
+        {/* Watchlist */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-[#262626]">
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-base font-bold text-white">Watchlist</h3>
+              <span className="text-xs font-semibold text-gray-500">
+                ({library?.watchlist.length || 0})
+              </span>
+            </div>
+            <Link
+              to="/library?tab=watchlist"
+              className="flex items-center gap-0.5 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors"
+            >
+              <span>View All</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            {library?.watchlist.slice(0, 3).map((item) => (
+              <ProfilePosterCard key={item.id} item={item} />
+            ))}
+            {(!library || library.watchlist.length === 0) && (
+              <p className="col-span-3 text-xs text-gray-500 italic py-4">Watchlist is empty.</p>
+            )}
+          </div>
+        </section>
+
+        {/* Recently Watched */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-[#262626]">
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-base font-bold text-white">Recently Watched</h3>
+              <span className="text-xs font-semibold text-gray-500">
+                ({library?.recently_watched.length || 0})
+              </span>
+            </div>
+            <Link
+              to="/library?tab=vistas"
+              className="flex items-center gap-0.5 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors"
+            >
+              <span>View All</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            {library?.recently_watched.slice(0, 3).map((item) => (
+              <ProfilePosterCard key={item.id} item={item} showStatusBadge={item.tipo === 'tv'} />
+            ))}
+            {(!library || library.recently_watched.length === 0) && (
+              <p className="col-span-3 text-xs text-gray-500 italic py-4">No watched titles yet.</p>
+            )}
+          </div>
+        </section>
       </div>
 
-      {/* Watch Stats Grid */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-bold text-white">Your Watch Statistics</h2>
-
-        {loading ? (
-          <div className="p-12 text-center text-xs text-gray-400">Loading metrics...</div>
-        ) : error ? (
-          <div className="p-6 rounded-xl bg-gray-900 border border-gray-800 flex items-center gap-3 text-xs text-red-400">
-            <AlertCircle className="w-5 h-5" />
-            <span>{error}</span>
-          </div>
-        ) : stats ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {/* Movies watched */}
-            <div className="p-5 rounded-2xl bg-[#111827] border border-gray-800/80 space-y-1">
-              <div className="flex items-center justify-between text-amber-400 mb-2">
-                <Film className="w-5 h-5" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Cinema</span>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-white">
-                {stats.movies_watched_count}
-              </div>
-              <p className="text-xs text-gray-400">Movies watched ({Math.round(stats.movie_hours)}h)</p>
-            </div>
-
-            {/* Episodes watched */}
-            <div className="p-5 rounded-2xl bg-[#111827] border border-gray-800/80 space-y-1">
-              <div className="flex items-center justify-between text-indigo-400 mb-2">
-                <Tv className="w-5 h-5" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">TV</span>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-white">
-                {stats.episodes_watched_count}
-              </div>
-              <p className="text-xs text-gray-400">Episodes watched ({Math.round(stats.tv_hours)}h)</p>
-            </div>
-
-            {/* Series completed */}
-            <div className="p-5 rounded-2xl bg-[#111827] border border-gray-800/80 space-y-1">
-              <div className="flex items-center justify-between text-emerald-400 mb-2">
-                <Play className="w-5 h-5" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Series</span>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-white">
-                {stats.series_watched_count}
-              </div>
-              <p className="text-xs text-gray-400">Series completed</p>
-            </div>
-
-            {/* Total time spent */}
-            <div className="p-5 rounded-2xl bg-[#111827] border border-gray-800/80 space-y-1">
-              <div className="flex items-center justify-between text-amber-400 mb-2">
-                <Clock className="w-5 h-5" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Total</span>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-white">
-                {horasTotales}h
-              </div>
-              <p className="text-xs text-gray-400">Approx. {diasTotales} days of watch time</p>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      {/* Quick Links */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Link
-          to="/library?tab=watchlist"
-          className="p-5 rounded-2xl bg-[#111827] border border-gray-800 hover:border-amber-500/40 transition-colors flex items-center justify-between group"
-        >
-          <div>
-            <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
-              Watchlist
-            </h3>
-            <p className="text-xs text-gray-400 mt-1">Review titles you have saved to watch</p>
-          </div>
-          <span className="text-xs font-semibold text-amber-400">View list →</span>
-        </Link>
-
-        <Link
-          to="/catalog"
-          className="p-5 rounded-2xl bg-[#111827] border border-gray-800 hover:border-amber-500/40 transition-colors flex items-center justify-between group"
-        >
-          <div>
-            <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
-              Explore Full Catalog
-            </h3>
-            <p className="text-xs text-gray-400 mt-1">Discover more movies and series for your collection</p>
-          </div>
-          <span className="text-xs font-semibold text-amber-400">Explore →</span>
-        </Link>
-      </div>
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSuccess={fetchData}
+      />
     </div>
+  )
+}
+
+/**
+ * Small poster card for bottom columns
+ */
+const ProfilePosterCard: React.FC<{ item: TitleCard; showStatusBadge?: boolean }> = ({
+  item,
+}) => {
+  return (
+    <Link to={`/titles/${item.id}`} className="group block space-y-1.5">
+      <div className="relative aspect-2/3 rounded-xl overflow-hidden bg-[#181818] border border-[#262626] group-hover:border-amber-500/50 transition-all shadow-md">
+        {item.portada_url ? (
+          <img
+            src={item.portada_url}
+            alt={item.nombre}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">
+            No image
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-0.5 min-w-0">
+        <h4 className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors truncate">
+          {item.nombre}
+        </h4>
+        <div className="flex items-center justify-between text-[11px] text-gray-400">
+          <span>{item.anio_estreno || ''}</span>
+          <div className="flex items-center gap-1 text-amber-400 font-bold">
+            <Star className="w-3 h-3 fill-amber-400" />
+            <span>{item.rating_unificado?.toFixed(1) || '0.0'}</span>
+          </div>
+        </div>
+      </div>
+    </Link>
   )
 }

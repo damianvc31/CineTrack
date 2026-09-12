@@ -333,14 +333,27 @@ export const HomePage: React.FC = () => {
         {/* ========================================================= */}
         {/* RIGHT COLUMN: USER PANEL (STICKY ON DESKTOP)              */}
         {/* ========================================================= */}
-        <aside className="w-full lg:w-64 shrink-0 lg:sticky lg:top-20 space-y-4">
+        <aside className="w-full lg:w-72 shrink-0 lg:sticky lg:top-20 space-y-4">
           {user ? (
             <div className="p-5 rounded-2xl bg-[#141414] border border-[#262626] shadow-xl space-y-4">
               {/* User Header: Avatar + Username + Bell */}
-              <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-black text-sm font-bold shadow-md shrink-0">
-                    {user.nombre_usuario.charAt(0).toUpperCase()}
+              <div className="flex items-center justify-between pb-4 border-b border-[#262626]">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-amber-500/40 bg-[#181818] flex items-center justify-center text-black font-bold shadow-md shrink-0">
+                    {user.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        alt={user.nombre_usuario}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          ;(e.target as HTMLElement).style.display = 'none'
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-black text-lg font-black">
+                        {user.nombre_usuario.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-sm font-bold text-white truncate leading-snug">
@@ -373,7 +386,7 @@ export const HomePage: React.FC = () => {
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-300 hover:text-white hover:bg-[#202020] transition-colors"
                 >
                   <Heart className="w-4 h-4 text-red-400" />
-                  <span className="font-medium">Favorites & Lists</span>
+                  <span className="font-medium">Favorites</span>
                 </Link>
 
                 <Link
@@ -409,7 +422,7 @@ export const HomePage: React.FC = () => {
                 </Link>
 
                 <Link
-                  to="/profile#settings"
+                  to="/settings"
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-300 hover:text-white hover:bg-[#202020] transition-colors"
                 >
                   <Settings className="w-4 h-4 text-gray-400" />

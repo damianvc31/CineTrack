@@ -27,6 +27,13 @@ export type User = UserResponse
 export type LoginCredentials = UserLogin
 export type RegisterCredentials = UserRegister
 
+export interface UserProfileUpdate {
+  pais?: string | null
+  ciudad?: string | null
+  descripcion?: string | null
+  avatar_url?: string | null
+}
+
 export interface AuthResponse {
   access_token: string
   token_type: string

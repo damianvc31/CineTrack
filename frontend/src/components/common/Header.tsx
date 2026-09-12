@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Search, Compass, Sparkles, User as UserIcon, LogOut, Menu, X, Heart, MessageSquare, Settings, Bell } from 'lucide-react'
+import { Search, Compass, Sparkles, User as UserIcon, LogOut, Menu, X, Heart, MessageSquare, Settings, Bell, Bookmark, Eye, PlaySquare } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import tmdbLogo from '@/assets/branding/tmdb-logo.svg'
 import cinetrackLogo from '@/assets/branding/cinetrack-logo.svg'
@@ -110,19 +110,32 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   <div className="relative">
                     <button
                       onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                      className="flex items-center gap-2 p-1 rounded-full hover:bg-[#171717] transition-colors focus:outline-none"
+                      className="flex items-center gap-2.5 p-0.5 rounded-full hover:bg-[#171717] transition-colors focus:outline-none"
                     >
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-black text-xs font-bold shadow-inner">
-                        {user.nombre_usuario.charAt(0).toUpperCase()}
+                      <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-amber-500/50 bg-[#181818] flex items-center justify-center text-black text-sm font-bold shadow-md shrink-0">
+                        {user.avatar_url ? (
+                          <img
+                            src={user.avatar_url}
+                            alt={user.nombre_usuario}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              ;(e.target as HTMLElement).style.display = 'none'
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-black text-sm font-black">
+                            {user.nombre_usuario.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                       </div>
-                      <span className="hidden lg:inline text-xs font-medium text-gray-200">
+                      <span className="hidden lg:inline text-xs font-semibold text-gray-200">
                         {user.nombre_usuario}
                       </span>
                     </button>
 
                     {userDropdownOpen && (
                       <div
-                        className="absolute right-0 mt-2 w-48 bg-[#141414] border border-[#262626] rounded-xl shadow-2xl py-1 z-50 text-xs animate-in fade-in slide-in-from-top-2"
+                        className="absolute right-0 mt-2 w-52 bg-[#141414] border border-[#262626] rounded-2xl shadow-2xl py-1.5 z-50 text-xs animate-in fade-in slide-in-from-top-2"
                         onMouseLeave={() => setUserDropdownOpen(false)}
                       >
                         <div className="px-4 py-2 border-b border-[#262626] text-[11px] text-gray-400">
@@ -131,30 +144,51 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                         <Link
                           to="/profile"
                           onClick={() => setUserDropdownOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
+                          className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <UserIcon className="w-3.5 h-3.5 text-amber-500" /> Profile
+                          <UserIcon className="w-4 h-4 text-amber-500" /> Profile
                         </Link>
                         <Link
                           to="/library?tab=favoritos"
                           onClick={() => setUserDropdownOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
+                          className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <Heart className="w-3.5 h-3.5 text-red-400" /> Favorites & Lists
+                          <Heart className="w-4 h-4 text-red-400" /> Favorites
+                        </Link>
+                        <Link
+                          to="/library?tab=watchlist"
+                          onClick={() => setUserDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
+                        >
+                          <Bookmark className="w-4 h-4 text-amber-400" /> Watchlist
+                        </Link>
+                        <Link
+                          to="/library?tab=vistas"
+                          onClick={() => setUserDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
+                        >
+                          <Eye className="w-4 h-4 text-emerald-400" /> Watch History
+                        </Link>
+                        <Link
+                          to="/library?tab=siguiendo"
+                          onClick={() => setUserDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
+                        >
+                          <PlaySquare className="w-4 h-4 text-amber-400" /> Following
                         </Link>
                         <Link
                           to="/reviews"
                           onClick={() => setUserDropdownOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
+                          className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <MessageSquare className="w-3.5 h-3.5 text-amber-400" /> Reviews
+                          <MessageSquare className="w-4 h-4 text-amber-400" /> Reviews
                         </Link>
                         <Link
-                          to="/profile#settings"
+                          to="/settings"
                           onClick={() => setUserDropdownOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
+                          className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <Settings className="w-3.5 h-3.5 text-gray-400" /> Settings
+                          <Settings className="w-4 h-4 text-gray-400" /> Settings
                         </Link>
                         <div className="border-t border-[#262626] my-1"></div>
                         <button
@@ -162,9 +196,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                             logout()
                             setUserDropdownOpen(false)
                           }}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-left text-red-400 hover:text-red-300 hover:bg-red-950/20"
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-left text-red-400 hover:text-red-300 hover:bg-red-950/20"
                         >
-                          <LogOut className="w-3.5 h-3.5" /> Sign Out
+                          <LogOut className="w-4 h-4" /> Sign Out
                         </button>
                       </div>
                     )}
@@ -248,16 +282,51 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                 <Link
                   to="/profile"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
                 >
                   <UserIcon className="w-4 h-4 text-amber-500" /> Profile
                 </Link>
                 <Link
                   to="/library?tab=favoritos"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
                 >
-                  <Heart className="w-4 h-4 text-red-400" /> Favorites & Lists
+                  <Heart className="w-4 h-4 text-red-400" /> Favorites
+                </Link>
+                <Link
+                  to="/library?tab=watchlist"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
+                >
+                  <Bookmark className="w-4 h-4 text-amber-400" /> Watchlist
+                </Link>
+                <Link
+                  to="/library?tab=vistas"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
+                >
+                  <Eye className="w-4 h-4 text-emerald-400" /> Watch History
+                </Link>
+                <Link
+                  to="/library?tab=siguiendo"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
+                >
+                  <PlaySquare className="w-4 h-4 text-amber-400" /> Following
+                </Link>
+                <Link
+                  to="/reviews"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
+                >
+                  <MessageSquare className="w-4 h-4 text-amber-400" /> Reviews
+                </Link>
+                <Link
+                  to="/settings"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
+                >
+                  <Settings className="w-4 h-4 text-gray-400" /> Settings
                 </Link>
                 <button
                   onClick={() => {

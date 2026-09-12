@@ -5,6 +5,13 @@ export interface GenreItem {
   nombre: string
 }
 
+export interface SeasonProgress {
+  numero: number
+  total_episodios: number
+  episodios_vistos: number
+  estado: 'completed' | 'in_progress' | 'unwatched'
+}
+
 export interface TitleCard {
   id: number
   tmdb_id: number
@@ -29,6 +36,8 @@ export interface TitleCard {
   user_estado?: string | null
   pais?: string | null
   idioma_original?: string | null
+  seasons_progress?: SeasonProgress[] | null
+  following_status_text?: string | null
 }
 
 export interface HomeSections {
@@ -101,37 +110,30 @@ export interface UserLibrary {
   recently_watched: TitleCard[]
 }
 
+export interface TopTitleStatItem {
+  id: number
+  nombre: string
+  tipo: string
+  anio_estreno?: number | null
+  anio_fin?: number | null
+  total_seasons?: number | null
+  portada_url?: string | null
+  metric_value: number
+}
+
 export interface UserStats {
   total_hours: number
   movie_hours: number
   tv_hours: number
   movies_watched_count: number
+  avg_movies_per_week?: number
   series_watched_count: number
+  seasons_completed_count?: number
   episodes_watched_count: number
-  top_by_popularity: Array<{
-    id: number
-    nombre: string
-    tipo: string
-    anio_estreno?: number | null
-    portada_url?: string | null
-    metric_value: number
-  }>
-  top_by_community_rating: Array<{
-    id: number
-    nombre: string
-    tipo: string
-    anio_estreno?: number | null
-    portada_url?: string | null
-    metric_value: number
-  }>
-  top_by_user_rating: Array<{
-    id: number
-    nombre: string
-    tipo: string
-    anio_estreno?: number | null
-    portada_url?: string | null
-    metric_value: number
-  }>
+  top_by_popularity: TopTitleStatItem[]
+  top_by_community_rating: TopTitleStatItem[]
+  top_by_user_rating: TopTitleStatItem[]
+  genres_distribution?: Record<string, number>
 }
 
 export interface UserReviewItem {

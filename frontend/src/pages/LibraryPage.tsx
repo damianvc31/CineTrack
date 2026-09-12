@@ -90,7 +90,7 @@ export const LibraryPage: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-gray-800 pb-3 mb-8 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-2 border-b border-[#262626] pb-3 mb-8 overflow-x-auto no-scrollbar">
         {[
           { id: 'favoritos', label: `Favorites (${data?.favorites?.length || 0})`, icon: Heart },
           { id: 'watchlist', label: `Watchlist (${data?.watchlist?.length || 0})`, icon: Bookmark },
@@ -106,7 +106,7 @@ export const LibraryPage: React.FC = () => {
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
                 active
                   ? 'bg-amber-500 text-black font-bold shadow-md shadow-amber-500/20'
-                  : 'bg-gray-900 text-gray-400 hover:text-white hover:bg-gray-800'
+                  : 'bg-[#141414] border border-[#262626] text-gray-400 hover:text-white hover:bg-[#1f1f1f]'
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
@@ -123,12 +123,12 @@ export const LibraryPage: React.FC = () => {
           <p className="text-xs text-gray-400">Loading titles from your library...</p>
         </div>
       ) : error ? (
-        <div className="p-8 text-center bg-gray-900/50 rounded-2xl border border-gray-800">
+        <div className="p-8 text-center bg-[#141414] rounded-2xl border border-red-800/40">
           <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
           <p className="text-sm text-gray-300">{error}</p>
         </div>
       ) : currentItems.length === 0 ? (
-        <div className="p-16 text-center bg-gray-900/30 rounded-2xl border border-gray-800/60 max-w-lg mx-auto">
+        <div className="p-16 text-center bg-[#141414] rounded-2xl border border-[#262626] max-w-lg mx-auto">
           <Bookmark className="w-12 h-12 text-gray-600 mx-auto mb-3" />
           <h3 className="text-base font-bold text-white mb-1">No titles in this section</h3>
           <p className="text-xs text-gray-400 mb-6">

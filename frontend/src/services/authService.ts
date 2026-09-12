@@ -1,5 +1,5 @@
 import { api } from './api'
-import type { AuthResponse, LoginCredentials, RegisterCredentials, User } from '@/types/auth'
+import type { AuthResponse, LoginCredentials, RegisterCredentials, User, UserProfileUpdate } from '@/types/auth'
 
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
@@ -19,6 +19,17 @@ export const authService = {
   },
 
   getMe: (): Promise<User> => api.get<User>('/auth/me'),
+
+  updateProfile: (profile: UserProfileUpdate): Promise<User> => {
+    return api.patch<User>('/users/me', profile)
+  },
+
+  changePassword: (currentPassword: string, newPassword: string): Promise<{ message: string }> => {
+    return api.post<{ message: string }>('/users/me/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    })
+  },
 
   logout: () => {
     localStorage.removeItem('cinetrack_token')
