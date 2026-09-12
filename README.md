@@ -87,6 +87,9 @@ python -m app.jobs.sync_tmdb --import-json docs/templates/template_pelicula.json
 
 # Importar título individual por ID de TMDB
 python -m app.jobs.sync_tmdb --import-tmdb-id 157336 --type movie
+
+# Vaciar completamente el catálogo (títulos, temporadas, episodios, reseñas y relaciones)
+python -m app.jobs.sync_tmdb --clear
 ```
 
 #### Calificación Unificada y Política de Reseñas
@@ -106,6 +109,7 @@ Todos los jobs de sincronización pueden dispararse también vía HTTP (`HTTP 20
 - `POST /api/v1/admin/sync/reviews`: Sincronización de reseñas TMDB (`limit_per_title`).
 - `POST /api/v1/admin/sync/import-tmdb`: Importar título por TMDB ID (`tmdb_id`, `type`).
 - `POST /api/v1/admin/sync/import-json`: Carga masiva desde lista JSON según plantillas.
+- `DELETE /api/v1/admin/catalog?confirm=true`: Vaciado total del catálogo y entidades dependientes (preserva usuarios y géneros).
 
 *Autenticación requerida:* Enviar cabecera `Authorization: Bearer <token_admin>` (usuario con `es_admin=True`) o cabecera `X-Admin-Key: <ADMIN_API_KEY>`.
 

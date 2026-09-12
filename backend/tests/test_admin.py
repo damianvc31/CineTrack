@@ -163,3 +163,46 @@ async def test_admin_background_workers_execution(monkeypatch):
 
     await admin._run_job_import_json(items=[{"tipo": "pelicula", "titulo": "Avatar"}])
     assert mock_service.import_from_json_data.called
+
+
+@pytest.mark.asyncio
+async def test_admin_clear_catalog_requires_confirmation(async_client: AsyncClient):
+    """Petición para vaciar catálogo sin confirm=true debe retornar 400."""
+    headers = {"X-Admin-Key": settings.ADMIN_API_KEY}
+    res = await async_client.delete("/api/v1/admin/catalog", headers=headers)
+    assert res.status_code == 400
+    assert "confirm=true" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_admin_clear_catalog_execution(async_client: AsyncClient, db_session: AsyncSession):
+    """Vaciado de catálogo con confirm=true elimina títulos y relaciones pero preserva géneros y usuarios."""
+    from app.models import Genero, Titulo, Usuario
+
+    headers = {"X-Admin-Key": settings.ADMIN_API_KEY}
+
+    # Crear género, usuario y título
+    g = Genero(id=99, nombre="Sci-Fi")
+    u = Usuario(nombre_usuario="persistent_user", password_hash="hash")
+    t = Titulo(id=999, tmdb_id=9999, tipo="movie", nombre="Matrix", rating_unificado=9.0)
+    db_session.add_all([g, u, t])
+    await db_session.commit()
+
+    # Ejecutar vaciado
+    res = await async_client.delete("/api/v1/admin/catalog?confirm=true", headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["deleted"]["titulos"] >= 1
+
+    # Verificar que el usuario y el género siguen existiendo
+    from sqlalchemy import select
+    user_check = (await db_session.execute(select(Usuario).where(Usuario.nombre_usuario == "persistent_user"))).scalar_one_or_none()
+    assert user_check is not None
+    genre_check = (await db_session.execute(select(Genero).where(Genero.id == 99))).scalar_one_or_none()
+    assert genre_check is not None
+
+    # Verificar que el título ya no existe
+    title_check = (await db_session.execute(select(Titulo).where(Titulo.id == 999))).scalar_one_or_none()
+    assert title_check is None
+

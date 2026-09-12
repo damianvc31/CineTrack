@@ -1,7 +1,7 @@
 import random
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Set
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -16,6 +16,7 @@ from app.models import (
     Temporada,
     Titulo,
     TituloElenco,
+    titulos_elenco,
     titulos_generos,
 )
 from app.schemas.catalog import (
@@ -786,3 +787,50 @@ async def get_user_stats(
         top_by_user_rating=top_user_rate,
         genres_distribution=genres_dist
     )
+
+
+# -----------------------------------------------------------------------------
+# ADMINISTRACIÓN: VACIADO TOTAL DEL CATÁLOGO
+# -----------------------------------------------------------------------------
+async def clear_entire_catalog(db: AsyncSession) -> Dict[str, int]:
+    """
+    Elimina todos los títulos del catálogo y sus datos dependientes en cascada:
+    - Episodios vistos
+    - Episodios y temporadas
+    - Vinculaciones con géneros y elencos
+    - Reseñas asociadas
+    - Estados de usuario asociados a títulos
+    - Títulos
+    - Actores huérfanos
+    Preserva intactos: usuarios registrados y tabla maestra de géneros.
+    """
+    # 1. Dependencias de episodios y temporadas
+    del_vistos = await db.execute(delete(EpisodioVisto))
+    del_eps = await db.execute(delete(Episodio))
+    del_temps = await db.execute(delete(Temporada))
+
+    # 2. Tablas asociativas
+    del_elenco = await db.execute(delete(titulos_elenco))
+    del_generos = await db.execute(delete(titulos_generos))
+
+    # 3. Reseñas y estados de usuario sobre títulos
+    del_resenas = await db.execute(delete(Resena))
+    del_estados = await db.execute(delete(EstadoUsuarioTitulo))
+
+    # 4. Títulos
+    del_titulos = await db.execute(delete(Titulo))
+
+    # 5. Actores huérfanos
+    del_actores = await db.execute(delete(Actor))
+
+    await db.commit()
+
+    return {
+        "titulos": del_titulos.rowcount if del_titulos.rowcount != -1 else 0,
+        "temporadas": del_temps.rowcount if del_temps.rowcount != -1 else 0,
+        "episodios": del_eps.rowcount if del_eps.rowcount != -1 else 0,
+        "resenas": del_resenas.rowcount if del_resenas.rowcount != -1 else 0,
+        "estados_usuario": del_estados.rowcount if del_estados.rowcount != -1 else 0,
+        "actores": del_actores.rowcount if del_actores.rowcount != -1 else 0,
+    }
+

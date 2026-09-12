@@ -31,6 +31,7 @@ async def main():
     parser.add_argument("--import-json", type=str, help="Ruta al archivo JSON con títulos a importar")
     parser.add_argument("--import-tmdb-id", type=int, help="Importar un título específico por su ID de TMDB")
     parser.add_argument("--type", choices=["movie", "tv"], default="movie", help="Tipo de título para --import-tmdb-id")
+    parser.add_argument("--clear", action="store_true", help="Vaciar todo el catálogo de títulos y entidades dependientes")
 
     args = parser.parse_args()
 
@@ -40,7 +41,13 @@ async def main():
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
 
-            if args.genres:
+            if args.clear:
+                logger.warning("-> Vaciando catálogo completo de títulos y relaciones...")
+                from app.services.catalog_service import clear_entire_catalog
+                res = await clear_entire_catalog(db)
+                logger.info(f"Catálogo vaciado exitosamente: {res}")
+
+            elif args.genres:
                 logger.info("-> Sincronizando géneros...")
                 count = await service.sync_genres()
                 logger.info(f"Total géneros nuevos agregados: {count}")

@@ -1,3 +1,4 @@
+from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -20,8 +21,15 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             if v.startswith("postgresql://"):
                 return v.replace("postgresql://", "postgresql+asyncpg://", 1)
-            elif v.startswith("sqlite://") and not v.startswith("sqlite+aiosqlite://"):
-                return v.replace("sqlite://", "sqlite+aiosqlite://", 1)
+            elif v.startswith("sqlite"):
+                if not v.startswith("sqlite+aiosqlite://"):
+                    v = v.replace("sqlite://", "sqlite+aiosqlite://", 1)
+                prefix = "sqlite+aiosqlite:///"
+                if v.startswith(prefix) and not v.startswith("sqlite+aiosqlite:////") and ":memory:" not in v:
+                    rel_path = v[len(prefix):]
+                    root_dir = Path(__file__).resolve().parents[3]
+                    abs_db_path = (root_dir / rel_path).resolve().as_posix()
+                    return f"sqlite+aiosqlite:///{abs_db_path}"
         return v
 
     # Auth
@@ -61,7 +69,7 @@ class Settings(BaseSettings):
     HOME_GENRE_MIN_TITLES_FOR_CAROUSEL: int = 10
 
     model_config = SettingsConfigDict(
-        env_file=(".env", ".env.local"),
+        env_file=(".env", "../.env", ".env.local"),
         env_file_encoding="utf-8",
         extra="ignore"
     )

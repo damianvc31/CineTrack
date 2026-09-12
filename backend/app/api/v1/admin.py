@@ -1,16 +1,18 @@
 import logging
 from typing import Any, Dict, List, Literal, Optional
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin
-from app.db.session import AsyncSessionLocal
+from app.db.session import AsyncSessionLocal, get_db
+from app.services import catalog_service
 from app.services.tmdb_client import TMDBClient
 from app.services.tmdb_sync_service import TMDBSyncService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin/sync", tags=["Administración - Sincronización"])
+router = APIRouter(prefix="/admin", tags=["Administración"])
 
 
 # -------------------------------------------------------------------------
@@ -150,9 +152,18 @@ async def _run_job_import_json(items: List[Dict[str, Any]]):
 
 
 # -------------------------------------------------------------------------
+# ESQUEMA PARA LIMPIEZA DE CATÁLOGO
+# -------------------------------------------------------------------------
+class ClearCatalogResponse(BaseModel):
+    status: str = "success"
+    message: str
+    deleted: Dict[str, int]
+
+
+# -------------------------------------------------------------------------
 # ENDPOINTS
 # -------------------------------------------------------------------------
-@router.post("/genres", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/sync/genres", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_sync_genres(
     background_tasks: BackgroundTasks,
     _: Any = Depends(get_current_admin)
@@ -165,7 +176,7 @@ async def trigger_sync_genres(
     )
 
 
-@router.post("/initial", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/sync/initial", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_initial_ingest(
     payload: InitialIngestRequest,
     background_tasks: BackgroundTasks,
@@ -184,7 +195,7 @@ async def trigger_initial_ingest(
     )
 
 
-@router.post("/daily", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/sync/daily", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_daily_sync(
     payload: DailySyncRequest,
     background_tasks: BackgroundTasks,
@@ -198,7 +209,7 @@ async def trigger_daily_sync(
     )
 
 
-@router.post("/percentiles", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/sync/percentiles", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_recalculate_percentiles(
     background_tasks: BackgroundTasks,
     _: Any = Depends(get_current_admin)
@@ -211,7 +222,7 @@ async def trigger_recalculate_percentiles(
     )
 
 
-@router.post("/reviews", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/sync/reviews", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_sync_reviews(
     payload: ReviewsSyncRequest,
     background_tasks: BackgroundTasks,
@@ -225,7 +236,7 @@ async def trigger_sync_reviews(
     )
 
 
-@router.post("/import-tmdb", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/sync/import-tmdb", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_import_tmdb_id(
     payload: ImportTMDBRequest,
     background_tasks: BackgroundTasks,
@@ -239,7 +250,7 @@ async def trigger_import_tmdb_id(
     )
 
 
-@router.post("/import-json", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/sync/import-json", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_import_json(
     items: List[Dict[str, Any]],
     background_tasks: BackgroundTasks,
@@ -256,3 +267,29 @@ async def trigger_import_json(
         job="import_json",
         message=f"Importación de {len(items)} registros JSON encolada en segundo plano."
     )
+
+
+@router.delete("/catalog", response_model=ClearCatalogResponse)
+async def clear_catalog(
+    confirm: bool = Query(False, description="Confirmar el vaciado total del catálogo"),
+    db: AsyncSession = Depends(get_db),
+    _: Any = Depends(get_current_admin)
+) -> ClearCatalogResponse:
+    """
+    Elimina todos los títulos, temporadas, episodios, reseñas y relaciones del catálogo.
+    Requiere ser administrador o cabecera X-Admin-Key, y confirmación explícita ?confirm=true.
+    Preserva intactos los usuarios y el catálogo maestro de géneros.
+    """
+    if not confirm:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Operación destructiva. Debe enviar ?confirm=true para confirmar el vaciado del catálogo."
+        )
+
+    deleted_stats = await catalog_service.clear_entire_catalog(db)
+    return ClearCatalogResponse(
+        status="success",
+        message="Catálogo y entidades asociadas eliminados correctamente.",
+        deleted=deleted_stats
+    )
+
