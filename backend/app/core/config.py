@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     TMDB_DAILY_SYNC_POP_THRESHOLD: float = 10.0
     TMDB_INGEST_PRIORITY: str = "popular_first"  # "popular_first" o "toprated_first"
     TMDB_REVIEWS_PER_TITLE_LIMIT: int = 20
+    TMDB_ALLOW_UNRELEASED: bool = False
 
     # Admin Key para endpoints administrativos y automatizaciones
     ADMIN_API_KEY: str = "cinetrack-dev-admin-secret-key"

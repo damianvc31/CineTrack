@@ -185,27 +185,20 @@ async def test_import_manual_without_tmdb_match_fails_with_error(db_session, moc
 
 
 @pytest.mark.asyncio
-async def test_daily_sync_updates_tracked_series(db_session, mock_tmdb_client):
+async def test_daily_sync_updates_changed_series(db_session, mock_tmdb_client):
     service = TMDBSyncService(db_session, mock_tmdb_client)
     await service.sync_genres()
 
-    # Crear usuario y serie seguida
-    user = Usuario(nombre_usuario="syncuser", password_hash="hashed_secret")
-    db_session.add(user)
-    await db_session.flush()
-
+    # Crear serie local en catálogo
     series = Titulo(tmdb_id=1396, tipo="tv", nombre="Breaking Bad", popularidad=50.0)
     db_session.add(series)
-    await db_session.flush()
-
-    estado = EstadoUsuarioTitulo(usuario_id=user.id, titulo_id=series.id, estado="siguiendo")
-    db_session.add(estado)
     await db_session.commit()
 
-    # Configurar mock de discover para estrenos (vacío)
+    # Configurar mock de get_changes reportando la serie 1396 y discover vacío
+    mock_tmdb_client.get_changes.return_value = {"results": [{"id": 1396}]}
     mock_tmdb_client.discover.return_value = {"results": []}
 
-    res_sync = await service.run_daily_sync()
+    res_sync = await service.run_daily_sync(changes_hours_window=120, releases_days_window=15)
     assert res_sync["updated_series"] == 1
 
 
@@ -320,4 +313,66 @@ async def test_daily_sync_with_custom_hours_window(db_session, mock_tmdb_client)
     res = await service.run_daily_sync(hours_window=72)
     assert "updated_series" in res
     assert "new_movies" in res
+
+
+@pytest.mark.asyncio
+async def test_upsert_movie_unreleased_behavior(db_session, mock_tmdb_client):
+    """Verifica que películas no estrenadas se omitan por defecto y se permitan con allow_unreleased=True."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    future_movie_details = dict(MOCK_MOVIE_DETAILS)
+    future_movie_details["release_date"] = "2099-01-01"
+    future_movie_details["id"] = 999901
+
+    # Con allow_unreleased=False (o default), retorna None y no se guarda
+    res_skipped = await service.upsert_movie(999901, details=future_movie_details, allow_unreleased=False)
+    assert res_skipped is None
+
+    # Con allow_unreleased=True, sí se guarda
+    res_allowed = await service.upsert_movie(999901, details=future_movie_details, allow_unreleased=True)
+    assert res_allowed is not None
+    assert res_allowed.tmdb_id == 999901
+
+
+@pytest.mark.asyncio
+async def test_upsert_series_unreleased_behavior(db_session, mock_tmdb_client):
+    """Verifica que series sin temporadas emitidas se omitan por defecto y se permitan con allow_unreleased=True."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    future_series_details = dict(MOCK_SERIES_DETAILS)
+    future_series_details["first_air_date"] = "2099-01-01"
+    future_series_details["id"] = 999902
+    future_series_details["seasons"] = [
+        {"season_number": 1, "air_date": "2099-01-01", "name": "Temporada 1"}
+    ]
+
+    # Con allow_unreleased=False, se omite
+    res_skipped = await service.upsert_series(999902, details=future_series_details, allow_unreleased=False)
+    assert res_skipped is None
+
+    # Con allow_unreleased=True, se inserta
+    res_allowed = await service.upsert_series(999902, details=future_series_details, allow_unreleased=True)
+    assert res_allowed is not None
+    assert res_allowed.tmdb_id == 999902
+
+
+@pytest.mark.asyncio
+async def test_cleanup_unreleased_titles(db_session, mock_tmdb_client):
+    """Verifica que cleanup_unreleased_titles borre títulos no estrenados y conserve los estrenados."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    from datetime import date
+
+    # Insertar una película estrenada y una futura
+    m_released = Titulo(tmdb_id=88801, tipo="movie", nombre="Estrenada", fecha_estreno=date(2020, 1, 1))
+    m_unreleased = Titulo(tmdb_id=88802, tipo="movie", nombre="Futura", fecha_estreno=date(2099, 1, 1))
+    m_no_date = Titulo(tmdb_id=88803, tipo="movie", nombre="Sin Fecha", fecha_estreno=None)
+    db_session.add_all([m_released, m_unreleased, m_no_date])
+    await db_session.commit()
+
+    res = await service.cleanup_unreleased_titles()
+    assert res["deleted_movies"] == 2
+
+    # Verificar que solo queda la estrenada
+    res_check = await db_session.execute(select(Titulo).where(Titulo.tmdb_id.in_([88801, 88802, 88803])))
+    remaining = res_check.scalars().all()
+    assert len(remaining) == 1
+    assert remaining[0].tmdb_id == 88801
 

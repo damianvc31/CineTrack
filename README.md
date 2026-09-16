@@ -75,8 +75,17 @@ python -m app.jobs.sync_tmdb --genres
 # Ingesta inicial de catálogo (opciones: --priority popular_first | toprated_first)
 python -m app.jobs.sync_tmdb --initial --priority popular_first
 
-# Sincronización diaria (series en seguimiento + nuevos estrenos)
+# Sincronización diaria estándar (valores por defecto: 48 hs para cambios y 15 días para cartelera)
 python -m app.jobs.sync_tmdb --daily
+
+# Sincronización diaria con parámetros personalizados:
+# --changes-hours: ventana en horas para /changes en series y películas de TMDB (ej. 120 para 5 días)
+# --releases-days: ventana en días para /discover de nuevos estrenos en cartelera (ej. 15 días)
+# --allow-unreleased: permitir títulos no estrenados (por defecto False; omite películas futuras y series sin temporadas emitidas)
+python -m app.jobs.sync_tmdb --daily --changes-hours 120 --releases-days 15
+
+# Saneamiento de títulos no estrenados (elimina películas futuras y series sin temporadas de la base de datos)
+python -m app.jobs.sync_tmdb --cleanup-unreleased
 
 # Recalcular percentiles de popularidad
 python -m app.jobs.sync_tmdb --percentiles
@@ -109,8 +118,9 @@ $$\text{Rating} = \frac{(\text{vote\_average\_tmdb} \times \text{vote\_count\_tm
 #### Endpoints Administrativos (API HTTP)
 Todos los jobs de sincronización pueden dispararse también vía HTTP (`HTTP 202 Accepted` con ejecución asíncrona mediante `BackgroundTasks`):
 - `POST /api/v1/admin/sync/genres`: Sincronización de géneros.
-- `POST /api/v1/admin/sync/initial`: Ingesta inicial (`priority`, `movies_target`, `series_target`).
-- `POST /api/v1/admin/sync/daily`: Sync diaria (`hours_window`).
+- `POST /api/v1/admin/sync/initial`: Ingesta inicial (`priority`, `movies_target`, `series_target`, `allow_unreleased`).
+- `POST /api/v1/admin/sync/daily`: Sync diaria (`changes_hours_window`, `releases_days_window`, `allow_unreleased`).
+- `POST /api/v1/admin/sync/cleanup-unreleased`: Saneamiento inmediato de títulos no estrenados.
 - `POST /api/v1/admin/sync/percentiles`: Recálculo de percentiles y rating unificado.
 - `POST /api/v1/admin/sync/reviews`: Sincronización de reseñas de TMDB.
 - `POST /api/v1/admin/sync/import-tmdb`: Importación puntual de título por ID TMDB.

@@ -34,11 +34,23 @@ class InitialIngestRequest(BaseModel):
     series_target: Optional[int] = Field(
         default=None, ge=1, le=10000, description="Objetivo de series a ingestar"
     )
+    allow_unreleased: Optional[bool] = Field(
+        default=None, description="Permitir títulos no estrenados (default: False / según config)"
+    )
 
 
 class DailySyncRequest(BaseModel):
+    changes_hours_window: Optional[int] = Field(
+        default=None, ge=1, le=720, description="Ventana de horas hacia atrás para consultar /changes de TMDB en series y películas (default config: 48 hs)"
+    )
+    releases_days_window: Optional[int] = Field(
+        default=None, ge=1, le=90, description="Ventana de días hacia atrás para consultar estrenos recientes en cartelera (default config: 15 días)"
+    )
     hours_window: Optional[int] = Field(
-        default=None, ge=1, le=168, description="Ventana de horas hacia atrás para consultar cambios en TMDB (ej. 48)"
+        default=None, ge=1, le=720, description="Alias compatible de changes_hours_window"
+    )
+    allow_unreleased: Optional[bool] = Field(
+        default=None, description="Permitir títulos no estrenados (default: False / según config)"
     )
 
 
@@ -68,7 +80,12 @@ async def _run_job_genres():
         await client.close()
 
 
-async def _run_job_initial(priority: Optional[str], movies_target: Optional[int], series_target: Optional[int]):
+async def _run_job_initial(
+    priority: Optional[str],
+    movies_target: Optional[int],
+    series_target: Optional[int],
+    allow_unreleased: Optional[bool] = None,
+):
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
@@ -76,7 +93,8 @@ async def _run_job_initial(priority: Optional[str], movies_target: Optional[int]
             await service.run_initial_ingest(
                 priority=priority,
                 movies_target=movies_target,
-                series_target=series_target
+                series_target=series_target,
+                allow_unreleased=allow_unreleased,
             )
     except Exception as e:
         logger.error(f"[Job Background] Error en ingesta inicial: {e}")
@@ -84,12 +102,22 @@ async def _run_job_initial(priority: Optional[str], movies_target: Optional[int]
         await client.close()
 
 
-async def _run_job_daily(hours_window: Optional[int]):
+async def _run_job_daily(
+    changes_hours_window: Optional[int] = None,
+    releases_days_window: Optional[int] = None,
+    hours_window: Optional[int] = None,
+    allow_unreleased: Optional[bool] = None,
+):
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
-            await service.run_daily_sync(hours_window=hours_window)
+            changes_h = changes_hours_window or hours_window
+            await service.run_daily_sync(
+                changes_hours_window=changes_h,
+                releases_days_window=releases_days_window,
+                allow_unreleased=allow_unreleased,
+            )
     except Exception as e:
         logger.error(f"[Job Background] Error en sincronización diaria: {e}")
     finally:
@@ -187,7 +215,8 @@ async def trigger_initial_ingest(
         _run_job_initial,
         priority=payload.priority,
         movies_target=payload.movies_target,
-        series_target=payload.series_target
+        series_target=payload.series_target,
+        allow_unreleased=payload.allow_unreleased,
     )
     return JobResponse(
         job="initial_ingest",
@@ -202,11 +231,38 @@ async def trigger_daily_sync(
     _: Any = Depends(get_current_admin)
 ) -> JobResponse:
     """Ejecuta la sincronización diaria de cambios TMDB y cartelera en background."""
-    background_tasks.add_task(_run_job_daily, hours_window=payload.hours_window)
+    changes_h = payload.changes_hours_window or payload.hours_window
+    background_tasks.add_task(
+        _run_job_daily,
+        changes_hours_window=changes_h,
+        releases_days_window=payload.releases_days_window,
+        allow_unreleased=payload.allow_unreleased,
+    )
+    changes_desc = f"{changes_h} hs" if changes_h else "config default (48 hs)"
+    releases_desc = f"{payload.releases_days_window} días" if payload.releases_days_window else "config default (15 días)"
     return JobResponse(
         job="daily_sync",
-        message=f"Sincronización diaria iniciada en segundo plano (ventana: {payload.hours_window or 'config default'} hs)."
+        message=f"Sincronización diaria iniciada en segundo plano (cambios: {changes_desc}, cartelera: {releases_desc})."
     )
+
+
+@router.post("/sync/cleanup-unreleased", response_model=JobResponse, status_code=status.HTTP_200_OK)
+async def trigger_cleanup_unreleased(
+    db: AsyncSession = Depends(get_db),
+    _: Any = Depends(get_current_admin)
+) -> JobResponse:
+    """Elimina del catálogo las películas no estrenadas y series sin temporadas emitidas, recalculando métricas."""
+    client = TMDBClient()
+    try:
+        service = TMDBSyncService(db, client)
+        res = await service.cleanup_unreleased_titles()
+        return JobResponse(
+            status="success",
+            job="cleanup_unreleased",
+            message=f"Saneamiento completado: {res.get('deleted_movies', 0)} películas y {res.get('deleted_series', 0)} series eliminadas."
+        )
+    finally:
+        await client.close()
 
 
 @router.post("/sync/percentiles", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)

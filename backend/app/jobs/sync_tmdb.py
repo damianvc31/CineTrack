@@ -24,7 +24,11 @@ async def main():
     parser.add_argument("--movies-target", type=int, default=None, help="Cantidad objetivo de películas para ingesta inicial")
     parser.add_argument("--series-target", type=int, default=None, help="Cantidad objetivo de series para ingesta inicial")
     parser.add_argument("--daily", action="store_true", help="Ejecutar sincronización diaria")
-    parser.add_argument("--hours-window", type=int, default=None, help="Ventana de horas para consultar cambios de TMDB en sync diaria")
+    parser.add_argument("--changes-hours", type=int, default=None, help="Ventana en horas para consultar /changes de TMDB en series y películas (default config: 48 hs, ej. 120 para 5 días)")
+    parser.add_argument("--releases-days", type=int, default=None, help="Ventana en días para consultar estrenos recientes en cartelera (default config: 15 días)")
+    parser.add_argument("--hours-window", type=int, default=None, help="Alias compatible de --changes-hours")
+    parser.add_argument("--allow-unreleased", action="store_true", default=False, help="Permitir títulos no estrenados (películas futuras o series sin temporadas emitidas, default: False)")
+    parser.add_argument("--cleanup-unreleased", action="store_true", help="Eliminar títulos no estrenados existentes de la base de datos y recalcular métricas")
     parser.add_argument("--percentiles", action="store_true", help="Recalcular percentiles de popularidad")
     parser.add_argument("--ratings", action="store_true", help="Recalcular rating unificado para todos los títulos")
     parser.add_argument("--reviews", action="store_true", help="Sincronizar reseñas de TMDB para todos los títulos hasta el tope (20)")
@@ -53,18 +57,29 @@ async def main():
                 logger.info(f"Total géneros nuevos agregados: {count}")
 
             elif args.initial:
-                logger.info(f"-> Ejecutando ingesta inicial (prioridad: {args.priority or 'default'})...")
+                logger.info(f"-> Ejecutando ingesta inicial (prioridad: {args.priority or 'default'}, allow_unreleased: {args.allow_unreleased})...")
                 res = await service.run_initial_ingest(
                     priority=args.priority,
                     movies_target=args.movies_target,
-                    series_target=args.series_target
+                    series_target=args.series_target,
+                    allow_unreleased=args.allow_unreleased,
                 )
                 logger.info(f"Resultado de ingesta inicial: {res}")
 
             elif args.daily:
-                logger.info("-> Ejecutando sincronización diaria...")
-                res = await service.run_daily_sync(hours_window=args.hours_window)
+                logger.info(f"-> Ejecutando sincronización diaria (allow_unreleased: {args.allow_unreleased})...")
+                changes_h = args.changes_hours or args.hours_window
+                res = await service.run_daily_sync(
+                    changes_hours_window=changes_h,
+                    releases_days_window=args.releases_days,
+                    allow_unreleased=args.allow_unreleased,
+                )
                 logger.info(f"Resultado sincronización diaria: {res}")
+
+            elif args.cleanup_unreleased:
+                logger.info("-> Saneando catálogo: eliminando títulos no estrenados...")
+                res = await service.cleanup_unreleased_titles()
+                logger.info(f"Resultado de saneamiento: {res}")
 
             elif args.percentiles:
                 logger.info("-> Recalculando percentiles de popularidad y ratings unificados...")

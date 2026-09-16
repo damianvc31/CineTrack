@@ -2,6 +2,29 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.8.3] - 2026-09-16
+### Agregado & Mejorado
+- **Desacoplamiento de Series Seguidas en Sincronización Diaria (`tmdb_sync_service.py`):**
+  - Se eliminó la restricción de que una serie deba estar seguida por algún usuario (`siguiendo`) para poder recibir actualizaciones. Ahora, cualquier serie del catálogo local se actualiza fielmente si TMDB reporta modificaciones en `/tv/changes` durante la ventana temporal configurada.
+- **Parametrización Independiente de Ventanas de Tiempo (`sync_tmdb.py`, `admin.py`, `config.py`):**
+  - Separación explícita de parámetros para evitar ambigüedades:
+    - `changes_hours_window` (`--changes-hours`, default 48 hs): Ventana en horas hacia atrás para consultar cambios reportados por TMDB en series y películas locales (`/tv/changes` y `/movie/changes`).
+    - `releases_days_window` (`--releases-days`, default 15 días): Ventana en días hacia atrás para descubrir nuevos estrenos calificados en cartelera (`/discover/movie`).
+    - Soporte en CLI, API administrativa (`DailySyncRequest`) y variables de entorno (`TMDB_CHANGES_HOURS_WINDOW`, `TMDB_DAILY_SYNC_DAYS_WINDOW`).
+- **Política y Filtrado de Títulos No Estrenados (`allow_unreleased`):**
+  - Se introdujo el parámetro de control `allow_unreleased: bool = False` (por defecto `False`) en configuración (`TMDB_ALLOW_UNRELEASED`), `.env`, `.env.example`, CLI (`--allow-unreleased`), servicio (`TMDBSyncService`) y API administrativa (`/api/v1/admin/sync/*`).
+  - **Películas:** Omitir guardado de películas con fecha de estreno futura (`fecha_estreno > today`) o sin fecha confirmada (`None`).
+  - **Series:** Omitir guardado de series sin temporadas emitidas (`first_air_date > today` o con 0 temporadas con episodios estrenados).
+  - **Descubrimiento:** Consulta a `/discover` con fecha tope de estreno (`primary_release_date.lte` / `first_air_date.lte` igual a la fecha de hoy).
+- **Herramienta y Endpoint de Saneamiento de Catálogo (`cleanup_unreleased_titles`):**
+  - Implementación de método de saneamiento que elimina títulos no estrenados y recalcula automáticamente percentiles de popularidad y ratings unificados.
+  - Disponible vía CLI (`python -m app.jobs.sync_tmdb --cleanup-unreleased`) y endpoint administrativo (`POST /api/v1/admin/sync/cleanup-unreleased`).
+  - Saneamiento ejecutado exitosamente en base de datos: 7 películas no estrenadas depuradas (5 con fechas futuras en 2026 y 2 sin fecha). 0 series afectadas (todas las 1003 series poseen al menos una temporada emitida).
+- **Prueba Exitosa de Sincronización Diaria en Desarrollo:**
+  - Ejecución en entorno local con ventana de cambios de 120 horas (5 días): 12 series locales actualizadas, 12 nuevos estrenos en cartelera incorporados (con popularidad >= 10.0 y estrenadas en los últimos 15 días), métricas recalculadas (catálogo total: 1006 películas y 1003 series, 0 títulos no estrenados).
+- **Suite de Pruebas Automatizadas:**
+  - Incorporación de tests unitarios para `allow_unreleased` y `cleanup_unreleased_titles` en `test_tmdb_sync.py`. 57 tests backend pasando al 100%.
+
 ## [v0.8.2] - 2026-09-12
 ### Corregido & Mejorado
 - **Cálculo de Distribución de Géneros por Título Único (`catalog_service.py`):**
