@@ -22,9 +22,11 @@ from app.models import (
 from app.models.usuario import Usuario
 from app.schemas.catalog import (
     CastMemberResponse,
+    CountryItem,
     EpisodeResponse,
     GenreResponse,
     HomeSectionsResponse,
+    LanguageItem,
     ReviewCreate,
     ReviewResponse,
     SeasonProgressResponse,
@@ -39,6 +41,26 @@ from app.schemas.catalog import (
     UserReviewsListResponse,
     UserStatsResponse,
 )
+
+# Mapeo canónico de géneros: expande géneros individuales a las duplas que TMDB asigna a series
+GENRE_EXPANSIONS: dict[str, list[str]] = {
+    "action": ["Action", "Action & Adventure"],
+    "adventure": ["Adventure", "Action & Adventure"],
+    "science fiction": ["Science Fiction", "Sci-Fi & Fantasy"],
+    "sci-fi": ["Science Fiction", "Sci-Fi & Fantasy"],
+    "fantasy": ["Fantasy", "Sci-Fi & Fantasy"],
+    "war": ["War", "War & Politics"],
+}
+
+EXCLUDED_GENRE_NAMES: set[str] = {"Action & Adventure", "Sci-Fi & Fantasy", "War & Politics"}
+
+
+def expand_genre_names(genre_name: str) -> list[str]:
+    """Expande un nombre de género a su conjunto canónico incluyendo duplas de TMDB."""
+    key = genre_name.strip().lower()
+    if key in GENRE_EXPANSIONS:
+        return GENRE_EXPANSIONS[key]
+    return [genre_name.strip()]
 
 
 def _build_title_card(
@@ -106,8 +128,14 @@ async def get_titles(
     tipo: Optional[str] = None,
     genero_id: Optional[int] = None,
     genero: Optional[str] = None,
+    generos: Optional[str | list[str]] = None,
+    genre_op: str = "or",
     actor_id: Optional[int] = None,
     actor: Optional[str] = None,
+    pais: Optional[str] = None,
+    paises: Optional[str | list[str]] = None,
+    idioma: Optional[str] = None,
+    idiomas: Optional[str | list[str]] = None,
     section: Optional[str] = None,
     q: Optional[str] = None,
     sort_by: str = "popularity",  # 'popularity', 'rating', 'release_date' (o 'newest'), 'title'
@@ -129,12 +157,65 @@ async def get_titles(
         query = query.join(titulos_generos, titulos_generos.c.titulo_id == Titulo.id).where(
             titulos_generos.c.genero_id == genero_id
         )
-    elif genero:
-        query = (
-            query.join(titulos_generos, titulos_generos.c.titulo_id == Titulo.id)
-            .join(Genero, Genero.id == titulos_generos.c.genero_id)
-            .where(Genero.nombre.ilike(f"%{genero.strip()}%"))
-        )
+    else:
+        target_genres: list[str] = []
+        if generos:
+            if isinstance(generos, str):
+                target_genres.extend([g.strip() for g in generos.split(",") if g.strip()])
+            else:
+                for g in generos:
+                    target_genres.extend([item.strip() for item in g.split(",") if item.strip()])
+        elif genero:
+            target_genres.extend([g.strip() for g in genero.split(",") if g.strip()])
+
+        if target_genres:
+            expanded_groups = [expand_genre_names(g) for g in target_genres]
+            if genre_op.lower() == "and":
+                for grp in expanded_groups:
+                    grp_subq = (
+                        select(titulos_generos.c.titulo_id)
+                        .join(Genero, Genero.id == titulos_generos.c.genero_id)
+                        .where(Genero.nombre.in_(grp))
+                        .scalar_subquery()
+                    )
+                    query = query.where(Titulo.id.in_(grp_subq))
+            else:
+                all_allowed_genres = [item for grp in expanded_groups for item in grp]
+                all_subq = (
+                    select(titulos_generos.c.titulo_id)
+                    .join(Genero, Genero.id == titulos_generos.c.genero_id)
+                    .where(Genero.nombre.in_(all_allowed_genres))
+                    .scalar_subquery()
+                )
+                query = query.where(Titulo.id.in_(all_subq))
+
+    # Filtro por país(es)
+    target_countries: list[str] = []
+    if paises:
+        if isinstance(paises, str):
+            target_countries.extend([p.strip().upper() for p in paises.split(",") if p.strip()])
+        else:
+            for p in paises:
+                target_countries.extend([item.strip().upper() for item in p.split(",") if item.strip()])
+    elif pais:
+        target_countries.extend([p.strip().upper() for p in pais.split(",") if p.strip()])
+
+    if target_countries:
+        query = query.where(Titulo.pais.in_(target_countries))
+
+    # Filtro por idioma(s)
+    target_languages: list[str] = []
+    if idiomas:
+        if isinstance(idiomas, str):
+            target_languages.extend([i.strip().lower() for i in idiomas.split(",") if i.strip()])
+        else:
+            for i in idiomas:
+                target_languages.extend([item.strip().lower() for item in i.split(",") if item.strip()])
+    elif idioma:
+        target_languages.extend([i.strip().lower() for i in idioma.split(",") if i.strip()])
+
+    if target_languages:
+        query = query.where(Titulo.idioma_original.in_(target_languages))
 
     if actor_id:
         actor_title_subq = (
@@ -1348,4 +1429,26 @@ async def clear_entire_catalog(db: AsyncSession) -> Dict[str, int]:
         "estados_usuario": del_estados.rowcount if del_estados.rowcount != -1 else 0,
         "actores": del_actores.rowcount if del_actores.rowcount != -1 else 0,
     }
+
+
+async def get_available_countries(db: AsyncSession) -> list[CountryItem]:
+    """Retorna la lista de países disponibles en el catálogo con código y conteo de títulos."""
+    res = await db.execute(
+        select(Titulo.pais, func.count(Titulo.id))
+        .where(Titulo.pais.isnot(None), Titulo.pais != "")
+        .group_by(Titulo.pais)
+        .order_by(func.count(Titulo.id).desc())
+    )
+    return [CountryItem(code=row[0], count=row[1]) for row in res.all()]
+
+
+async def get_available_languages(db: AsyncSession) -> list[LanguageItem]:
+    """Retorna la lista de idiomas originales disponibles en el catálogo con código y conteo de títulos."""
+    res = await db.execute(
+        select(Titulo.idioma_original, func.count(Titulo.id))
+        .where(Titulo.idioma_original.isnot(None), Titulo.idioma_original != "")
+        .group_by(Titulo.idioma_original)
+        .order_by(func.count(Titulo.id).desc())
+    )
+    return [LanguageItem(code=row[0], count=row[1]) for row in res.all()]
 

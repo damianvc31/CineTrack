@@ -56,7 +56,7 @@
 - [x] Ingesta de fotos de actores y sección Top Cast *(Completado en v0.8.0 - v0.8.1)*.
 - [x] Carga de avatar desde archivo local con centrado y zoom *(Completado en v0.8.0 - v0.8.1)*.
 - [ ] Recomendador avanzado con function calling y búsqueda semántica vectorial (embeddings con pgvector).
-- [ ] Buscador extendido con filtros por director, guionista y actor.
+- [x] Buscador integral por título, director, guionista y actor *(Completado en v0.8.4)*.
 - [ ] Pantallas de extensión ("Ver más") con paginación para cada sección.
 - [ ] Soporte multirregión para plataformas de streaming (JustWatch / TMDB Watch Providers).
 - [ ] Posible refinamiento UX en desmarques de episodios: diálogo opcional para advertir al usuario o resetear progreso posterior al desmarcar un episodio intermedio.

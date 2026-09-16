@@ -11,6 +11,16 @@ class GenreResponse(BaseModel):
     nombre: str
 
 
+class CountryItem(BaseModel):
+    code: str
+    count: int
+
+
+class LanguageItem(BaseModel):
+    code: str
+    count: int
+
+
 class CastMemberResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

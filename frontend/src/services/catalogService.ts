@@ -10,13 +10,29 @@ import type {
   UnreviewedWatchedResponse,
 } from '@/types/catalog'
 
+export interface CountryItem {
+  code: string
+  count: number
+}
+
+export interface LanguageItem {
+  code: string
+  count: number
+}
+
 export interface TitleFilters {
   section?: 'new_releases' | 'trending' | 'classics' | 'top_rated' | 'others'
   tipo?: 'movie' | 'tv'
   genero?: string
+  generos?: string | string[]
+  genre_op?: 'or' | 'and'
   genero_id?: number
   actor?: string
   actor_id?: number
+  pais?: string
+  paises?: string | string[]
+  idioma?: string
+  idiomas?: string | string[]
   q?: string
   sort_by?: 'popularity' | 'rating' | 'release_date' | 'title'
   order?: 'desc' | 'asc'
@@ -35,12 +51,23 @@ export const catalogService = {
   getHome: (filters?: { tipo?: 'movie' | 'tv' }) =>
     api.get<HomeSections>('/home', filters as Record<string, string | number | boolean>),
 
-  getTitles: (filters: TitleFilters = {}) =>
-    api.get<TitlesResponse>('/titles', filters as Record<string, string | number | boolean>),
+  getTitles: (filters: TitleFilters = {}) => {
+    const formattedParams: Record<string, string | number | boolean | undefined | null> = {
+      ...filters,
+      generos: Array.isArray(filters.generos) ? filters.generos.join(',') : filters.generos,
+      paises: Array.isArray(filters.paises) ? filters.paises.join(',') : filters.paises,
+      idiomas: Array.isArray(filters.idiomas) ? filters.idiomas.join(',') : filters.idiomas,
+    }
+    return api.get<TitlesResponse>('/titles', formattedParams)
+  },
 
   getTitleDetail: (id: number) => api.get<TitleDetail>(`/titles/${id}`),
 
   getGenres: () => api.get<Array<{ id: number; nombre: string }>>('/genres'),
+
+  getCountries: () => api.get<CountryItem[]>('/countries'),
+
+  getLanguages: () => api.get<LanguageItem[]>('/languages'),
 
   getReviews: (titleId: number, page: number = 1, pageSize: number = 20) =>
     api.get<ReviewItem[]>(`/titles/${titleId}/reviews`, { page, page_size: pageSize }),

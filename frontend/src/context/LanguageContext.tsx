@@ -20,7 +20,10 @@ const UI_STRINGS: Record<string, { en: string; es: string }> = {
   exploreCatalog: { en: 'Explore', es: 'Explorar' },
   exploreCatalogHeading: { en: 'Explore Catalog', es: 'Explorar Catálogo' },
   aiAssistant: { en: 'AI Assistant', es: 'Asistente IA' },
-  searchPlaceholder: { en: 'Search movies, series, cast...', es: 'Buscar películas, series, elenco...' },
+  searchPlaceholder: {
+    en: 'Search titles, actors, directors, writers...',
+    es: 'Buscar títulos, actores, directores, guionistas...'
+  },
   logIn: { en: 'Log In', es: 'Iniciar Sesión' },
   signUp: { en: 'Sign Up', es: 'Registrarse' },
   signUpRegister: { en: 'Sign Up / Register', es: 'Registrarse' },
@@ -32,7 +35,10 @@ const UI_STRINGS: Record<string, { en: string; es: string }> = {
   // Catalog Page
   titlesFound: { en: 'titles found', es: 'títulos encontrados' },
   filterAndDiscover: { en: 'Filter and discover', es: 'Filtra y descubre' },
-  searchCatalogPlaceholder: { en: 'Search titles, actors...', es: 'Buscar títulos, actores...' },
+  searchCatalogPlaceholder: {
+    en: 'Search titles, actors, directors, writers...',
+    es: 'Buscar títulos, actores, directores, guionistas...'
+  },
   clearSearch: { en: 'Clear search', es: 'Limpiar búsqueda' },
   filtersLabel: { en: 'Filters:', es: 'Filtros:' },
   allTypes: { en: 'All types', es: 'Todos los tipos' },
@@ -54,6 +60,19 @@ const UI_STRINGS: Record<string, { en: string; es: string }> = {
     es: 'No hay títulos que coincidan con los filtros seleccionados. Intenta restablecer los filtros o buscar con otro término.'
   },
   clearFilters: { en: 'Clear filters', es: 'Restablecer filtros' },
+  clearAll: { en: 'Clear all', es: 'Limpiar todo' },
+  countriesFilter: { en: 'Country', es: 'País' },
+  languagesFilter: { en: 'Language', es: 'Idioma' },
+  genresFilter: { en: 'Genres', es: 'Géneros' },
+  matchMode: { en: 'Match', es: 'Coincidir' },
+  matchAny: { en: 'Any (OR)', es: 'Cualquiera (OR)' },
+  matchAll: { en: 'All (AND)', es: 'Todos (AND)' },
+  searchCountriesPlaceholder: { en: 'Search country...', es: 'Buscar país...' },
+  searchLanguagesPlaceholder: { en: 'Search language...', es: 'Buscar idioma...' },
+  searchGenresPlaceholder: { en: 'Search genre...', es: 'Buscar género...' },
+  activeFilters: { en: 'Active filters', es: 'Filtros activos' },
+  noOptionsFound: { en: 'No options found', es: 'No se encontraron opciones' },
+  selectedCount: { en: 'selected', es: 'seleccionados' },
   previous: { en: 'Previous', es: 'Anterior' },
   next: { en: 'Next', es: 'Siguiente' },
   pageLabel: { en: 'Page', es: 'Página' },

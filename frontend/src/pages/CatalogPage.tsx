@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useOutletContext } from 'react-router-dom'
-import { Filter, Search, ChevronLeft, ChevronRight, Film, Tv, Sparkles, AlertCircle, X } from 'lucide-react'
-import { catalogService, type TitlesResponse } from '@/services/catalogService'
+import { Filter, Search, ChevronLeft, ChevronRight, Film, Tv, Sparkles, AlertCircle, X, RotateCcw } from 'lucide-react'
+import { catalogService, type TitlesResponse, type CountryItem, type LanguageItem } from '@/services/catalogService'
 import { TitleCard } from '@/components/common/TitleCard'
+import { MultiSelectDropdown, type MultiSelectOption } from '@/components/common/MultiSelectDropdown'
 import { useLanguage } from '@/context/LanguageContext'
 
 interface OutletContextType {
@@ -11,11 +12,13 @@ interface OutletContextType {
 
 export const CatalogPage: React.FC = () => {
   const { openAuth } = useOutletContext<OutletContextType>()
-  const { t, translateGenreName } = useLanguage()
+  const { language, t, translateGenreName } = useLanguage()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [data, setData] = useState<TitlesResponse | null>(null)
   const [genres, setGenres] = useState<string[]>([])
+  const [countries, setCountries] = useState<CountryItem[]>([])
+  const [languages, setLanguages] = useState<LanguageItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -23,16 +26,33 @@ export const CatalogPage: React.FC = () => {
   const query = searchParams.get('q') || ''
   const tipo = (searchParams.get('tipo') as 'movie' | 'tv') || undefined
   const section = (searchParams.get('section') as any) || undefined
-  const genero = searchParams.get('genero') || undefined
   const actor = searchParams.get('actor') || undefined
   const sortBy = (searchParams.get('sort_by') as any) || 'popularity'
   const order = (searchParams.get('order') as any) || 'desc'
   const page = parseInt(searchParams.get('page') || '1', 10)
 
-  // Input local para búsqueda instantánea
+  // Multi-select filters parsing
+  const selectedGenres = useMemo(() => {
+    const raw = searchParams.get('generos') || searchParams.get('genero') || ''
+    return raw ? raw.split(',').map((g) => g.trim()).filter(Boolean) : []
+  }, [searchParams])
+
+  const genreOp = (searchParams.get('genre_op') as 'or' | 'and') || 'or'
+
+  const selectedCountries = useMemo(() => {
+    const raw = searchParams.get('paises') || searchParams.get('pais') || ''
+    return raw ? raw.split(',').map((c) => c.trim().toUpperCase()).filter(Boolean) : []
+  }, [searchParams])
+
+  const selectedLanguages = useMemo(() => {
+    const raw = searchParams.get('idiomas') || searchParams.get('idioma') || ''
+    return raw ? raw.split(',').map((l) => l.trim().toLowerCase()).filter(Boolean) : []
+  }, [searchParams])
+
+  // Input local para búsqueda de texto
   const [searchInput, setSearchInput] = useState(query)
 
-  // Cargar lista de géneros disponibles
+  // Cargar metadatos disponibles (géneros, países e idiomas)
   useEffect(() => {
     catalogService
       .getGenres()
@@ -41,34 +61,106 @@ export const CatalogPage: React.FC = () => {
         setGenres(names)
       })
       .catch(console.error)
+
+    catalogService
+      .getCountries()
+      .then(setCountries)
+      .catch(console.error)
+
+    catalogService
+      .getLanguages()
+      .then(setLanguages)
+      .catch(console.error)
   }, [])
 
-  const fetchTitles = useCallback(async (showSpinner = true) => {
-    if (showSpinner) setLoading(true)
-    setError(null)
-    try {
-      const res = await catalogService.getTitles({
-        q: query || undefined,
-        tipo,
-        section,
-        genero,
-        actor,
-        sort_by: sortBy,
-        order,
-        page,
-        page_size: 24,
-      })
-      setData(res)
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError('Error al consultar el catálogo')
+  // Nombres localizados para países e idiomas
+  const getCountryLabel = useCallback(
+    (code: string) => {
+      try {
+        const dn = new Intl.DisplayNames([language], { type: 'region' })
+        return dn.of(code.toUpperCase()) || code
+      } catch {
+        return code
       }
-    } finally {
-      if (showSpinner) setLoading(false)
-    }
-  }, [query, tipo, section, genero, actor, sortBy, order, page])
+    },
+    [language]
+  )
+
+  const getLanguageLabel = useCallback(
+    (code: string) => {
+      try {
+        const dn = new Intl.DisplayNames([language], { type: 'language' })
+        const name = dn.of(code.toLowerCase())
+        return name ? name.charAt(0).toUpperCase() + name.slice(1) : code
+      } catch {
+        return code
+      }
+    },
+    [language]
+  )
+
+  // Opciones formateadas para dropdowns
+  const genreOptions = useMemo<MultiSelectOption[]>(() => {
+    return genres
+      .map((g) => ({
+        value: g,
+        label: translateGenreName(g),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [genres, translateGenreName])
+
+  const countryOptions = useMemo<MultiSelectOption[]>(() => {
+    return countries
+      .map((c) => ({
+        value: c.code,
+        label: getCountryLabel(c.code),
+        count: c.count,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [countries, getCountryLabel])
+
+  const languageOptions = useMemo<MultiSelectOption[]>(() => {
+    return languages
+      .map((l) => ({
+        value: l.code,
+        label: getLanguageLabel(l.code),
+        count: l.count,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [languages, getLanguageLabel])
+
+  const fetchTitles = useCallback(
+    async (showSpinner = true) => {
+      if (showSpinner) setLoading(true)
+      setError(null)
+      try {
+        const res = await catalogService.getTitles({
+          q: query || undefined,
+          tipo,
+          section,
+          generos: selectedGenres.length > 0 ? selectedGenres : undefined,
+          genre_op: genreOp,
+          paises: selectedCountries.length > 0 ? selectedCountries : undefined,
+          idiomas: selectedLanguages.length > 0 ? selectedLanguages : undefined,
+          actor,
+          sort_by: sortBy,
+          order,
+          page,
+          page_size: 24,
+        })
+        setData(res)
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message)
+        } else {
+          setError('Error al consultar el catálogo')
+        }
+      } finally {
+        if (showSpinner) setLoading(false)
+      }
+    },
+    [query, tipo, section, selectedGenres, genreOp, selectedCountries, selectedLanguages, actor, sortBy, order, page]
+  )
 
   useEffect(() => {
     fetchTitles(true)
@@ -96,12 +188,77 @@ export const CatalogPage: React.FC = () => {
     updateParam('q', searchInput.trim() || undefined)
   }
 
+  const handleGenresChange = (newValues: string[]) => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('genero')
+    if (newValues.length > 0) {
+      next.set('generos', newValues.join(','))
+    } else {
+      next.delete('generos')
+      next.delete('genre_op')
+    }
+    next.set('page', '1')
+    setSearchParams(next)
+  }
+
+  const handleGenreOpChange = (newOp: string) => {
+    const next = new URLSearchParams(searchParams)
+    if (newOp === 'and') {
+      next.set('genre_op', 'and')
+    } else {
+      next.delete('genre_op')
+    }
+    next.set('page', '1')
+    setSearchParams(next)
+  }
+
+  const handleCountriesChange = (newValues: string[]) => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('pais')
+    if (newValues.length > 0) {
+      next.set('paises', newValues.join(','))
+    } else {
+      next.delete('paises')
+    }
+    next.set('page', '1')
+    setSearchParams(next)
+  }
+
+  const handleLanguagesChange = (newValues: string[]) => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('idioma')
+    if (newValues.length > 0) {
+      next.set('idiomas', newValues.join(','))
+    } else {
+      next.delete('idiomas')
+    }
+    next.set('page', '1')
+    setSearchParams(next)
+  }
+
+  const handleClearAllFilters = () => {
+    const next = new URLSearchParams()
+    if (sortBy !== 'popularity') next.set('sort_by', sortBy)
+    if (order !== 'desc') next.set('order', order)
+    setSearchInput('')
+    setSearchParams(next)
+  }
+
   const setPage = (newPage: number) => {
     const next = new URLSearchParams(searchParams)
     next.set('page', newPage.toString())
     setSearchParams(next)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  const hasActiveFilters = Boolean(
+    query ||
+    tipo ||
+    section ||
+    selectedGenres.length > 0 ||
+    selectedCountries.length > 0 ||
+    selectedLanguages.length > 0
+  )
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -153,8 +310,8 @@ export const CatalogPage: React.FC = () => {
       </div>
 
       {/* Filters and Sorting Bar */}
-      <div className="flex flex-wrap items-center gap-3 mb-8 p-4 rounded-xl bg-[#141414] border border-[#262626]">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 mr-2">
+      <div className="flex flex-wrap items-center gap-2.5 mb-4 p-4 rounded-xl bg-[#141414] border border-[#262626]">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 mr-1">
           <Filter className="w-4 h-4 text-amber-400" />
           <span>{t('filtersLabel')}</span>
         </div>
@@ -170,20 +327,6 @@ export const CatalogPage: React.FC = () => {
           <option value="tv">{t('series')}</option>
         </select>
 
-        {/* Genre Filter */}
-        <select
-          value={genero || ''}
-          onChange={(e) => updateParam('genero', e.target.value || undefined)}
-          className="px-3 py-1.5 rounded-lg bg-[#0d0d0d] border border-[#262626] text-xs text-gray-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 max-w-[150px] transition-colors"
-        >
-          <option value="">{t('allGenres')}</option>
-          {genres.map((g) => (
-            <option key={g} value={g}>
-              {translateGenreName(g)}
-            </option>
-          ))}
-        </select>
-
         {/* Section Filter */}
         <select
           value={section || ''}
@@ -197,6 +340,48 @@ export const CatalogPage: React.FC = () => {
           <option value="top_rated">{t('sectionTopRated')}</option>
           <option value="others">{t('sectionOthers')}</option>
         </select>
+
+        {/* Multi-select Genres Dropdown with OR/AND match toggle */}
+        <MultiSelectDropdown
+          label={t('genresFilter')}
+          options={genreOptions}
+          selectedValues={selectedGenres}
+          onChange={handleGenresChange}
+          placeholderSearch={t('searchGenresPlaceholder')}
+          emptyMessage={t('noOptionsFound')}
+          clearLabel={t('clearFilters')}
+          toggleConfig={{
+            label: t('matchMode'),
+            value: genreOp,
+            options: [
+              { value: 'or', label: t('matchAny') },
+              { value: 'and', label: t('matchAll') },
+            ],
+            onChange: handleGenreOpChange,
+          }}
+        />
+
+        {/* Multi-select Countries Dropdown */}
+        <MultiSelectDropdown
+          label={t('countriesFilter')}
+          options={countryOptions}
+          selectedValues={selectedCountries}
+          onChange={handleCountriesChange}
+          placeholderSearch={t('searchCountriesPlaceholder')}
+          emptyMessage={t('noOptionsFound')}
+          clearLabel={t('clearFilters')}
+        />
+
+        {/* Multi-select Languages Dropdown */}
+        <MultiSelectDropdown
+          label={t('languagesFilter')}
+          options={languageOptions}
+          selectedValues={selectedLanguages}
+          onChange={handleLanguagesChange}
+          placeholderSearch={t('searchLanguagesPlaceholder')}
+          emptyMessage={t('noOptionsFound')}
+          clearLabel={t('clearFilters')}
+        />
 
         {/* Sorting */}
         <div className="ml-auto flex items-center gap-2">
@@ -221,6 +406,109 @@ export const CatalogPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Active Filter Chips / Pills */}
+      {hasActiveFilters && (
+        <div className="flex flex-wrap items-center gap-2 mb-6 px-1">
+          <span className="text-xs text-gray-400 font-medium mr-1">{t('activeFilters')}:</span>
+
+          {query && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30">
+              <span>"{query}"</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('')
+                  updateParam('q', undefined)
+                }}
+                className="hover:text-white"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          {tipo && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-[#1f1f1f] text-gray-200 border border-[#333]">
+              <span>{tipo === 'movie' ? t('movies') : t('series')}</span>
+              <button type="button" onClick={() => updateParam('tipo', undefined)} className="hover:text-amber-400">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          {section && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-[#1f1f1f] text-gray-200 border border-[#333]">
+              <span>{t(`section${section.charAt(0).toUpperCase() + section.slice(1)}`) || section}</span>
+              <button type="button" onClick={() => updateParam('section', undefined)} className="hover:text-amber-400">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          {selectedGenres.map((g) => (
+            <span
+              key={g}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30"
+            >
+              <span>{translateGenreName(g)}</span>
+              {selectedGenres.length > 1 && (
+                <span className="text-[10px] text-amber-400/70 font-mono uppercase">
+                  ({genreOp})
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => handleGenresChange(selectedGenres.filter((v) => v !== g))}
+                className="hover:text-white"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+
+          {selectedCountries.map((c) => (
+            <span
+              key={c}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-[#1f1f1f] text-gray-200 border border-[#333]"
+            >
+              <span>{getCountryLabel(c)}</span>
+              <button
+                type="button"
+                onClick={() => handleCountriesChange(selectedCountries.filter((v) => v !== c))}
+                className="hover:text-amber-400"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+
+          {selectedLanguages.map((l) => (
+            <span
+              key={l}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-[#1f1f1f] text-gray-200 border border-[#333]"
+            >
+              <span>{getLanguageLabel(l)}</span>
+              <button
+                type="button"
+                onClick={() => handleLanguagesChange(selectedLanguages.filter((v) => v !== l))}
+                className="hover:text-amber-400"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+
+          <button
+            type="button"
+            onClick={handleClearAllFilters}
+            className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-amber-400 ml-2 transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>{t('clearAll')}</span>
+          </button>
+        </div>
+      )}
+
       {/* Grid Content or Empty State */}
       {loading ? (
         <div className="flex flex-col items-center justify-center min-h-[40vh] gap-3">
@@ -240,10 +528,7 @@ export const CatalogPage: React.FC = () => {
             {t('noTitlesFilterDesc')}
           </p>
           <button
-            onClick={() => {
-              setSearchInput('')
-              setSearchParams(new URLSearchParams())
-            }}
+            onClick={handleClearAllFilters}
             className="px-4 py-2 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-400 text-black shadow-md transition-colors"
           >
             {t('clearFilters')}

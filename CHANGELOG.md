@@ -2,6 +2,32 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.8.4] - 2026-09-16
+### Agregado & Mejorado
+- **Filtros Multiselección Avanzados en Catálogo (`/catalog`):**
+  - **Filtro por País de Origen (`paises`):** Dropdown multiselección con lista dinámica de países con títulos en base de datos, conteos de disponibilidad y localización reactiva en el idioma de la interfaz mediante `Intl.DisplayNames`.
+  - **Filtro por Idioma Original (`idiomas`):** Dropdown multiselección con lista dinámica de idiomas disponibles en el catálogo, conteos y nombres localizados.
+  - **Multiselección de Géneros y Modo de Coincidencia (`generos` & `genre_op`):**
+    - Soporte para seleccionar múltiples géneros simultáneamente.
+    - Selector interactivo de lógica de coincidencia: **Cualquiera (OR)** (por defecto, muestra títulos que tengan al menos uno de los géneros seleccionados) o **Todos (AND)** (muestra únicamente títulos que contengan todos y cada uno de los géneros seleccionados).
+  - **Normalización Canónica de Géneros TMDB:**
+    - Se excluyeron del listado de selección las duplas híbridas de TMDB (`Action & Adventure`, `Sci-Fi & Fantasy`, `War & Politics`) que generaban confusión entre películas y series.
+    - Expansión automática en backend: al seleccionar un género simple (ej. `Action`, `Sci-Fi` o `Fantasy`), el backend busca tanto la etiqueta de película como la correspondiente dupla de serie de televisión, logrando resultados coherentes en todo el catálogo.
+  - **Componente Reutilizable `MultiSelectDropdown` (`MultiSelectDropdown.tsx`):**
+    - Desplegable elegante con buscador interno en tiempo real para encontrar rápidamente países, idiomas o géneros.
+    - Badges numéricos de selección, checkboxes visuales estilizados y botón de deselección rápida.
+  - **Barra de Filtros Activos (Chips / Pills):**
+    - Visualización de etiquetas removibles para cada filtro activo (término de búsqueda, tipo, sección, cada género con su indicador `(OR)` o `(AND)`, cada país y cada idioma).
+    - Botón *"Limpiar todo"* para restablecer el catálogo a su vista base con un solo clic.
+  - **Clarificación de Buscador Integral (Header y Catálogo):**
+    - Actualización de placeholders en ambas barras de búsqueda (*"Buscar títulos, actores, directores, guionistas..."* / *"Search titles, actors, directors, writers..."*) clarificando la capacidad ya existente del motor de búsqueda de indexar títulos por nombre, actores, creadores, directores y guionistas. Actualizado en `ROADMAP.md` (cerrando la tarea correspondiente del backlog).
+  - **Nuevos Endpoints en Backend (`/api/v1/titles`):**
+    - `GET /api/v1/countries`: Devuelve la lista ordenada de códigos de país y conteo de títulos asociados en base de datos.
+    - `GET /api/v1/languages`: Devuelve la lista de idiomas originales y cantidad de títulos.
+    - Soporte de listas o strings separados por comas en `generos`, `paises` e `idiomas` en `GET /api/v1/titles`.
+  - **Suite de Pruebas Automatizadas:**
+    - Incorporación de 3 nuevos tests unitarios en `test_catalog.py` validando endpoints de metadatos, filtrado combinado y expansión canónica con switch `OR`/`AND`. Total 60 tests backend pasando al 100%.
+
 ## [v0.8.3] - 2026-09-16
 ### Agregado & Mejorado
 - **Desacoplamiento de Series Seguidas en Sincronización Diaria (`tmdb_sync_service.py`):**

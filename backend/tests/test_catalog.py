@@ -359,3 +359,114 @@ async def test_home_classics_filtering(async_client: AsyncClient, db_session: As
     assert 91 not in classic_ids
     assert 92 not in classic_ids
 
+
+@pytest.mark.asyncio
+async def test_get_countries_and_languages_endpoints(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica que los endpoints de países e idiomas devuelvan datos agrupados correctamente."""
+    t1 = Titulo(id=301, tmdb_id=3001, tipo="movie", nombre="Film US", pais="US", idioma_original="en")
+    t2 = Titulo(id=302, tmdb_id=3002, tipo="movie", nombre="Film JP", pais="JP", idioma_original="ja")
+    t3 = Titulo(id=303, tmdb_id=3003, tipo="tv", nombre="Series US 2", pais="US", idioma_original="en")
+    db_session.add_all([t1, t2, t3])
+    await db_session.commit()
+
+    # Países
+    res_c = await async_client.get("/api/v1/countries")
+    assert res_c.status_code == 200
+    countries = res_c.json()
+    us_item = next((c for c in countries if c["code"] == "US"), None)
+    assert us_item is not None
+    assert us_item["count"] >= 2
+
+    # Idiomas
+    res_l = await async_client.get("/api/v1/languages")
+    assert res_l.status_code == 200
+    languages = res_l.json()
+    en_item = next((l for l in languages if l["code"] == "en"), None)
+    assert en_item is not None
+    assert en_item["count"] >= 2
+
+
+@pytest.mark.asyncio
+async def test_catalog_multi_filter_country_and_language(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica filtrado por múltiples países e idiomas."""
+    t1 = Titulo(id=401, tmdb_id=4001, tipo="movie", nombre="Film US", pais="US", idioma_original="en")
+    t2 = Titulo(id=402, tmdb_id=4002, tipo="movie", nombre="Film JP", pais="JP", idioma_original="ja")
+    t3 = Titulo(id=403, tmdb_id=4003, tipo="movie", nombre="Film ES", pais="ES", idioma_original="es")
+    db_session.add_all([t1, t2, t3])
+    await db_session.commit()
+
+    # Filtro por países (US o JP)
+    res_p = await async_client.get("/api/v1/titles?paises=US,JP")
+    assert res_p.status_code == 200
+    ids = [item["id"] for item in res_p.json()["items"]]
+    assert 401 in ids
+    assert 402 in ids
+    assert 403 not in ids
+
+    # Filtro por idioma (ja o es)
+    res_i = await async_client.get("/api/v1/titles?idiomas=ja,es")
+    assert res_i.status_code == 200
+    ids_i = [item["id"] for item in res_i.json()["items"]]
+    assert 402 in ids_i
+    assert 403 in ids_i
+    assert 401 not in ids_i
+
+
+@pytest.mark.asyncio
+async def test_catalog_genre_canonical_expansion_and_and_or_toggle(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica la expansión de duplas TMDB y los operadores OR y AND para géneros."""
+    # Generos en BD
+    g_scifi_movie = Genero(id=878, nombre="Science Fiction")
+    g_scifi_tv = Genero(id=10765, nombre="Sci-Fi & Fantasy")
+    g_comedy = Genero(id=35, nombre="Comedy")
+    db_session.add_all([g_scifi_movie, g_scifi_tv, g_comedy])
+    await db_session.flush()
+
+    # Película Sci-Fi pura
+    m_scifi = Titulo(id=501, tmdb_id=5001, tipo="movie", nombre="Interstellar 2")
+    # Película Comedia pura
+    m_comedy = Titulo(id=502, tmdb_id=5002, tipo="movie", nombre="Superbad")
+    # Serie Sci-Fi & Fantasy + Comedy
+    s_scifi_comedy = Titulo(id=503, tmdb_id=5003, tipo="tv", nombre="Rick and Morty")
+    db_session.add_all([m_scifi, m_comedy, s_scifi_comedy])
+    await db_session.flush()
+
+    await db_session.execute(titulos_generos.insert().values(titulo_id=501, genero_id=878))
+    await db_session.execute(titulos_generos.insert().values(titulo_id=502, genero_id=35))
+    await db_session.execute(titulos_generos.insert().values(titulo_id=503, genero_id=10765))
+    await db_session.execute(titulos_generos.insert().values(titulo_id=503, genero_id=35))
+    await db_session.commit()
+
+    # 1. Expansión canónica: buscar "Science Fiction" debe traer tanto la película (878) como la serie (10765)
+    res_exp = await async_client.get("/api/v1/titles?generos=Science Fiction")
+    assert res_exp.status_code == 200
+    ids_exp = [t["id"] for t in res_exp.json()["items"]]
+    assert 501 in ids_exp
+    assert 503 in ids_exp
+    assert 502 not in ids_exp
+
+    # 2. Multi-género con OR (default): Science Fiction O Comedy -> trae 501, 502 y 503
+    res_or = await async_client.get("/api/v1/titles?generos=Science Fiction,Comedy&genre_op=or")
+    assert res_or.status_code == 200
+    ids_or = [t["id"] for t in res_or.json()["items"]]
+    assert 501 in ids_or
+    assert 502 in ids_or
+    assert 503 in ids_or
+
+    # 3. Multi-género con AND: Science Fiction Y Comedy -> solo 503 tiene ambos
+    res_and = await async_client.get("/api/v1/titles?generos=Science Fiction,Comedy&genre_op=and")
+    assert res_and.status_code == 200
+    ids_and = [t["id"] for t in res_and.json()["items"]]
+    assert 503 in ids_and
+    assert 501 not in ids_and
+    assert 502 not in ids_and
+
+    # 4. Verificar que GET /genres no exponga "Sci-Fi & Fantasy" ni "Action & Adventure"
+    res_g = await async_client.get("/api/v1/genres")
+    assert res_g.status_code == 200
+    genre_names = [g["nombre"] for g in res_g.json()]
+    assert "Sci-Fi & Fantasy" not in genre_names
+    assert "Action & Adventure" not in genre_names
+    assert "Science Fiction" in genre_names
+    assert "Comedy" in genre_names
+

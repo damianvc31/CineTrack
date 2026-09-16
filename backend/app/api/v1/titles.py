@@ -6,14 +6,17 @@ from app.api.deps import get_current_user, get_optional_current_user
 from app.db.session import get_db
 from app.models.usuario import Usuario
 from app.schemas.catalog import (
+    CountryItem,
     GenreResponse,
     HomeSectionsResponse,
+    LanguageItem,
     ReviewCreate,
     ReviewResponse,
     TitleDetailResponse,
     TitleListResponse,
 )
 from app.services import catalog_service
+from app.services.catalog_service import EXCLUDED_GENRE_NAMES
 from app.models.genero import Genero
 from sqlalchemy import select
 
@@ -35,9 +38,15 @@ async def get_home(
 async def list_titles(
     tipo: Optional[str] = Query(default=None, description="Filtrar por tipo: 'movie' o 'tv'"),
     genero_id: Optional[int] = Query(default=None, description="Filtrar por ID numérico de género"),
-    genero: Optional[str] = Query(default=None, description="Filtrar por nombre de género (ej: 'Drama', 'Fantasy', 'Comedy')"),
+    genero: Optional[str] = Query(default=None, description="Filtrar por nombre de género"),
+    generos: Optional[str] = Query(default=None, description="Filtrar por uno o más géneros separados por coma (ej: 'Action,Comedy')"),
+    genre_op: str = Query(default="or", pattern="^(or|and)$", description="Operador lógico para múltiples géneros: 'or' (cualquiera) o 'and' (todos)"),
     actor_id: Optional[int] = Query(default=None, description="Filtrar por ID numérico de actor"),
     actor: Optional[str] = Query(default=None, description="Filtrar por nombre de actor (ej: 'DiCaprio', 'Tom Cruise')"),
+    pais: Optional[str] = Query(default=None, description="Filtrar por país de origen (código ISO o lista separada por coma)"),
+    paises: Optional[str] = Query(default=None, description="Filtrar por uno o más países de origen separados por coma (ej: 'US,JP,KR')"),
+    idioma: Optional[str] = Query(default=None, description="Filtrar por idioma original (código ISO o lista separada por coma)"),
+    idiomas: Optional[str] = Query(default=None, description="Filtrar por uno o más idiomas originales separados por coma (ej: 'en,ja,es')"),
     section: Optional[str] = Query(default=None, description="Filtrar por sección curada: 'new_releases', 'trending', 'classics', 'top_rated', 'others'"),
     q: Optional[str] = Query(default=None, description="Buscar por nombre, director, guionista o actor del elenco"),
     sort_by: str = Query(default="popularity", description="Criterio de orden: 'popularity', 'rating', 'release_date', 'title'"),
@@ -47,15 +56,21 @@ async def list_titles(
     current_user: Optional[Usuario] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> TitleListResponse:
-    """Búsqueda y listado paginado de títulos con filtros y secciones."""
+    """Búsqueda y listado paginado de títulos con filtros multidimensionales y secciones."""
     user_id = current_user.id if current_user else None
     return await catalog_service.get_titles(
         db,
         tipo=tipo,
         genero_id=genero_id,
         genero=genero,
+        generos=generos,
+        genre_op=genre_op,
         actor_id=actor_id,
         actor=actor,
+        pais=pais,
+        paises=paises,
+        idioma=idioma,
+        idiomas=idiomas,
         section=section,
         q=q,
         sort_by=sort_by,
@@ -128,7 +143,27 @@ async def delete_review(
 async def list_genres(
     db: AsyncSession = Depends(get_db)
 ) -> list[GenreResponse]:
-    """Retorna la lista completa de géneros registrados en el catálogo."""
+    """Retorna la lista de géneros canónicos registrados en el catálogo (excluyendo duplas compuestas)."""
     res = await db.execute(select(Genero).order_by(Genero.nombre.asc()))
     generos = res.scalars().all()
-    return [GenreResponse(id=g.id, nombre=g.nombre) for g in generos]
+    return [
+        GenreResponse(id=g.id, nombre=g.nombre)
+        for g in generos
+        if g.nombre not in EXCLUDED_GENRE_NAMES
+    ]
+
+
+@router.get("/countries", response_model=list[CountryItem])
+async def list_countries(
+    db: AsyncSession = Depends(get_db)
+) -> list[CountryItem]:
+    """Retorna la lista de países disponibles en el catálogo con código y conteo de títulos."""
+    return await catalog_service.get_available_countries(db)
+
+
+@router.get("/languages", response_model=list[LanguageItem])
+async def list_languages(
+    db: AsyncSession = Depends(get_db)
+) -> list[LanguageItem]:
+    """Retorna la lista de idiomas originales disponibles en el catálogo con código y conteo de títulos."""
+    return await catalog_service.get_available_languages(db)
