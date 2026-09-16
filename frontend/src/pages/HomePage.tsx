@@ -7,7 +7,7 @@ import {
   Layers,
   AlertCircle,
   RefreshCw,
-  Flame,
+  TrendingUp,
   Clock,
   Award,
   Bell,
@@ -21,13 +21,27 @@ import {
   LogOut,
   Send,
   Gem,
-  Smile,
   Zap,
   Theater,
   Skull,
   Rocket,
-  Compass,
-  Video,
+  Map,
+  Laugh,
+  PocketKnife,
+  CassetteTape,
+  Palette,
+  Paintbrush,
+  Users,
+  ScrollText,
+  Music,
+  Search,
+  Footprints,
+  Swords,
+  Sunset,
+  Baby,
+  Newspaper,
+  Rose,
+  Mic,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
@@ -102,15 +116,83 @@ export const HomePage: React.FC = () => {
 
   const getGenreIcon = (name: string) => {
     const lower = name.toLowerCase()
-    if (lower.includes('com') || lower.includes('humor')) return <Smile className="w-5 h-5 text-amber-400" />
-    if (lower.includes('acc') || lower.includes('act') || lower.includes('war') || lower.includes('bél')) return <Zap className="w-5 h-5 text-amber-400" />
+
+    // Animación: composición artística Paleta + Pincel superpuesto
+    if (lower.includes('anim')) {
+      return (
+        <div className="relative w-5 h-5 flex items-center justify-center">
+          <Palette className="w-4 h-4 text-amber-400" />
+          <Paintbrush className="w-2.5 h-2.5 text-amber-300 absolute -bottom-0.5 -right-0.5 drop-shadow" />
+        </div>
+      )
+    }
+
+    // Acción
+    if (lower.includes('acc') || lower.includes('act')) return <Zap className="w-5 h-5 text-amber-400" />
+
+    // Aventura
+    if (lower.includes('avent') || lower.includes('advent')) return <Map className="w-5 h-5 text-amber-400" />
+
+    // Comedia
+    if (lower.includes('com') || lower.includes('humor')) return <Laugh className="w-5 h-5 text-amber-400" />
+
+    // Crimen
+    if (lower.includes('crim')) return <PocketKnife className="w-5 h-5 text-amber-400" />
+
+    // Documental
+    if (lower.includes('doc')) return <CassetteTape className="w-5 h-5 text-amber-400" />
+
+    // Drama
     if (lower.includes('dram')) return <Theater className="w-5 h-5 text-amber-400" />
+
+    // Familia
+    if (lower.includes('fam')) return <Users className="w-5 h-5 text-amber-400" />
+
+    // Fantasía
+    if (lower.includes('fant')) return <Sparkles className="w-5 h-5 text-amber-400" />
+
+    // Historia
+    if (lower.includes('hist')) return <ScrollText className="w-5 h-5 text-amber-400" />
+
+    // Terror
     if (lower.includes('terr') || lower.includes('horr')) return <Skull className="w-5 h-5 text-amber-400" />
-    if (lower.includes('cienc') || lower.includes('sci') || lower.includes('fic')) return <Rocket className="w-5 h-5 text-amber-400" />
-    if (lower.includes('mis') || lower.includes('mys') || lower.includes('susp') || lower.includes('thrill')) return <Compass className="w-5 h-5 text-amber-400" />
+
+    // Música
+    if (lower.includes('mús') || lower.includes('mus')) return <Music className="w-5 h-5 text-amber-400" />
+
+    // Misterio
+    if (lower.includes('mis') || lower.includes('mys')) return <Search className="w-5 h-5 text-amber-400" />
+
+    // Romance
     if (lower.includes('rom')) return <Heart className="w-5 h-5 text-amber-400" />
-    if (lower.includes('anim')) return <Sparkles className="w-5 h-5 text-amber-400" />
-    if (lower.includes('doc')) return <Video className="w-5 h-5 text-amber-400" />
+
+    // Ciencia Ficción
+    if (lower.includes('cienc') || lower.includes('sci') || lower.includes('fic')) return <Rocket className="w-5 h-5 text-amber-400" />
+
+    // Suspenso / Thriller
+    if (lower.includes('susp') || lower.includes('thrill')) return <Footprints className="w-5 h-5 text-amber-400" />
+
+    // Bélica / Guerra
+    if (lower.includes('bél') || lower.includes('war') || lower.includes('guer')) return <Swords className="w-5 h-5 text-amber-400" />
+
+    // Western
+    if (lower.includes('west')) return <Sunset className="w-5 h-5 text-amber-400" />
+
+    // Infantil (Kids - Series)
+    if (lower.includes('kid') || lower.includes('infant')) return <Baby className="w-5 h-5 text-amber-400" />
+
+    // Noticias (News - Series)
+    if (lower.includes('notic') || lower.includes('news')) return <Newspaper className="w-5 h-5 text-amber-400" />
+
+    // Reality (Series)
+    if (lower.includes('real')) return <Users className="w-5 h-5 text-amber-400" />
+
+    // Telenovela (Soap - Series)
+    if (lower.includes('soap') || lower.includes('telenov')) return <Rose className="w-5 h-5 text-amber-400" />
+
+    // Talk Show (Series)
+    if (lower.includes('talk')) return <Mic className="w-5 h-5 text-amber-400" />
+
     return <Film className="w-5 h-5 text-amber-400" />
   }
 
@@ -260,11 +342,11 @@ export const HomePage: React.FC = () => {
             </div>
           )}
 
-          {/* Carousel 1: 🔥 Trending */}
+          {/* Carousel 1: 📈 Trending */}
           <CarouselRow
             title={t('trendingNow')}
             subtitle={language === 'es' ? 'Los títulos más populares del momento' : 'The most popular titles people are talking about'}
-            icon={<Flame className="w-5 h-5 text-amber-400" />}
+            icon={<TrendingUp className="w-5 h-5 text-amber-400" />}
             titles={data.trending}
             viewMoreLink={`/catalog?section=trending${tipoParam}`}
             onOpenAuth={openAuth}
@@ -318,19 +400,6 @@ export const HomePage: React.FC = () => {
                 onStateChange={handleCardStateChange}
               />
             ))}
-
-          {/* Carousel: Other Collections */}
-          {data.others && data.others.length > 0 && (
-            <CarouselRow
-              title={t('sectionOthers')}
-              subtitle={language === 'es' ? 'Joyas ocultas y colecciones diversas' : 'Hidden gems and diverse collections'}
-              icon={<Compass className="w-5 h-5 text-amber-400" />}
-              titles={data.others}
-              viewMoreLink={`/catalog?section=others${tipoParam}`}
-              onOpenAuth={openAuth}
-              onStateChange={handleCardStateChange}
-            />
-          )}
         </main>
 
         {/* ========================================================= */}

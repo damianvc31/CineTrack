@@ -47,7 +47,7 @@ async def list_titles(
     paises: Optional[str] = Query(default=None, description="Filtrar por uno o más países de origen separados por coma (ej: 'US,JP,KR')"),
     idioma: Optional[str] = Query(default=None, description="Filtrar por idioma original (código ISO o lista separada por coma)"),
     idiomas: Optional[str] = Query(default=None, description="Filtrar por uno o más idiomas originales separados por coma (ej: 'en,ja,es')"),
-    section: Optional[str] = Query(default=None, description="Filtrar por sección curada: 'new_releases', 'trending', 'classics', 'top_rated', 'others'"),
+    section: Optional[str] = Query(default=None, description="Filtrar por sección curada: 'new_releases', 'trending', 'classics', 'top_rated'"),
     q: Optional[str] = Query(default=None, description="Buscar por nombre, director, guionista o actor del elenco"),
     sort_by: str = Query(default="popularity", description="Criterio de orden: 'popularity', 'rating', 'release_date', 'title'"),
     order: str = Query(default="desc", pattern="^(asc|desc)$", description="Dirección del orden: 'desc' o 'asc'"),

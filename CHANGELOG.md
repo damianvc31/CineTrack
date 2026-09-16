@@ -2,6 +2,26 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.8.5] - 2026-09-16
+### Agregado & Mejorado
+- **Refinamiento Integral de Home (`HomePage.tsx` y `catalog_service.py`):**
+  - **Eliminación de Carruseles con Duplas de Series:** Se excluyeron del listado de carruseles de la Home las duplas híbridas de TMDB (`Action & Adventure`, `Sci-Fi & Fantasy`, `War & Politics`). En su lugar, los carruseles canónicos individuales (`Action`, `Adventure`, `Science Fiction`, `Fantasy`, `War`) expanden automáticamente sus consultas para consolidar películas y series de manera unificada y orgánica.
+  - **Eliminación de la Sección "Más Descubrimientos" (`others`):** Se removió el carrusel de descubrimientos de la Home, su lógica de base de datos y su opción en el selector de filtros de `/catalog`, simplificando la interfaz y evitando títulos repetidos.
+  - **Actualización Integral de Iconografía Vectorial (`lucide-react`):**
+    - Tendencias: sustitución de `Flame` por `TrendingUp` 📈 (reservando el fuego exclusivamente para la métrica visual de popularidad).
+    - Animación: composición artística superpuesta de paleta y pincel (`Palette` + `Paintbrush` 🎨🖌️).
+    - Crimen: `PocketKnife` 🔪.
+    - Documental: `CassetteTape` 📼.
+    - Misterio: `Search` 🔍.
+    - Suspenso: `Footprints` 👣.
+    - Bélica: `Swords` ⚔️.
+    - Western: `Sunset` 🏜️.
+    - Infantil: `Baby` 👶.
+    - Telenovelas: `Rose` 🌹.
+    - Comedia: `Laugh` 😂.
+    - Aventura: `Map` 🗺️.
+    - Mapeo específico y estilizado para cada género del catálogo (`Users`, `ScrollText`, `Music`, `Heart`, `Rocket`, `Theater`, `Skull`, `Newspaper`, `Mic`, etc.).
+
 ## [v0.8.4] - 2026-09-16
 ### Agregado & Mejorado
 - **Filtros Multiselección Avanzados en Catálogo (`/catalog`):**

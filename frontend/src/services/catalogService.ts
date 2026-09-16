@@ -21,7 +21,7 @@ export interface LanguageItem {
 }
 
 export interface TitleFilters {
-  section?: 'new_releases' | 'trending' | 'classics' | 'top_rated' | 'others'
+  section?: 'new_releases' | 'trending' | 'classics' | 'top_rated'
   tipo?: 'movie' | 'tv'
   genero?: string
   generos?: string | string[]

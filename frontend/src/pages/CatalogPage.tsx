@@ -338,7 +338,6 @@ export const CatalogPage: React.FC = () => {
           <option value="new_releases">{t('sectionNewReleases')}</option>
           <option value="classics">{t('sectionClassics')}</option>
           <option value="top_rated">{t('sectionTopRated')}</option>
-          <option value="others">{t('sectionOthers')}</option>
         </select>
 
         {/* Multi-select Genres Dropdown with OR/AND match toggle */}

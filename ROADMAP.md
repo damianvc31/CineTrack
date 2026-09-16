@@ -48,7 +48,7 @@
 
 ## Backlog (Pendientes para Versión Superior)
 
-- [ ] Repaso e iconografía personalizada de géneros cinematográficos.
+- [x] Repaso e iconografía personalizada de géneros cinematográficos *(Completado en v0.8.5)*.
 - [ ] Sistema de notificaciones activas por estrenos de nuevas temporadas.
 - [ ] Badge "Viendo Actualmente" (🔥) en series con episodios recientes.
 - [x] Panel de estadísticas avanzadas en el perfil (tiempo total, distribución de géneros, gráfico Donut SVG) *(Completado en v0.8.0)*.
