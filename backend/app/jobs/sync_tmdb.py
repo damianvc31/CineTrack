@@ -68,7 +68,7 @@ async def main():
 
             elif args.daily:
                 logger.info(f"-> Ejecutando sincronización diaria (allow_unreleased: {args.allow_unreleased})...")
-                changes_h = args.changes_hours or args.hours_window
+                changes_h = args.changes_hours if args.changes_hours is not None else args.hours_window
                 res = await service.run_daily_sync(
                     changes_hours_window=changes_h,
                     releases_days_window=args.releases_days,

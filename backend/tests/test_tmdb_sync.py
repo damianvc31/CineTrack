@@ -313,6 +313,7 @@ async def test_daily_sync_with_custom_hours_window(db_session, mock_tmdb_client)
     res = await service.run_daily_sync(hours_window=72)
     assert "updated_series" in res
     assert "new_movies" in res
+    assert "new_series" in res
 
 
 @pytest.mark.asyncio

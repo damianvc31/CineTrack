@@ -79,8 +79,8 @@ python -m app.jobs.sync_tmdb --initial --priority popular_first
 python -m app.jobs.sync_tmdb --daily
 
 # Sincronización diaria con parámetros personalizados:
-# --changes-hours: ventana en horas para /changes en series y películas de TMDB (ej. 120 para 5 días)
-# --releases-days: ventana en días para /discover de nuevos estrenos en cartelera (ej. 15 días)
+# --changes-hours: ventana en horas para /changes en series y películas de TMDB (ej. 120 para 5 días, o 0 para omitir cambios)
+# --releases-days: ventana en días para /discover de nuevos estrenos en cartelera de películas y series (ej. 15 días)
 # --allow-unreleased: permitir títulos no estrenados (por defecto False; omite películas futuras y series sin temporadas emitidas)
 python -m app.jobs.sync_tmdb --daily --changes-hours 120 --releases-days 15
 

@@ -112,7 +112,7 @@ async def _run_job_daily(
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
-            changes_h = changes_hours_window or hours_window
+            changes_h = changes_hours_window if changes_hours_window is not None else hours_window
             await service.run_daily_sync(
                 changes_hours_window=changes_h,
                 releases_days_window=releases_days_window,
@@ -231,14 +231,14 @@ async def trigger_daily_sync(
     _: Any = Depends(get_current_admin)
 ) -> JobResponse:
     """Ejecuta la sincronización diaria de cambios TMDB y cartelera en background."""
-    changes_h = payload.changes_hours_window or payload.hours_window
+    changes_h = payload.changes_hours_window if payload.changes_hours_window is not None else payload.hours_window
     background_tasks.add_task(
         _run_job_daily,
         changes_hours_window=changes_h,
         releases_days_window=payload.releases_days_window,
         allow_unreleased=payload.allow_unreleased,
     )
-    changes_desc = f"{changes_h} hs" if changes_h else "config default (48 hs)"
+    changes_desc = f"{changes_h} hs" if changes_h is not None else "config default (48 hs)"
     releases_desc = f"{payload.releases_days_window} días" if payload.releases_days_window else "config default (15 días)"
     return JobResponse(
         job="daily_sync",
