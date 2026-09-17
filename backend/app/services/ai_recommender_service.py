@@ -101,7 +101,7 @@ Genera la respuesta en formato JSON estricto siguiendo las reglas del sistema:""
 
 class AIRecommenderService:
     def __init__(self):
-        self.gemini_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+        self.gemini_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent"
         self.groq_url = "https://api.groq.com/openai/v1/chat/completions"
 
     async def _call_gemini(self, user_message: str) -> Dict[str, Any]:
@@ -131,7 +131,7 @@ class AIRecommenderService:
             return json.loads(raw_text)
 
     async def _call_groq(self, user_message: str) -> Dict[str, Any]:
-        """Llamada directa asíncrona a Groq API (Llama-3.3-70B)."""
+        """Llamada directa asíncrona a Groq API (openai/gpt-oss-120b)."""
         if not settings.GROQ_API_KEY:
             raise ValueError("GROQ_API_KEY no configurada")
 
@@ -140,7 +140,7 @@ class AIRecommenderService:
             "Content-Type": "application/json"
         }
         payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "openai/gpt-oss-120b",
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_message}
