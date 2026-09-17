@@ -1065,7 +1065,8 @@ class TMDBSyncService:
 
                 genre_added = 0
                 page = 1
-                max_pages = 25  # Protección para evitar bucles infinitos en discover
+                # Permitir explorar suficientes páginas según el target (hasta 50 páginas o más si el target es alto)
+                max_pages = min(500, max(50, (target // 20) * 4 + 10))
 
                 while genre_added < target and page <= max_pages:
                     try:
