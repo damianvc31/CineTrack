@@ -164,6 +164,19 @@ const UI_STRINGS: Record<string, { en: string; es: string }> = {
     en: 'Track all your written opinions, edit ratings, and review titles you have already watched.',
     es: 'Consulta todas tus opiniones, edita calificaciones y reseña los títulos que ya viste.'
   },
+
+  // AI Recommender Page
+  recommendationsNav: { en: 'AI Recommendations', es: 'Recomendaciones IA' },
+  aiRecommenderTitle: { en: 'AI Recommender', es: 'Recomendador Inteligente con IA' },
+  aiRecommenderSubtitle: {
+    en: 'Describe what you feel like watching and our AI will handpick the best matches from the catalog.',
+    es: 'Describe qué tienes ganas de ver y nuestra IA seleccionará las mejores opciones de nuestro catálogo.'
+  },
+  aiWhyRecommended: { en: 'Why we recommend it:', es: 'Por qué te la recomendamos:' },
+  aiGuestTip: {
+    en: 'Sign in or register to let CineTrack tailor recommendations to your favorites and watch history!',
+    es: '¡Iniciá sesión o registrate para que CineTrack adapte las recomendaciones a tus favoritos e historial!'
+  },
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)

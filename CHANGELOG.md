@@ -24,6 +24,8 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
     - Clarificación de la calificación unificada como proveniente de la comunidad (TMDB + CineTrack) y tooltip del percentil de popularidad.
     - Corrección de tooltips en el botón visto en tarjetas según el estado real (`isWatched`).
     - Unificación del término *"puntaje"* (reemplazando *"nota"*).
+
+## [v0.8.5] - 2026-09-16
 ### Agregado & Mejorado
 - **Refinamiento Integral de Home (`HomePage.tsx` y `catalog_service.py`):**
   - **Eliminación de Carruseles con Duplas de Series:** Se excluyeron del listado de carruseles de la Home las duplas híbridas de TMDB (`Action & Adventure`, `Sci-Fi & Fantasy`, `War & Politics`). En su lugar, los carruseles canónicos individuales (`Action`, `Adventure`, `Science Fiction`, `Fantasy`, `War`) expanden automáticamente sus consultas para consolidar películas y series de manera unificada y orgánica.

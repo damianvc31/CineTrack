@@ -1391,3 +1391,316 @@ async def get_available_languages(db: AsyncSession) -> list[LanguageItem]:
     )
     return [LanguageItem(code=row[0], count=row[1]) for row in res.all()]
 
+
+# =============================================================================
+# RECOMENDADOR INTELIGENTE POR IA (FASE 6)
+# =============================================================================
+
+GENRE_KEYWORD_MAP = {
+    "accion": "Action",
+    "acción": "Action",
+    "action": "Action",
+    "aventura": "Adventure",
+    "adventure": "Adventure",
+    "animacion": "Animation",
+    "animación": "Animation",
+    "animation": "Animation",
+    "anime": "Animation",
+    "comedia": "Comedy",
+    "comedy": "Comedy",
+    "humor": "Comedy",
+    "crimen": "Crime",
+    "crime": "Crime",
+    "policial": "Crime",
+    "documental": "Documentary",
+    "documentary": "Documentary",
+    "drama": "Drama",
+    "dramatica": "Drama",
+    "dramática": "Drama",
+    "familia": "Family",
+    "family": "Family",
+    "familiar": "Family",
+    "infantil": "Family",
+    "fantasia": "Fantasy",
+    "fantasía": "Fantasy",
+    "fantasy": "Fantasy",
+    "historia": "History",
+    "history": "History",
+    "historica": "History",
+    "histórica": "History",
+    "terror": "Horror",
+    "horror": "Horror",
+    "miedo": "Horror",
+    "musica": "Music",
+    "música": "Music",
+    "music": "Music",
+    "musical": "Music",
+    "misterio": "Mystery",
+    "mystery": "Mystery",
+    "romance": "Romance",
+    "romantica": "Romance",
+    "romántica": "Romance",
+    "amor": "Romance",
+    "ciencia ficcion": "Science Fiction",
+    "ciencia ficción": "Science Fiction",
+    "sci-fi": "Science Fiction",
+    "scifi": "Science Fiction",
+    "science fiction": "Science Fiction",
+    "suspenso": "Thriller",
+    "thriller": "Thriller",
+    "belica": "War",
+    "bélica": "War",
+    "guerra": "War",
+    "war": "War",
+    "western": "Western",
+}
+
+
+async def get_user_recommendation_context(db: AsyncSession, usuario_id: int) -> dict:
+    """Extrae el perfil condensado de gustos, favoritos y títulos vistos del usuario."""
+    # 1. Favoritos
+    fav_res = await db.execute(
+        select(Titulo.id, Titulo.nombre)
+        .join(EstadoUsuarioTitulo, EstadoUsuarioTitulo.titulo_id == Titulo.id)
+        .where(
+            EstadoUsuarioTitulo.usuario_id == usuario_id,
+            EstadoUsuarioTitulo.favorito == True
+        )
+        .limit(15)
+    )
+    favorites = [{"id": r[0], "nombre": r[1]} for r in fav_res.all()]
+
+    # 2. Títulos mejor puntuados por el usuario (>= 8.0)
+    high_res = await db.execute(
+        select(Titulo.id, Titulo.nombre, Resena.puntaje)
+        .join(Resena, Resena.titulo_id == Titulo.id)
+        .where(
+            Resena.usuario_id == usuario_id,
+            Resena.puntaje >= 8.0
+        )
+        .order_by(Resena.puntaje.desc())
+        .limit(10)
+    )
+    high_rated = [{"id": r[0], "nombre": r[1], "puntaje": r[2]} for r in high_res.all()]
+
+    # 3. Títulos vistos (IDs a excluir)
+    watched_res = await db.execute(
+        select(EstadoUsuarioTitulo.titulo_id)
+        .where(
+            EstadoUsuarioTitulo.usuario_id == usuario_id,
+            EstadoUsuarioTitulo.estado == "vista"
+        )
+    )
+    watched_ids = set(watched_res.scalars().all())
+
+    # 4. Géneros más frecuentes en favoritos o vistos
+    genre_freq_res = await db.execute(
+        select(Genero.nombre, func.count(Genero.id).label("cnt"))
+        .join(titulos_generos, titulos_generos.c.genero_id == Genero.id)
+        .join(EstadoUsuarioTitulo, EstadoUsuarioTitulo.titulo_id == titulos_generos.c.titulo_id)
+        .where(
+            EstadoUsuarioTitulo.usuario_id == usuario_id,
+            or_(EstadoUsuarioTitulo.favorito == True, EstadoUsuarioTitulo.estado == "vista")
+        )
+        .group_by(Genero.nombre)
+        .order_by(desc("cnt"))
+        .limit(4)
+    )
+    top_genres = [r[0] for r in genre_freq_res.all()]
+
+    return {
+        "favorites": favorites,
+        "high_rated": high_rated,
+        "watched_ids": list(watched_ids),
+        "top_genres": top_genres,
+        "has_history": bool(favorites or high_rated or watched_ids)
+    }
+
+
+async def get_recommendation_candidates(
+    db: AsyncSession,
+    prompt: str,
+    usuario_id: Optional[int] = None,
+    tipo_filtro: Optional[str] = "all"
+) -> tuple[list[dict], Optional[dict]]:
+    """Selecciona un pool acotado (30-45 títulos) de candidatos relevantes de PostgreSQL."""
+    lower_prompt = prompt.lower()
+    user_ctx = await get_user_recommendation_context(db, usuario_id) if usuario_id else None
+
+    # Detección de géneros mencionados en el prompt
+    detected_genres = set()
+    for kw, gname in GENRE_KEYWORD_MAP.items():
+        if kw in lower_prompt:
+            detected_genres.add(gname)
+
+    # Si no detectó en prompt pero el usuario tiene géneros favoritos, apoyarse en ellos
+    target_genres = list(detected_genres)
+    if not target_genres and user_ctx and user_ctx.get("top_genres"):
+        target_genres = user_ctx["top_genres"][:2]
+
+    # Detección de tipo en el prompt si no vino impuesto por tipo_filtro
+    effective_tipo = tipo_filtro
+    if effective_tipo == "all":
+        if "serie" in lower_prompt or "series" in lower_prompt or "temporada" in lower_prompt:
+            effective_tipo = "tv"
+        elif "pelicula" in lower_prompt or "película" in lower_prompt or "peli" in lower_prompt or "movie" in lower_prompt:
+            effective_tipo = "movie"
+
+    # Detección de décadas
+    min_year = None
+    max_year = None
+    if "80" in lower_prompt or "ochenta" in lower_prompt:
+        min_year, max_year = 1980, 1989
+    elif "90" in lower_prompt or "noventa" in lower_prompt:
+        min_year, max_year = 1990, 1999
+    elif "2000" in lower_prompt or "dos mil" in lower_prompt:
+        min_year, max_year = 2000, 2009
+    elif "clasico" in lower_prompt or "clásico" in lower_prompt or "classic" in lower_prompt:
+        max_year = datetime.now().year - 20
+
+    # Construir consulta base
+    q = (
+        select(Titulo)
+        .options(selectinload(Titulo.generos))
+        .where(Titulo.vote_count_tmdb >= 50)
+    )
+
+    if effective_tipo in ("movie", "tv"):
+        q = q.where(Titulo.tipo == effective_tipo)
+
+    if min_year:
+        q = q.where(Titulo.anio_estreno >= min_year)
+    if max_year:
+        q = q.where(Titulo.anio_estreno <= max_year)
+
+    # Excluir ya vistos salvo que pida volver a ver
+    allow_rewatch = "volver a ver" in lower_prompt or "repetir" in lower_prompt or "rewatch" in lower_prompt
+    if user_ctx and user_ctx.get("watched_ids") and not allow_rewatch:
+        q = q.where(Titulo.id.notin_(user_ctx["watched_ids"]))
+
+    # Si hay géneros target, unirse a titulos_generos
+    if target_genres:
+        expanded = []
+        for tg in target_genres:
+            expanded.extend(expand_genre_names(tg))
+        q = (
+            q.join(titulos_generos, titulos_generos.c.titulo_id == Titulo.id)
+            .join(Genero, Genero.id == titulos_generos.c.genero_id)
+            .where(Genero.nombre.in_(expanded))
+            .distinct()
+        )
+
+    # Ordenar por rating_unificado y popularidad
+    q = q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(40)
+    res = await db.execute(q)
+    candidate_titles = list(res.scalars().all())
+
+    # Si el pool fue muy chico (< 15), complementar con los títulos más aclamados del catálogo general
+    if len(candidate_titles) < 20:
+        existing_ids = {t.id for t in candidate_titles}
+        if user_ctx and not allow_rewatch:
+            existing_ids.update(user_ctx.get("watched_ids", []))
+
+        fill_q = (
+            select(Titulo)
+            .options(selectinload(Titulo.generos))
+            .where(
+                Titulo.id.notin_(list(existing_ids)),
+                Titulo.vote_count_tmdb >= 100
+            )
+        )
+        if effective_tipo in ("movie", "tv"):
+            fill_q = fill_q.where(Titulo.tipo == effective_tipo)
+        fill_q = fill_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(35 - len(candidate_titles))
+        fill_res = await db.execute(fill_q)
+        candidate_titles.extend(list(fill_res.scalars().all()))
+
+    # Buscar fragmentos de reseñas locales para los candidatos
+    cand_ids = [t.id for t in candidate_titles]
+    snippets_map = {}
+    if cand_ids:
+        rev_res = await db.execute(
+            select(Resena.titulo_id, Resena.texto)
+            .where(
+                Resena.titulo_id.in_(cand_ids),
+                Resena.texto.isnot(None),
+                func.length(Resena.texto) >= 20
+            )
+            .order_by(desc(Resena.id))
+        )
+        for tid, cont in rev_res.all():
+            if tid not in snippets_map and cont:
+                snippets_map[tid] = cont[:140] + ("..." if len(cont) > 140 else "")
+
+    # Mapear a estructura compacta para el LLM
+    formatted_candidates = []
+    for t in candidate_titles:
+        g_names = [g.nombre for g in t.generos]
+        short_synopsis = (t.sinopsis[:160] + "...") if t.sinopsis and len(t.sinopsis) > 160 else (t.sinopsis or "")
+        formatted_candidates.append({
+            "id": t.id,
+            "nombre": t.nombre,
+            "tipo": t.tipo,
+            "anio": t.anio_estreno,
+            "generos": g_names,
+            "director": t.director,
+            "vote_average": round(t.rating_unificado or t.vote_average_tmdb, 1),
+            "vote_count": t.vote_count_tmdb,
+            "sinopsis_corta": short_synopsis,
+            "community_review_snippet": snippets_map.get(t.id)
+        })
+
+    return formatted_candidates, user_ctx
+
+
+async def get_hydrated_recommendations(
+    db: AsyncSession,
+    title_ids: list[int],
+    usuario_id: Optional[int] = None
+) -> list[TitleCardResponse]:
+    """Obtiene y construye las TitleCards completas e interactivas para una lista de IDs recomendados."""
+    if not title_ids:
+        return []
+
+    q = (
+        select(Titulo)
+        .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
+        .where(Titulo.id.in_(title_ids))
+    )
+    res = await db.execute(q)
+    titles_map = {t.id: t for t in res.scalars().all()}
+
+    user_states_map = {}
+    user_ratings_map = {}
+    if usuario_id:
+        st_res = await db.execute(
+            select(EstadoUsuarioTitulo).where(
+                EstadoUsuarioTitulo.usuario_id == usuario_id,
+                EstadoUsuarioTitulo.titulo_id.in_(title_ids)
+            )
+        )
+        user_states_map = {st.titulo_id: st for st in st_res.scalars().all()}
+
+        r_res = await db.execute(
+            select(Resena.titulo_id, Resena.puntaje).where(
+                Resena.usuario_id == usuario_id,
+                Resena.titulo_id.in_(title_ids),
+                Resena.puntaje.isnot(None)
+            )
+        )
+        for r_tid, r_score in r_res.all():
+            user_ratings_map[r_tid] = r_score
+
+    cards = []
+    for tid in title_ids:
+        t = titles_map.get(tid)
+        if t:
+            cards.append(
+                _build_title_card(
+                    t,
+                    user_states_map.get(t.id),
+                    user_rating=user_ratings_map.get(t.id)
+                )
+            )
+    return cards
+

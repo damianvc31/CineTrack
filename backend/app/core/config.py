@@ -54,7 +54,10 @@ class Settings(BaseSettings):
     # Admin Key para endpoints administrativos y automatizaciones
     ADMIN_API_KEY: str = "cinetrack-dev-admin-secret-key"
 
-    AI_PROVIDER_API_KEY: str = ""
+    # AI Recommender (Híbrido: Gemini Primario + Groq Fallback)
+    GEMINI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
+    AI_RECOMMENDER_PRIMARY: str = "gemini"  # "gemini" o "groq"
 
     # Home Sections & Pools Configuration
     HOME_SECTION_SAMPLE_SIZE: int = 10

@@ -49,14 +49,23 @@
 ## Backlog (Pendientes para Versión Superior)
 
 - [x] Repaso e iconografía personalizada de géneros cinematográficos *(Completado en v0.8.5)*.
-- [ ] Sistema de notificaciones activas por estrenos de nuevas temporadas.
-- [ ] Badge "Viendo Actualmente" (🔥) en series con episodios recientes.
+- [x] Buscador integral por título, director, guionista y actor *(Completado en v0.8.4)*.
+- [x] Pantallas de extensión ("Ver más") con paginación para cada sección *(Completado: enlaces en carruseles de Home conectados a `/catalog` con filtros de sección/género y paginación completa)*.
 - [x] Panel de estadísticas avanzadas en el perfil (tiempo total, distribución de géneros, gráfico Donut SVG) *(Completado en v0.8.0)*.
 - [x] Selector de idioma de interfaz y diccionario de géneros *(Completado en v0.8.0 - v0.8.1)*.
 - [x] Ingesta de fotos de actores y sección Top Cast *(Completado en v0.8.0 - v0.8.1)*.
 - [x] Carga de avatar desde archivo local con centrado y zoom *(Completado en v0.8.0 - v0.8.1)*.
-- [ ] Recomendador avanzado con function calling y búsqueda semántica vectorial (embeddings con pgvector).
-- [x] Buscador integral por título, director, guionista y actor *(Completado en v0.8.4)*.
-- [ ] Pantallas de extensión ("Ver más") con paginación para cada sección.
-- [ ] Soporte multirregión para plataformas de streaming (JustWatch / TMDB Watch Providers).
+- [ ] **Sistema de notificaciones activas por panel in-app:**
+  - Avisos informativos por cambio de status de series en cualquier lista del usuario (renovación con/sin fecha, cancelación, finalización, hiatus entre temporadas o reboots sin alterar el estado del usuario).
+  - Alertas automáticas cuando una serie en estado "Vista" estrena nueva temporada/episodios, pasando automáticamente a "Siguiendo".
+- [ ] **Badge visual "Viendo Actualmente" (🔥):**
+  - Indicador en series de "Siguiendo" con episodios recientes, con ventana de días configurable por cada usuario desde su pantalla de Configuración (`/settings`).
+- [ ] **Soporte multirregión para plataformas de streaming:**
+  - Integración de JustWatch / TMDB Watch Providers según el país del usuario, requiriendo tabla relacional propia.
+- [ ] **Selector de idioma para el contenido (Títulos y Sinopsis):**
+  - Tabla de traducciones multilingüe conectada a TMDB, con regla de fallback al inglés/idioma original para contenidos o idiomas faltantes.
+- [ ] **Expansión selectiva del catálogo mediante jobs dirigidos:**
+  - Comando o endpoint administrativo para ingestar títulos con filtros específicos (ej. cine argentino, series de $\ge 5$ temporadas, etc.) sin rehacer la ingesta inicial completa.
+- [ ] **Recomendador avanzado:**
+  - Evolución del recomendador con function calling y búsqueda semántica vectorial (embeddings con pgvector).
 - [ ] Posible refinamiento UX en desmarques de episodios: diálogo opcional para advertir al usuario o resetear progreso posterior al desmarcar un episodio intermedio.

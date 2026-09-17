@@ -70,6 +70,16 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                 <span>{t('catalog')}</span>
               </Link>
 
+              {/* Botón Asistente IA */}
+              <Link
+                to="/recommendations"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-950/60 to-indigo-950/60 hover:from-purple-900/70 hover:to-indigo-900/70 border border-purple-500/40 hover:border-purple-400/60 text-purple-300 hover:text-white transition-all shrink-0 shadow-sm"
+                title={t('recommendationsNav')}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                <span>{t('aiAssistant')}</span>
+              </Link>
+
               {/* Barra de Búsqueda con X de limpieza */}
               <form onSubmit={handleSearchSubmit} className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -183,6 +193,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                           className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
                           <MessageSquare className="w-4 h-4 text-amber-400" /> {t('reviews')}
+                        </Link>
+                        <Link
+                          to="/recommendations"
+                          onClick={() => setUserDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2 text-purple-300 hover:text-white hover:bg-purple-950/20"
+                        >
+                          <Sparkles className="w-4 h-4 text-purple-400" /> {t('recommendationsNav')}
                         </Link>
                         <Link
                           to="/settings"
