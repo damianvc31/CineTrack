@@ -63,14 +63,19 @@ Cada usuario mantiene un registro individual de interacción con cada título (`
 
 ---
 
-## 3. Calificación Ponderada Unificada
+## 3. Calificación Ponderada Unificada y Motor de Reseñas
 
 Para evitar la fricción de mostrar puntajes dispares, CineTrack calcula una calificación única ponderada:
 
 $$\text{Rating Unificado} = \frac{(\text{vote\_average\_tmdb} \times \text{vote\_count\_tmdb}) + \sum_{i=1}^{N} \text{puntaje\_usuario}_i}{\text{vote\_count\_tmdb} + N}$$
 
-- **Reseñas de TMDB:** Cualitativas. Se importan hasta 20 reseñas externas por obra (`TMDB_REVIEWS_PER_TITLE_LIMIT = 20`) para dar riqueza testimonial sin alterar la ponderación numérica (sus calificaciones ya forman parte del `vote_average_tmdb`).
-- **Reseñas de CineTrack:** Cada usuario registrado puede emitir una reseña con puntaje de 1.0 a 10.0, recalculando de inmediato el rating consolidado en base de datos.
+- **Reseñas de TMDB:** Cualitativas. Se importan hasta 20 reseñas externas por obra (`TMDB_REVIEWS_PER_TITLE_LIMIT = 20`) con insignia distintiva (*TMDB Review*) para dar riqueza testimonial sin alterar la ponderación numérica (sus calificaciones ya forman parte del `vote_average_tmdb`).
+- **Reseñas de CineTrack y Escala Decimal en Saltos de 0.5:**
+  - Los usuarios pueden calificar en una escala de **0.0 a 10.0 en múltiplos exactos de 0.5** (ej. 7.0, 7.5, 8.0, 8.5, etc.).
+  - **Calificación Opcional:** El puntaje es opcional (`puntaje = None` / `-`). Si el usuario opta por emitir una reseña puramente textual, esta no ingresa en la fórmula de promedio ponderado, evitando penalizaciones o sesgos numéricos.
+  - **Regla Estricta de 1 Reseña por Usuario:** Cada usuario solo puede emitir una única reseña por título. Si ya existe una, la interfaz presenta su propia reseña con opciones de edición in-place (lápiz) y eliminación segura (tacho de basura).
+  - **Condición de Visualización:** Para redactar una nueva reseña, el título debe haber sido marcado previamente como visto (`vista`). Se preserva el derecho a editar o eliminar reseñas existentes en todo momento.
+  - **Recálculo Atómico:** Toda inserción, actualización o eliminación (`DELETE /api/v1/titles/{id}/reviews`) dispara de forma atómica el recálculo de `rating_unificado` en la base de datos.
 
 ---
 
@@ -88,12 +93,11 @@ La población inicial del catálogo (`--initial` o `/admin/sync/initial`) está 
 
 ## 5. Sincronización Diaria y Detección de Cambios
 
-El proceso de sincronización periódica (`--daily` o `/admin/sync/daily`) mantiene el catálogo al día con mínimo consumo de cuota de API externa mediante cuatro reglas de negocio:
+El proceso de sincronización periódica (`--daily` o `/admin/sync/daily`) mantiene el catálogo al día de forma autónoma con mínimo consumo de cuota de API externa mediante tres reglas de negocio desacopladas del estado de los usuarios:
 
-1. **Actualización Prioritaria de Series Seguidas:** Identifica todas las series que tengan al menos un usuario activo en estado `siguiendo`. Actualiza su estado de emisión (`Ended`, `Returning Series`, `Canceled`) y descarga atómicamente los nuevos episodios o temporadas recién emitidos.
-2. **Detección Desatendida de Cambios vía `/changes`:** Consulta los endpoints `/tv/changes` y `/movie/changes` dentro de una ventana temporal móvil (`TMDB_CHANGES_HOURS_WINDOW`, default 48 horas) para detectar y actualizar cualquier serie o película existente en el catálogo local que haya sufrido modificaciones en TMDB, incluso si ningún usuario la sigue todavía.
-3. **Ingesta Autónoma de Estrenos en Cartelera:** Detecta películas estrenadas en los últimos 15 días (`TMDB_DAILY_SYNC_DAYS_WINDOW = 15`) que superen un umbral de relevancia (`popularity >= 10.0`) y las incorpora al catálogo local.
-4. **Recálculo de Percentiles:** Tras actualizar el catálogo, se recalcula la distribución estadística de popularidad (`popularidad_percentil`) para todos los títulos.
+1. **Detección Desatendida de Cambios vía `/changes` de TMDB:** Consulta los endpoints `/tv/changes` y `/movie/changes` dentro de una ventana temporal móvil (`TMDB_CHANGES_HOURS_WINDOW`, default 48 horas / 2 días) para identificar modificaciones en metadatos, nuevos episodios, temporadas o cambios de estado de emisión (`Ended`, `Returning Series`, `Canceled`) en TMDB, actualizando atómicamente cualquier serie o película del catálogo local que haya variado.
+2. **Ingesta Autónoma de Estrenos Recientes en Cartelera:** Detecta películas estrenadas en los últimos 15 días (`TMDB_DAILY_SYNC_DAYS_WINDOW = 15`) que superen un umbral de relevancia (`popularity >= 10.0`) y las incorpora automáticamente al catálogo local (respetando `allow_unreleased=False` por defecto).
+3. **Recálculo Estadístico de Percentiles y Ratings:** Tras actualizar el catálogo, recalcula la distribución estadística de popularidad (`popularidad_percentil`) y los promedios ponderados (`rating_unificado`) para todos los títulos.
 
 ---
 
@@ -102,7 +106,8 @@ El proceso de sincronización periódica (`--daily` o `/admin/sync/daily`) manti
 Durante la importación o sincronización de cualquier título, se aplican reglas de filtrado y estructuración crediticia:
 
 - **Dirección y Guion:** Se deduplican directores y creadores. Para guionistas se concatenan hasta un máximo de 3 autores principales (`TMDB_CREW_WRITERS_LIMIT = 3`).
-- **Elenco Principal Jerarquizado:** Se limita el reparto a los 15 actores principales más relevantes (`TMDB_CAST_LIMIT = 15`), ordenados por la jerarquía crediticia oficial de TMDB (`orden`).
+- **Elenco Principal Jerarquizado con Fotos:** Se limita el reparto a los 15 actores principales más relevantes (`TMDB_CAST_LIMIT = 15`), ordenados por la jerarquía crediticia oficial de TMDB (`orden`).
+- **Fotografía de Actores (Top Cast):** Cada actor persiste su imagen oficial de TMDB (`foto_url`, resolución `w185`) en el modelo `Actor`. Para títulos ya ingestados, el job administrativo `populate_actor_photos` descarga y vincula las fotos faltantes de forma asíncrona con control de tasa de TMDB. En la UI, se renderiza la sección "Top Cast" con avatares circulares y nombres de personajes por encima de las temporadas en series y debajo de la sinopsis en películas.
 - **Atributos de Personaje:** En la relación N:M (`titulos_elenco`) se persiste explícitamente el nombre del papel interpretado (`personaje`) y su número de orden para renderizar fichas de reparto fidedignas en la UI.
 - **Jerarquía Episódica:** En series de televisión se importan todas las temporadas y episodios regulares, persistiendo números de episodio, fecha de emisión exacta (`air_date`) y sinopsis individual.
 - **Omisión de Temporadas Vacías:** Únicamente se persisten temporadas que contengan al menos un episodio emitido o programado. Las temporadas placeholder de TMDB con 0 episodios son omitidas automáticamente para evitar ruido visual en la UI, acordeones vacíos e inflación artificial del conteo de temporadas de la serie.
@@ -138,5 +143,24 @@ El endpoint de listado paginado separa de forma ortogonal el filtro de colecció
 | `page` / `page_size` | int | Paginación estándar | Default `page=1`, `page_size=20` (máx 100) |
 
 - **Badge de Popularidad:** Todas las respuestas de tarjetas (`TitleCardResponse`) exponen el campo `popularidad_percentil: float` (0.0 a 1.0) para que la interfaz pueda renderizar directamente el indicador visual de tendencia (🔥 xx%).
+
+---
+
+## 9. Expansión Selectiva del Catálogo por Géneros (Criterio 1: `--expand`)
+
+Para garantizar balance temático y profundidad en géneros específicos sin realizar una ingesta masiva ciega, el sistema provee el job CLI `--expand` y el endpoint administrativo `/api/v1/admin/sync/expand`:
+
+- **Mecanismo de Descubrimiento:** Utiliza los endpoints `/discover/movie` y `/discover/tv` de TMDB aplicando filtros combinados de calidad:
+  - Umbral mínimo de votos: `TMDB_EXPAND_MIN_VOTE_COUNT = 300` (configurable).
+  - Calificación promedio mínima: `TMDB_EXPAND_MIN_VOTE_AVERAGE = 7.0` (configurable).
+  - Objetivo por género: `TMDB_EXPAND_TARGET_PER_GENRE = 50` (configurable, calculando dinámicamente las páginas necesarias).
+  - Restricción de obras estrenadas: Por defecto (`allow_unreleased=False`), filtra únicamente producciones que ya hayan tenido estreno comercial real (`primary_release_date.lte` y `first_air_date.lte` a la fecha actual).
+- **Idempotencia Absoluta:** Obras ya presentes en el catálogo son ignoradas sin consumir llamadas de créditos ni duplicar registros, avanzando en la paginación hasta cumplir la cuota objetivo de títulos nuevos.
+- **Saneamiento de Obras No Estrenadas (`--cleanup-unreleased`):** Elimina películas con fecha de estreno futura y series que carezcan de temporadas estrenadas en emisión, recalculando percentiles para mantener el catálogo limpio.
+
+---
+
+> *Para las especificaciones técnicas, grounding estricto y cascada jerárquica de resiliencia del Asistente de Recomendaciones con IA, consultar [docs/ARQUITECTURA_RECOMENDADOR.md](ARQUITECTURA_RECOMENDADOR.md).*
+
 
 

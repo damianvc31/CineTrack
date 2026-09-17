@@ -64,8 +64,8 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
    - Recálculo atómico disparado tras la incorporación o actualización de lotes en el catálogo.
 5. **Recomendador de IA Embebido:**
    - Desacoplado de los hubs del entorno de desarrollo.
-   - **Versión Mínima:** Recomendador simple sin function calling (implementado como última pieza del flujo núcleo según `spec.md`). Conexión vía API a modelo gratuito/eficiente (Google Gemini API / Groq API) con un prompt directo estructurado que combina el texto del usuario con sus preferencias de perfil (favoritos, vistos, reseñas) y puntajes de comunidad.
-   - **Versión Superior:** Evolución planificada a *function calling* estructurado (herramientas de búsqueda exacta + similitud semántica con embeddings vectoriales), con la arquitectura de FastAPI ya preparada para soportar ambas modalidades.
+   - **Versión Mínima (Implementada - v0.9.3):** Recomendador con grounding estricto sobre el catálogo local de PostgreSQL, filtrado bilingüe temático en SQL y cascada jerárquica multi-modelo de 2 niveles entre proveedores de nube (Gemini / Groq) con fallback offline a motor heurístico local. Prompt estructurado directo que combina la consulta con el perfil del usuario (favoritos, vistos, reseñas) sin requerir llamadas agénticas intermedias.
+   - **Versión Superior (Planificada Post-Entrega):** Evolución hacia búsqueda semántica vectorial con embeddings (`fastembed` en CPU o Google Text-Embedding API) persistidos en PostgreSQL con la extensión `pgvector`. **Se descarta formalmente el uso de *function calling* y agentes multi-turno** por inviabilidad técnica en entornos de producción (latencia acumulada de 5-8s y rápido agotamiento de cuotas por minuto/TPM en capas gratuitas). La versión superior consolida una arquitectura RAG híbrida de un solo turno (*single-turn hybrid RAG*): búsqueda vectorial y filtros relacionales directos en backend + generación y justificación cinematográfica en una sola llamada de LLM.
 
 6. **Motor Integral de Reseñas y Calificación Decimal:**
    - **Regla Estricta 1 Reseña por Usuario por Título:** Garantizada mediante validación y upsert a nivel de servicio y restricciones de unicidad.
@@ -168,3 +168,74 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 ├── ROADMAP.md              # Backlog y próximas fases
 └── README.md               # Guía de instalación, ejecución y variables
 ```
+
+---
+
+## 6. Arquitectura de Despliegue en Producción (PaaS Cloud)
+
+Para la puesta en producción y entrega final del proyecto, se adopta una **Arquitectura PaaS Desacoplada (Plataforma como Servicio)** de nivel profesional, alta disponibilidad y costo cero:
+
+```
+                      ┌─────────────────────────────────────────────────────────┐
+                      │                     CLIENTES / EVALUADORES              │
+                      └────────────────────────────┬────────────────────────────┘
+                                                   │
+                                                   ▼ HTTPS
+                      ┌─────────────────────────────────────────────────────────┐
+                      │ FRONTEND: Vercel (Edge CDN)                             │
+                      │ • SPA React 19 + TypeScript + Vite 8                    │
+                      │ • URL: https://cinetrack.vercel.app                     │
+                      │ • Certificado SSL automático y CDN global               │
+                      └────────────────────────────┬────────────────────────────┘
+                                                   │
+                                                   ▼ REST API Fetch (HTTPS)
+                      ┌─────────────────────────────────────────────────────────┐
+                      │ BACKEND: Render.com (Web Service)                       │
+                      │ • FastAPI + Uvicorn (Python 3.11+)                      │
+                      │ • URL: https://cinetrack-api.onrender.com               │
+                      │ • Auto-Deploy continuo en cada push a rama de release   │
+                      └─────────────────────┬─────────────────┬─────────────────┘
+                                            │                 │
+                                            ▼ SQL (AsyncPG)   │ Disparo diario con
+                      ┌─────────────────────────────┐         │ X-Admin-Key
+                      │ BASE DE DATOS: Neon.tech    │         │
+                      │ • PostgreSQL Serverless     │         │
+                      │ • Pooling nativo con SSL    │         │
+                      │ • Catálogo persistido       │         │
+                      └─────────────────────────────┘         │
+                                                              ▼
+                      ┌─────────────────────────────────────────────────────────┐
+                      │ CRON DIARIO DE CATÁLOGO: GitHub Actions                 │
+                      │ • Programación cron: 03:00 AM UTC diario                │
+                      │ • Invoca POST /api/v1/admin/sync/daily en background    │
+                      │ • Sincroniza cartelera y catálogo sin servidor extra    │
+                      └─────────────────────────────────────────────────────────┘
+```
+
+### 6.1. Componentes del Despliegue
+
+1. **Base de Datos Gestionada (Neon.tech PostgreSQL):**
+   - Instancia serverless de PostgreSQL 16 con SSL nativo.
+   - Conexión asíncrona mediante `postgresql+asyncpg://` soportada nativamente por `config.py` y `db/session.py`.
+   - Inicialización mediante migraciones Alembic (`alembic upgrade head`) y volcado de catálogo desde el entorno de desarrollo.
+
+2. **Backend API (Render.com Web Service):**
+   - Vinculado al repositorio GitHub (`damianvc31/CineTrack`).
+   - **Build Command:** `pip install -r backend/requirements.txt`.
+   - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend`.
+   - **Variables de Entorno Clave:** `DATABASE_URL`, `TMDB_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, `AUTH_SECRET_KEY`, `ADMIN_API_KEY`, `AI_RECOMMENDER_PRIMARY`.
+
+3. **Frontend SPA (Vercel):**
+   - Vinculado al repositorio GitHub en el subdirectorio `frontend`.
+   - **Build Command:** `npm run build` (Framework preset: Vite).
+   - **Output Directory:** `dist`.
+   - **Variable de Entorno:** `VITE_API_URL=https://cinetrack-api.onrender.com/api/v1`.
+
+4. **Sincronización Diaria Periódica (GitHub Actions Workflow):**
+   - Workflow desacoplado en `.github/workflows/daily_sync.yml`.
+   - Ejecuta un `curl` diario enviando la cabecera `X-Admin-Key` al endpoint administrativo `/api/v1/admin/sync/daily`, el cual delega la ingesta a `fastapi.BackgroundTasks` y responde inmediatamente con `HTTP 202 Accepted`.
+
+### 6.2. Fundamento Técnico de la Elección
+- **Simplicidad Operativa (KISS):** Elimina la necesidad de aprovisionar y mantener sistemas operativos Linux, túneles SSH, configuración de Nginx y certificados Let's Encrypt manuales.
+- **Contenerización Transparente:** Tanto Render como Vercel ejecutan la aplicación en contenedores Linux aislados y seguros por defecto, sin obligar al desarrollador a mantener `Dockerfile` ni consumir recursos locales de Docker Desktop.
+- **Integración Continua (CI/CD):** Todo cambio o fix commiteado y pusheado se compila, verifica y publica automáticamente en producción en menos de dos minutos.

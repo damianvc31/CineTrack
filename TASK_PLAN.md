@@ -121,12 +121,22 @@
     - [x] Variables de entorno `GEMINI_FALLBACK_MODELS`, `GROQ_FALLBACK_MODELS`, `RECOMMENDATION_CANDIDATES_LIMIT` y `AI_RECOMMENDER_PRIMARY` en `.env`, `.env.example` y `config.py`.
     - [x] Suite de 70 tests de backend pasando al 100%.
 
+  - [ ] **Fase 7: Despliegue a Producción y Entrega Final (v1.0.0)**
+    - [ ] Paso 7.1: Documentación de la arquitectura de despliegue en `ARCHITECTURE.md` y `README.md`.
+    - [ ] Paso 7.2: Script de migración y volcado de base de datos (`export_to_postgres.py`) para trasladar el catálogo local `cinetrack.db` a PostgreSQL en la nube.
+    - [ ] Paso 7.3: Aprovisionamiento de base de datos PostgreSQL Serverless en Neon.tech y verificación de conexión SSL (`DATABASE_URL`).
+    - [ ] Paso 7.4: Despliegue del backend FastAPI en Render.com (Web Service) y configuración de variables de entorno de producción.
+    - [ ] Paso 7.5: Despliegue de la SPA React 19 en Vercel con variable `VITE_API_URL` apuntando al backend en Render.
+    - [ ] Paso 7.6: Configuración del workflow de sincronización diaria en GitHub Actions (`.github/workflows/daily_sync.yml`) invocando `POST /api/v1/admin/sync/daily`.
+    - [ ] Paso 7.7: Validación funcional de extremo a extremo en entorno de producción (login, catálogo, reseñas, recomendador y cron).
+    - [ ] Paso 7.8: Tag `v1.0.0` y preparación de documentación final para entrega del curso.
+
 ---
 
-## Próximos Hitos (Versión Superior):
-- [ ] **Recomendador Avanzado con IA Embebida (Branch `feature/recomendador-avanzado`):**
-  - [ ] Enriquecimiento de contexto y vectorización semántica de catálogo (Embeddings / `pgvector`).
-  - [ ] Agente agéntico con selección por estado de ánimo, function calling y análisis profundo de reseñas/comunidad.
+## Próximos Hitos (Versión Superior / Post-Entrega):
+- [ ] **Recomendador Avanzado con Búsqueda Semántica Vectorial:**
+  - [ ] Generación de embeddings con `fastembed` (CPU) o Google Text-Embedding API.
+  - [ ] Búsqueda por similitud de coseno con `pgvector` en PostgreSQL.
 - [ ] **Sistema de Notificaciones In-App:**
   - [ ] Avisos de cambio de status de series en listas del usuario (renovación, cancelación, finalización, hiatus).
   - [ ] Alertas y transición automática a "Siguiendo" cuando una serie en "Vista" estrena nueva temporada/episodios.
