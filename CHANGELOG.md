@@ -2,6 +2,19 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.9.3] - 2026-09-17
+### Rendimiento & Resiliencia
+- **Optimización de Cuota y Cascada Jerárquica Multi-Nivel entre Proveedores:**
+  - **Jerarquía de Ejecución:** Ante una consulta, el recomendador evalúa en estricto orden de calidad:
+    1. Modelo insignia del proveedor primario (ej. Gemini `gemini-3.6-flash`).
+    2. Modelo insignia del proveedor secundario (ej. Groq `openai/gpt-oss-120b`).
+    3. Modelos de respaldo del proveedor primario (`gemini-flash-lite-latest`, `gemini-3.5-flash-lite`, `gemini-3.8-flash`).
+    4. Modelos de respaldo del proveedor secundario (`openai/gpt-oss-20b`, `groq/compound-mini`, `qwen/qwen3.8-27b`).
+    5. Motor heurístico determinista local offline si todos los servicios en la nube estuviesen caídos.
+  - **Reducción del 70% en el Payload de Candidatos:** Parámetro `RECOMMENDATION_CANDIDATES_LIMIT` (default 20, antes 45 títulos rígidos). Reduce el prompt de ~5.500 a ~1.500 tokens, cuadruplicando la capacidad de consultas por minuto y multiplicando por 4 el rendimiento de la cuota diaria.
+  - **Fallo Rápido sin Demoras:** Detección inmediata de 429 para pasar al siguiente modelo/proveedor sin reintentos redundantes.
+  - **Configuración Completa en Entorno:** Nuevas variables `GEMINI_FALLBACK_MODELS` y `GROQ_FALLBACK_MODELS` configurables en `config.py`, `.env` y `.env.example`.
+
 ## [v0.9.2] - 2026-09-17
 ### Corregido & Mejorado
 - **Afinidad Semántica y Búsqueda Temática Bilingüe en el Recomendador con IA:**

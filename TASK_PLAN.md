@@ -106,6 +106,21 @@
     - [x] Pantalla dedicada `/recommendations` (`RecommendationsPage.tsx`), sincronización con query param `?prompt=...`, botón de acceso rápido con chispa en navbar y menú mobile, disparadores temáticos y filtros rápidos por tipo de obra.
     - [x] Suite de 65 tests automatizados en backend con cobertura completa de conmutación por error y fallback (100% pasando).
 
+  - [x] **Expansión de Catálogo por Géneros y Afinación (v0.9.1 - v0.9.2)**
+    - [x] Job CLI y endpoint administrativo de expansión de catálogo por géneros con umbrales de calidad (`--expand`, v0.9.1).
+    - [x] Mapeo semántico bilingüe de conceptos en español (`THEME_EXPANSION_MAP`) y búsqueda temática priorizada en SQL para sinopsis TMDB (v0.9.2).
+    - [x] Elevación de piso de votos para relleno general a 150 votos y desacople de perfil en búsquedas con términos específicos (v0.9.2).
+
+  - [x] **Optimización de Cuota y Cascada Jerárquica Multi-Nivel entre Proveedores (v0.9.3)**
+    - [x] Reducción de 45 a 20 candidatos en pool (`RECOMMENDATION_CANDIDATES_LIMIT`), recortando el footprint de tokens de entrada en un 73% (~1.500 tokens).
+    - [x] Cascada jerárquica de 2 niveles de calidad entre modelos de nube:
+      - Nivel 1: Modelos insignia principales (Primario -> Secundario, ej. Gemini `gemini-3.6-flash` -> Groq `openai/gpt-oss-120b`).
+      - Nivel 2: Modelos de respaldo ligeros con cuotas independientes (Primario -> Secundario, ej. `gemini-flash-lite-latest`, `3.5-flash-lite`, `3.8-flash` -> `openai/gpt-oss-20b`, `compound-mini`, `qwen-27b`).
+      - Nivel 3: Motor heurístico offline determinista local.
+    - [x] Fallo rápido inmediato ante código HTTP 429 sin pausas redundantes de reintento.
+    - [x] Variables de entorno `GEMINI_FALLBACK_MODELS`, `GROQ_FALLBACK_MODELS`, `RECOMMENDATION_CANDIDATES_LIMIT` y `AI_RECOMMENDER_PRIMARY` en `.env`, `.env.example` y `config.py`.
+    - [x] Suite de 70 tests de backend pasando al 100%.
+
 ---
 
 ## Próximos Hitos (Versión Superior):

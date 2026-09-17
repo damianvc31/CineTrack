@@ -1947,7 +1947,8 @@ async def get_recommendation_candidates(
         for t in gen_res.scalars().all():
             collected_titles[t.id] = t
 
-    candidate_titles = list(collected_titles.values())[:45]
+    max_candidates = getattr(settings, "RECOMMENDATION_CANDIDATES_LIMIT", 20)
+    candidate_titles = list(collected_titles.values())[:max_candidates]
 
     # Buscar fragmentos de reseñas locales para los candidatos
     cand_ids = [t.id for t in candidate_titles]

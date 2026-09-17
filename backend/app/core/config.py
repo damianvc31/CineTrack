@@ -59,12 +59,15 @@ class Settings(BaseSettings):
     # Admin Key para endpoints administrativos y automatizaciones
     ADMIN_API_KEY: str = "cinetrack-dev-admin-secret-key"
 
-    # AI Recommender (Híbrido: Gemini Primario + Groq Fallback)
+    # AI Recommender (Híbrido con Cascada Multi-Nivel: Gemini / Groq + Fallback Heurístico)
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.6-flash"
+    GEMINI_FALLBACK_MODELS: str = "gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.8-flash"
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "openai/gpt-oss-120b"
+    GROQ_FALLBACK_MODELS: str = "openai/gpt-oss-20b,groq/compound-mini,qwen/qwen3.8-27b"
     AI_RECOMMENDER_PRIMARY: str = "gemini"  # "gemini" o "groq"
+    RECOMMENDATION_CANDIDATES_LIMIT: int = 20
 
     # Home Sections & Pools Configuration
     HOME_SECTION_SAMPLE_SIZE: int = 10

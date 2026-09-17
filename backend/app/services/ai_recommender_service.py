@@ -65,6 +65,11 @@ def _detect_language(prompt: str) -> str:
     return "en"
 
 
+def _parse_model_list(models_str: str) -> List[str]:
+    """Parsea una lista de nombres de modelos separados por comas eliminando espacios en blanco."""
+    return [m.strip() for m in models_str.split(",") if m.strip()]
+
+
 def _build_user_message(
     prompt: str,
     user_context: Optional[Dict[str, Any]],
@@ -124,12 +129,12 @@ class AIRecommenderService:
     def __init__(self):
         self.groq_url = "https://api.groq.com/openai/v1/chat/completions"
 
-    async def _call_gemini(self, user_message: str) -> Dict[str, Any]:
+    async def _call_gemini(self, user_message: str, model_override: Optional[str] = None) -> Dict[str, Any]:
         """Llamada directa asíncrona a Google Gemini API."""
         if not settings.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY no configurada")
 
-        gemini_model = getattr(settings, "GEMINI_MODEL", "gemini-3.6-flash")
+        gemini_model = model_override or getattr(settings, "GEMINI_MODEL", "gemini-3.6-flash")
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={settings.GEMINI_API_KEY}"
         payload = {
             "system_instruction": {
@@ -151,12 +156,12 @@ class AIRecommenderService:
             raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
             return json.loads(raw_text)
 
-    async def _call_groq(self, user_message: str) -> Dict[str, Any]:
+    async def _call_groq(self, user_message: str, model_override: Optional[str] = None) -> Dict[str, Any]:
         """Llamada directa asíncrona a Groq API."""
         if not settings.GROQ_API_KEY:
             raise ValueError("GROQ_API_KEY no configurada")
 
-        groq_model = getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
+        groq_model = model_override or getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
         headers = {
             "Authorization": f"Bearer {settings.GROQ_API_KEY}",
             "Content-Type": "application/json"
@@ -178,30 +183,52 @@ class AIRecommenderService:
             raw_text = data["choices"][0]["message"]["content"]
             return json.loads(raw_text)
 
-    async def _call_gemini_with_retry(self, user_message: str, max_retries: int = 2) -> Dict[str, Any]:
-        """Invoca Gemini API con reintentos espaciados ante errores temporales (429, 503, timeouts)."""
+    async def _call_gemini_with_retry(self, user_message: str, max_retries: int = 2) -> tuple[Dict[str, Any], str]:
+        """Invoca Gemini API con reintentos y cascada automática a modelos alternativos ante 429/503."""
+        primary_model = getattr(settings, "GEMINI_MODEL", "gemini-3.6-flash")
+        models_to_try = [primary_model]
+        for alt in ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.8-flash"]:
+            if alt != primary_model and alt not in models_to_try:
+                models_to_try.append(alt)
+
         last_error = None
-        for attempt in range(max_retries):
-            try:
-                return await self._call_gemini(user_message)
-            except Exception as e:
-                last_error = e
-                logger.warning(f"Intento {attempt + 1}/{max_retries} en Gemini API falló: {e}")
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(1.5)
+        for model in models_to_try:
+            for attempt in range(max_retries):
+                try:
+                    res = await self._call_gemini(user_message, model_override=model)
+                    return res, model
+                except Exception as e:
+                    last_error = e
+                    logger.warning(f"Intento {attempt + 1}/{max_retries} en Gemini ({model}) falló: {e}")
+                    # Si la cuota está agotada (429), pasar de inmediato al siguiente modelo con cuota fresca
+                    if "429" in str(e) or "quota" in str(e).lower():
+                        break
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(1.0)
         raise last_error
 
-    async def _call_groq_with_retry(self, user_message: str, max_retries: int = 2) -> Dict[str, Any]:
-        """Invoca Groq API con reintentos espaciados ante errores temporales."""
+    async def _call_groq_with_retry(self, user_message: str, max_retries: int = 2) -> tuple[Dict[str, Any], str]:
+        """Invoca Groq API con reintentos y cascada automática a modelos alternativos ante 429/timeouts."""
+        primary_model = getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
+        models_to_try = [primary_model]
+        for alt in ["openai/gpt-oss-20b", "groq/compound-mini", "qwen/qwen3.8-27b"]:
+            if alt != primary_model and alt not in models_to_try:
+                models_to_try.append(alt)
+
         last_error = None
-        for attempt in range(max_retries):
-            try:
-                return await self._call_groq(user_message)
-            except Exception as e:
-                last_error = e
-                logger.warning(f"Intento {attempt + 1}/{max_retries} en Groq API falló: {e}")
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(1.5)
+        for model in models_to_try:
+            for attempt in range(max_retries):
+                try:
+                    res = await self._call_groq(user_message, model_override=model)
+                    return res, model
+                except Exception as e:
+                    last_error = e
+                    logger.warning(f"Intento {attempt + 1}/{max_retries} en Groq ({model}) falló: {e}")
+                    # Si es 429 (límite de tasa por minuto o día), pasar de inmediato al siguiente modelo con cuota fresca
+                    if "429" in str(e):
+                        break
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(1.0)
         raise last_error
 
     def _fallback_heuristic(
@@ -378,28 +405,53 @@ class AIRecommenderService:
         provider_used = "heuristic"
         model_used = "Motor Heurístico Local (CineTrack Recommender Engine)"
 
-        primary = getattr(settings, "AI_RECOMMENDER_PRIMARY", "gemini").lower()
-        providers_order = ["gemini", "groq"] if primary == "gemini" else ["groq", "gemini"]
+        primary_prov = getattr(settings, "AI_RECOMMENDER_PRIMARY", "gemini").lower()
+        secondary_prov = "groq" if primary_prov == "gemini" else "gemini"
 
-        for prov in providers_order:
+        # Modelos principales y fallbacks configurados
+        gemini_primary = getattr(settings, "GEMINI_MODEL", "gemini-3.6-flash")
+        gemini_fallbacks = _parse_model_list(getattr(settings, "GEMINI_FALLBACK_MODELS", "gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.8-flash"))
+        groq_primary = getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
+        groq_fallbacks = _parse_model_list(getattr(settings, "GROQ_FALLBACK_MODELS", "openai/gpt-oss-20b,groq/compound-mini,qwen/qwen3.8-27b"))
+
+        models_by_prov = {
+            "gemini": (gemini_primary, gemini_fallbacks),
+            "groq": (groq_primary, groq_fallbacks),
+        }
+
+        # Secuencia ordenada de intentos:
+        # Nivel 1: Modelos insignia principales (primero proveedor primario, luego proveedor secundario)
+        cascade_schedule: List[tuple[str, str]] = [
+            (primary_prov, models_by_prov[primary_prov][0]),
+            (secondary_prov, models_by_prov[secondary_prov][0]),
+        ]
+        # Nivel 2: Modelos de respaldo ligeros (primero proveedor primario, luego proveedor secundario)
+        for m in models_by_prov[primary_prov][1]:
+            cascade_schedule.append((primary_prov, m))
+        for m in models_by_prov[secondary_prov][1]:
+            cascade_schedule.append((secondary_prov, m))
+
+        for prov, model in cascade_schedule:
             if raw_result:
                 break
 
             if prov == "gemini" and settings.GEMINI_API_KEY:
                 try:
-                    raw_result = await self._call_gemini_with_retry(user_message, max_retries=2)
+                    raw_result = await self._call_gemini(user_message, model_override=model)
                     provider_used = "gemini"
-                    model_used = getattr(settings, "GEMINI_MODEL", "gemini-3.6-flash")
+                    model_used = model
+                    break
                 except Exception as e:
-                    logger.warning("Falla persistente en Gemini API (%s), evaluando siguiente proveedor...", e)
+                    logger.warning("Falla en Gemini API con modelo '%s': %s", model, e)
 
             elif prov == "groq" and settings.GROQ_API_KEY:
                 try:
-                    raw_result = await self._call_groq_with_retry(user_message, max_retries=2)
+                    raw_result = await self._call_groq(user_message, model_override=model)
                     provider_used = "groq"
-                    model_used = getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
+                    model_used = model
+                    break
                 except Exception as e:
-                    logger.warning("Falla persistente en Groq API (%s), evaluando siguiente proveedor...", e)
+                    logger.warning("Falla en Groq API con modelo '%s': %s", model, e)
 
         # Último recurso: Motor heurístico offline si fallaron ambos servicios en la nube
         if not raw_result:
