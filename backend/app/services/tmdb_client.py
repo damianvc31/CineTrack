@@ -90,6 +90,7 @@ class TMDBClient:
         release_date_gte: Optional[str] = None,
         release_date_lte: Optional[str] = None,
         vote_average_gte: Optional[float] = None,
+        with_genres: Optional[str] = None,
     ) -> Dict[str, Any]:
         endpoint = f"/discover/{media_type}"
         params: Dict[str, Any] = {
@@ -100,6 +101,8 @@ class TMDBClient:
             params["vote_count.gte"] = vote_count_gte
         if vote_average_gte is not None:
             params["vote_average.gte"] = vote_average_gte
+        if with_genres is not None:
+            params["with_genres"] = with_genres
 
         if media_type == "movie":
             if release_date_gte:

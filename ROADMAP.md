@@ -68,8 +68,8 @@
   - Integración de JustWatch / TMDB Watch Providers según el país del usuario, requiriendo tabla relacional propia.
 - [ ] **Selector de idioma para el contenido (Títulos y Sinopsis):**
   - Tabla de traducciones multilingüe conectada a TMDB, con regla de fallback al inglés/idioma original para contenidos o idiomas faltantes.
-- [ ] **Expansión selectiva del catálogo mediante jobs dirigidos:**
-  - Comando o endpoint administrativo para ingestar títulos con filtros específicos (ej. cine argentino, series de $\ge 5$ temporadas, etc.) sin rehacer la ingesta inicial completa.
+- [x] **Expansión selectiva del catálogo mediante jobs dirigidos (Criterio 1):** *(Completado en v0.9.1)*
+  - Job CLI `python -m app.jobs.sync_tmdb --expand` con filtro por género (individual o masivo), tipo de medio (`both`, `movie`, `tv`) y umbrales configurables de votos (`min_vote_count`) y calificación (`min_vote_average`) sin duplicar títulos existentes ni rehacer la ingesta inicial completa.
 - [ ] **Recomendador avanzado:**
   - Evolución del recomendador con function calling y búsqueda semántica vectorial (embeddings con pgvector).
 - [ ] Posible refinamiento UX en desmarques de episodios: diálogo opcional para advertir al usuario o resetear progreso posterior al desmarcar un episodio intermedio.

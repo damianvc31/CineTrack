@@ -99,6 +99,13 @@ python -m app.jobs.sync_tmdb --import-json docs/templates/template_pelicula.json
 # Importar título individual por ID de TMDB
 python -m app.jobs.sync_tmdb --import-tmdb-id 157336 --type movie
 
+# Expansión de catálogo por géneros (Criterio 1: discover con thresholds de votos y rating)
+# Para todos los géneros:
+python -m app.jobs.sync_tmdb --expand
+# Para un género puntual (por nombre o ID de TMDB) con parámetros personalizados:
+python -m app.jobs.sync_tmdb --expand --genre "Ciencia ficción" --min-vote-count 300 --min-vote-average 7.0 --target-per-genre 50
+python -m app.jobs.sync_tmdb --expand --genre 28 --media-type movie
+
 # Vaciar completamente el catálogo (títulos, temporadas, episodios, reseñas y relaciones)
 python -m app.jobs.sync_tmdb --clear
 ```

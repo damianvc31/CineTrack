@@ -35,6 +35,12 @@ async def main():
     parser.add_argument("--import-json", type=str, help="Ruta al archivo JSON con títulos a importar")
     parser.add_argument("--import-tmdb-id", type=int, help="Importar un título específico por su ID de TMDB")
     parser.add_argument("--type", choices=["movie", "tv"], default="movie", help="Tipo de título para --import-tmdb-id")
+    parser.add_argument("--expand", action="store_true", help="Expande el catálogo por géneros vía /discover con filtros de calidad (Criterio 1)")
+    parser.add_argument("--genre", type=str, default=None, help="Género específico para --expand (nombre o ID). Si se omite, procesa todos los géneros")
+    parser.add_argument("--media-type", choices=["both", "movie", "tv"], default="both", help="Tipo de medio a expandir ('both', 'movie' o 'tv')")
+    parser.add_argument("--min-vote-count", type=int, default=None, help="Mínimo de votos para --expand (default config)")
+    parser.add_argument("--min-vote-average", type=float, default=None, help="Mínimo de calificación promedio para --expand (default config)")
+    parser.add_argument("--target-per-genre", type=int, default=None, help="Cantidad objetivo de títulos por género para --expand (default config)")
     parser.add_argument("--clear", action="store_true", help="Vaciar todo el catálogo de títulos y entidades dependientes")
 
     args = parser.parse_args()
@@ -125,6 +131,19 @@ async def main():
                     logger.info(f"Título importado con éxito: {titulo.nombre} (ID local: {titulo.id})")
                 else:
                     logger.error(f"No se pudo importar el título con ID {args.import_tmdb_id}")
+
+            elif args.expand:
+                genre_desc = args.genre or "TODOS los géneros"
+                logger.info(f"-> Ejecutando expansión de catálogo por géneros (Criterio 1) para: {genre_desc}...")
+                res = await service.expand_catalog_by_genres(
+                    genre=args.genre,
+                    media_type=args.media_type,
+                    target_per_genre=args.target_per_genre,
+                    min_vote_count=args.min_vote_count,
+                    min_vote_average=args.min_vote_average,
+                    allow_unreleased=args.allow_unreleased,
+                )
+                logger.info(f"Resultado de expansión de catálogo: {res}")
 
             else:
                 parser.print_help()

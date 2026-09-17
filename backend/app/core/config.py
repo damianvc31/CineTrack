@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     TMDB_REVIEWS_PER_TITLE_LIMIT: int = 20
     TMDB_ALLOW_UNRELEASED: bool = False
 
+    # TMDB Expand Configuration (Criterio 1: Expansión por géneros vía /discover)
+    TMDB_EXPAND_MIN_VOTE_COUNT: int = 300
+    TMDB_EXPAND_MIN_VOTE_AVERAGE: float = 7.0
+    TMDB_EXPAND_TITLES_PER_GENRE: int = 50
+
     # Admin Key para endpoints administrativos y automatizaciones
     ADMIN_API_KEY: str = "cinetrack-dev-admin-secret-key"
 

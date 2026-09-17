@@ -2,6 +2,23 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.9.1] - 2026-09-17
+### Agregado & Mejorado
+- **Job de Expansión de Catálogo por Géneros (Criterio 1):**
+  - Nuevo método `expand_catalog_by_genres` en `TMDBSyncService` que utiliza `/discover` de TMDB con filtros de calidad y géneros específicos o totales.
+  - Parámetros configurables en `Settings` y `.env` / `.env.example`:
+    - `TMDB_EXPAND_MIN_VOTE_COUNT`: umbral mínimo de votos (default 300).
+    - `TMDB_EXPAND_MIN_VOTE_AVERAGE`: umbral mínimo de calificación promedio (default 7.0).
+    - `TMDB_EXPAND_TITLES_PER_GENRE`: objetivo de títulos por género (default 50).
+  - Interfaz de comandos CLI enriquecida en `backend/app/jobs/sync_tmdb.py`:
+    - `--expand`: flag para ejecutar la expansión.
+    - `--genre`: filtro por género puntual (nombre o ID de TMDB); si se omite, itera sobre todos los géneros.
+    - `--media-type`: `both` (default), `movie` o `tv`.
+    - `--min-vote-count`, `--min-vote-average`, `--target-per-genre`: overrides configurables por CLI.
+  - Soporte de `with_genres` en `TMDBClient.discover`.
+  - Recálculo automático de percentiles y rating unificado tras la ingesta.
+  - Cobertura de tests unitarios completa en `backend/tests/test_tmdb_sync.py` (17 tests pasando).
+
 ## [v0.9.0] - 2026-09-16
 ### Agregado & Mejorado
 - **Fase 6: Recomendador Inteligente con IA (Cierre de la Versión Mínima / MVP):**

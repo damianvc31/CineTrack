@@ -1,4 +1,5 @@
 import pytest
+from datetime import date
 from unittest.mock import AsyncMock, patch
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -376,4 +377,76 @@ async def test_cleanup_unreleased_titles(db_session, mock_tmdb_client):
     remaining = res_check.scalars().all()
     assert len(remaining) == 1
     assert remaining[0].tmdb_id == 88801
+
+
+@pytest.mark.asyncio
+async def test_expand_catalog_by_genres_single_genre(db_session, mock_tmdb_client):
+    """Verifica la expansión de catálogo para un género específico pasando los filtros adecuados a discover."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    await service.sync_genres()
+
+    # Configurar mock de discover para retornar una película y luego terminar
+    mock_tmdb_client.discover.return_value = {
+        "page": 1,
+        "total_pages": 1,
+        "results": [{"id": 157336, "title": "Interstellar"}]
+    }
+
+    res = await service.expand_catalog_by_genres(
+        genre="Ciencia ficción",
+        media_type="movie",
+        target_per_genre=5,
+        min_vote_count=250,
+        min_vote_average=7.2,
+    )
+
+    assert res["genres_processed"] == 1
+    assert res["movies_added"] == 1
+    assert res["series_added"] == 0
+
+    # Comprobar llamada a discover con with_genres, vote_count.gte y vote_average.gte
+    mock_tmdb_client.discover.assert_called_with(
+        media_type="movie",
+        sort_by="popularity.desc",
+        page=1,
+        vote_count_gte=250,
+        vote_average_gte=7.2,
+        with_genres="878",  # ID de Ciencia ficción en fixtures
+        release_date_lte=pytest.approx(date.today().strftime("%Y-%m-%d")),
+    )
+
+
+@pytest.mark.asyncio
+async def test_expand_catalog_all_genres(db_session, mock_tmdb_client):
+    """Verifica que si no se pasa género, itera sobre todos los géneros registrados."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    await service.sync_genres()
+
+    # Discover sin resultados nuevos
+    mock_tmdb_client.discover.return_value = {
+        "page": 1,
+        "total_pages": 1,
+        "results": []
+    }
+
+    res = await service.expand_catalog_by_genres(
+        genre=None,
+        media_type="both",
+        target_per_genre=2,
+    )
+
+    # 6 géneros únicos en fixtures
+    assert res["genres_processed"] == 6
+    assert res["total_added"] == 0
+
+
+@pytest.mark.asyncio
+async def test_expand_catalog_invalid_genre_raises_error(db_session, mock_tmdb_client):
+    """Verifica que si se ingresa un género inexistente, lanza ValueError."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    await service.sync_genres()
+
+    with pytest.raises(ValueError, match="No se encontró ningún género"):
+        await service.expand_catalog_by_genres(genre="GeneroInexistenteTotal")
+
 

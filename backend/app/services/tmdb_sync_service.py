@@ -993,3 +993,148 @@ class TMDBSyncService:
         logger.info(f"Rating unificado recalculado para {len(titulos)} títulos.")
         return len(titulos)
 
+    # -------------------------------------------------------------------------
+    # EXPANSIÓN DE CATÁLOGO POR GÉNEROS (CRITERIO 1)
+    # -------------------------------------------------------------------------
+    async def expand_catalog_by_genres(
+        self,
+        genre: Optional[Any] = None,
+        media_type: str = "both",
+        target_per_genre: Optional[int] = None,
+        min_vote_count: Optional[int] = None,
+        min_vote_average: Optional[float] = None,
+        allow_unreleased: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """
+        Criterio 1: Expande el catálogo vía /discover filtrando por género y umbrales de calidad.
+        Permite especificar un género (ID o nombre) o procesar todos los géneros existentes.
+        """
+        target = target_per_genre if target_per_genre is not None else settings.TMDB_EXPAND_TITLES_PER_GENRE
+        min_votes = min_vote_count if min_vote_count is not None else settings.TMDB_EXPAND_MIN_VOTE_COUNT
+        min_avg = min_vote_average if min_vote_average is not None else settings.TMDB_EXPAND_MIN_VOTE_AVERAGE
+        allow_unrel = settings.TMDB_ALLOW_UNRELEASED if allow_unreleased is None else allow_unreleased
+        release_date_lte = None if allow_unrel else date.today().strftime("%Y-%m-%d")
+
+        # 1. Asegurar catálogo de géneros
+        res_genres = await self.db.execute(select(Genero).order_by(Genero.id))
+        all_db_genres = res_genres.scalars().all()
+        if not all_db_genres:
+            logger.info("Catálogo de géneros vacío en base de datos. Sincronizando desde TMDB...")
+            await self.sync_genres()
+            res_genres = await self.db.execute(select(Genero).order_by(Genero.id))
+            all_db_genres = res_genres.scalars().all()
+
+        # 2. Filtrar géneros objetivo
+        target_genres: List[Genero] = []
+        if genre is not None:
+            genre_str = str(genre).strip()
+            if genre_str.isdigit():
+                gid = int(genre_str)
+                target_genres = [g for g in all_db_genres if g.id == gid]
+            else:
+                target_genres = [g for g in all_db_genres if genre_str.lower() in g.nombre.lower()]
+
+            if not target_genres:
+                raise ValueError(f"No se encontró ningún género que coincida con '{genre}'.")
+        else:
+            target_genres = all_db_genres
+
+        # 3. Determinar media_types a procesar
+        if media_type in ("movie", "tv"):
+            media_types_to_process = [media_type]
+        else:
+            media_types_to_process = ["movie", "tv"]
+
+        logger.info(
+            f"Iniciando expansión por géneros: {len(target_genres)} géneros, "
+            f"tipos: {media_types_to_process}, target por género: {target}, "
+            f"min_votes: {min_votes}, min_rating: {min_avg}"
+        )
+
+        total_movies_added = 0
+        total_series_added = 0
+
+        for g in target_genres:
+            logger.info(f"--- Procesando Género: {g.nombre} (ID: {g.id}) ---")
+
+            for mtype in media_types_to_process:
+                # Cargar IDs existentes para evitar llamadas get_details redundantes
+                res_existing = await self.db.execute(select(Titulo.tmdb_id).where(Titulo.tipo == mtype))
+                existing_ids: Set[int] = set(res_existing.scalars().all())
+
+                genre_added = 0
+                page = 1
+                max_pages = 25  # Protección para evitar bucles infinitos en discover
+
+                while genre_added < target and page <= max_pages:
+                    try:
+                        data = await self.client.discover(
+                            media_type=mtype,
+                            sort_by="popularity.desc",
+                            page=page,
+                            vote_count_gte=min_votes,
+                            vote_average_gte=min_avg,
+                            with_genres=str(g.id),
+                            release_date_lte=release_date_lte,
+                        )
+                    except Exception as e:
+                        logger.error(f"Error consultando discover ({mtype}, genero: {g.nombre}, pag: {page}): {e}")
+                        break
+
+                    results = data.get("results", [])
+                    total_pages = data.get("total_pages", 0)
+                    if not results:
+                        break
+
+                    for item in results:
+                        if genre_added >= target:
+                            break
+
+                        tmdb_id = item.get("id")
+                        if not tmdb_id or tmdb_id in existing_ids:
+                            continue
+
+                        try:
+                            if mtype == "movie":
+                                t = await self.upsert_movie(tmdb_id, allow_unreleased=allow_unrel)
+                            else:
+                                t = await self.upsert_series(tmdb_id, fetch_episodes=True, allow_unreleased=allow_unrel)
+
+                            existing_ids.add(tmdb_id)
+                            if t is not None:
+                                genre_added += 1
+                                if mtype == "movie":
+                                    total_movies_added += 1
+                                else:
+                                    total_series_added += 1
+
+                                await self.db.commit()
+                                logger.info(
+                                    f"[EXPAND] [{g.nombre}] {mtype.upper()} ({genre_added}/{target}): "
+                                    f"'{t.nombre}' (TMDB ID: {tmdb_id}, Rating: {t.rating_unificado})"
+                                )
+                        except Exception as e:
+                            logger.error(f"Error upserting {mtype} id {tmdb_id} en género {g.nombre}: {e}")
+                            await self.db.rollback()
+
+                    if page >= total_pages or genre_added >= target:
+                        break
+
+                    page += 1
+
+        # 4. Recalcular métricas si hubo nuevos títulos
+        if (total_movies_added + total_series_added) > 0:
+            logger.info("Recalculando percentiles y ratings tras expansión...")
+            await self.recalculate_percentiles()
+            await self.recalculate_unified_ratings()
+
+        summary = {
+            "genres_processed": len(target_genres),
+            "movies_added": total_movies_added,
+            "series_added": total_series_added,
+            "total_added": total_movies_added + total_series_added,
+        }
+        logger.info(f"Expansión por géneros completada: {summary}")
+        return summary
+
+
