@@ -2,6 +2,16 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.9.2] - 2026-09-17
+### Corregido & Mejorado
+- **Afinidad Semántica y Búsqueda Temática Bilingüe en el Recomendador con IA:**
+  - **Mapeo Temático Bilingüe (`THEME_EXPANSION_MAP`):** Mapeo exhaustivo de conceptos en español a terminología en inglés para sinopsis de TMDB (`planes`, `atracos`, `robos`, `estafas`, `asesinos en serie`, `espionaje`, `venganza`, `conspiraciones`, `viajes temporales`, etc.).
+  - **Búsqueda Temática Combinada de Máxima Prioridad:** Consulta SQL optimizada en `catalog_service.get_recommendation_candidates` que cruza géneros detectados con coincidencias semánticas en la sinopsis (`Genero.nombre.in_(...) AND Titulo.sinopsis.ilike(...)`), posicionando títulos temáticamente idóneos (*Heat*, *The Usual Suspects*, *Nine Queens*, *Reservoir Dogs*, *Lock Stock*) en la cabecera del pool de candidatos en lugar de relleno de alta nota no relacionado.
+  - **Piso de Votos para Relleno General:** Elevación del umbral mínimo a 150 votos en el relleno por género para evitar anomalías con pocos votos en las recomendaciones.
+  - **Prevención de Contaminación de Perfil:** Se evita forzar los géneros históricos del usuario cuando este realiza una búsqueda temática específica con términos explícitos.
+  - **Soporte Offline en Motor Heurístico:** Integración de `THEME_EXPANSION_MAP` en `_fallback_heuristic` para que la selección local offline también priorice afinidad temática real.
+  - **Soporte de `only_watched` sin términos explícitos:** Asegurado el rescate directo de títulos del historial del usuario ante consultas como *"Recomiéndame de las que ya vi"*.
+
 ## [v0.9.1] - 2026-09-17
 ### Agregado & Mejorado
 - **Job de Expansión de Catálogo por Géneros (Criterio 1):**

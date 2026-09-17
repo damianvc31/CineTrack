@@ -11,6 +11,7 @@ from app.schemas.recommendations import (
     RecommendationItem,
     RecommendationResponse,
 )
+from app.services.catalog_service import THEME_EXPANSION_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ Tu objetivo es recomendar entre 2 y 5 títulos de películas o series al usuario
 3. El mensaje general "message" debe ser cálido, entusiasta y cinematográfico, redactado ESTRICTAMENTE en el idioma especificado en la consulta.
 4. POLÍTICA DE INCERTIDUMBRE Y RESOLUCIÓN OBLIGATORIA:
    - AFINIDAD ESTRICTA VS. RELLENO: Es preferible recomendar 2 o 3 títulos con estricta y genuina afinidad temática, autoral o de tono antes que rellenar con obras no relacionadas solo por alcanzar un cupo numérico. NUNCA incluyas obras que no guarden relación con el pedido temático del usuario (ej: si piden "películas de robos y atracos/heist", jamás recomiendes una comedia de viajes en el tiempo solo porque tenga alta nota). Si en el pool hay solo 2 o 3 obras que encajan genuinamente, recomienda solo esas y aclara en el mensaje de apertura que son las joyas ideales disponibles en el catálogo para ese criterio.
+   - PREFERENCIA TEMÁTICA ESTRICTA: Si el usuario solicita una dinámica, subgénero o temática puntual (como "planes elaborados", "atracos/robos/heist", "asesinos en serie", "venganza", "viajes en el tiempo", etc.), debes seleccionar prioritariamente aquellas obras cuya premisa o sinopsis aborde DIRECTAMENTE esa temática. NO selecciones títulos simplemente porque pertenezcan a la categoría general de género si su trama no tiene relación con el pedido específico (ejemplo: si piden "thrillers de crimen y planes elaborados", recomienda obras como Heat, The Usual Suspects, Reservoir Dogs, Lock Stock, Nine Queens, etc., y NUNCA documentales de narcotraficantes o dramas ajenos a la temática).
    - SIEMPRE que haya al menos 1 o 2 títulos en el pool de candidatos que guarden afinidad con el pedido (por género, temática, director, actor o tono), DEBES RESPONDER con "status": "recommended". Nunca respondas que no hay títulos en el catálogo si dispones de candidatos afines.
    - Si el usuario pide algo genérico o amplio ("recomiéndame algo bueno", "sorpréndeme", "qué puedo ver"): DEBES RESOLVER con confianza seleccionando 3 a 5 de los títulos con mayor puntaje y popularidad del pool.
    - ÚNICAMENTE si el prompt es un texto ininteligible o caracteres aleatorios sin ningún sentido lingüístico o temático (ej: "asdasd", "12345", "qwerty") responde con:
@@ -243,6 +245,15 @@ class AIRecommenderService:
         is_only_watched = bool(user_context and user_context.get("only_watched"))
         prompt_words = set(re.findall(r"[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]{3,}", lower))
 
+        # Enriquecer términos temáticos bilingües (ES -> EN) para análisis en sinopsis y géneros
+        thematic_syn_words: set[str] = set()
+        for w in prompt_words:
+            if w in THEME_EXPANSION_MAP:
+                thematic_syn_words.update(THEME_EXPANSION_MAP[w])
+        for term, en_terms in THEME_EXPANSION_MAP.items():
+            if term in lower:
+                thematic_syn_words.update(en_terms)
+
         # Puntuación heurística de afinidad para cada candidato en el pool
         scored_candidates = []
         for c in candidates:
@@ -262,12 +273,15 @@ class AIRecommenderService:
                 score += 50.0
 
             gen_str = " ".join(c.get("generos", [])).lower()
-            if any(w in gen_str for w in prompt_words):
+            if any(w in gen_str for w in (prompt_words | thematic_syn_words)):
                 score += 25.0
 
             syn_str = (c.get("sinopsis_corta") or "").lower()
-            syn_matches = sum(1 for w in prompt_words if w in syn_str)
-            score += min(syn_matches * 15.0, 45.0)
+            # Bonificación prioritaria si la sinopsis coincide con conceptos temáticos clave (ej: heist, robbery, mastermind)
+            thematic_matches = sum(1 for w in thematic_syn_words if len(w) >= 4 and w in syn_str)
+            direct_matches = sum(1 for w in prompt_words if len(w) >= 4 and w in syn_str)
+            syn_score = (thematic_matches * 25.0) + (direct_matches * 15.0)
+            score += min(syn_score, 60.0)
 
             # Pequeño jitter aleatorio (0 a 1.5) para que búsquedas generales roten naturalmente
             score += random.uniform(0.0, 1.5)

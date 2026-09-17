@@ -101,6 +101,7 @@ async def test_recommendations_gemini_success(
     }
 
     with patch("app.services.ai_recommender_service.settings.GEMINI_API_KEY", "mock-gemini-key"), \
+         patch("app.services.ai_recommender_service.settings.AI_RECOMMENDER_PRIMARY", "gemini"), \
          patch("app.services.ai_recommender_service.ai_recommender_service._call_gemini", new_callable=AsyncMock) as mock_gemini:
         mock_gemini.return_value = mock_gemini_dict
 
@@ -141,6 +142,7 @@ async def test_recommendations_gemini_fails_falls_back_to_groq(
 
     with patch("app.services.ai_recommender_service.settings.GEMINI_API_KEY", "mock-gemini-key"), \
          patch("app.services.ai_recommender_service.settings.GROQ_API_KEY", "mock-groq-key"), \
+         patch("app.services.ai_recommender_service.settings.AI_RECOMMENDER_PRIMARY", "gemini"), \
          patch("app.services.ai_recommender_service.ai_recommender_service._call_gemini", side_effect=RuntimeError("Gemini 429 Rate Limit")), \
          patch("app.services.ai_recommender_service.ai_recommender_service._call_groq", new_callable=AsyncMock) as mock_groq:
         mock_groq.return_value = mock_groq_dict
@@ -200,6 +202,7 @@ async def test_recommendations_clarification_needed(
     }
 
     with patch("app.services.ai_recommender_service.settings.GEMINI_API_KEY", "mock-gemini-key"), \
+         patch("app.services.ai_recommender_service.settings.AI_RECOMMENDER_PRIMARY", "gemini"), \
          patch("app.services.ai_recommender_service.ai_recommender_service._call_gemini", new_callable=AsyncMock) as mock_gemini:
         mock_gemini.return_value = mock_clarification
 

@@ -1413,6 +1413,24 @@ GENRE_KEYWORD_MAP = {
     "crimen": "Crime",
     "crime": "Crime",
     "policial": "Crime",
+    "policiales": "Crime",
+    "robo": "Crime",
+    "robos": "Crime",
+    "atraco": "Crime",
+    "atracos": "Crime",
+    "heist": "Crime",
+    "estafa": "Crime",
+    "estafas": "Crime",
+    "estafador": "Crime",
+    "estafadores": "Crime",
+    "mafia": "Crime",
+    "gangster": "Crime",
+    "gangsters": "Crime",
+    "asesino": "Crime",
+    "asesinos": "Crime",
+    "asesinato": "Crime",
+    "asesinatos": "Crime",
+    "serial killer": "Crime",
     "documental": "Documentary",
     "documentary": "Documentary",
     "drama": "Drama",
@@ -1425,6 +1443,9 @@ GENRE_KEYWORD_MAP = {
     "fantasia": "Fantasy",
     "fantasía": "Fantasy",
     "fantasy": "Fantasy",
+    "magia": "Fantasy",
+    "mago": "Fantasy",
+    "magos": "Fantasy",
     "historia": "History",
     "history": "History",
     "historica": "History",
@@ -1432,6 +1453,10 @@ GENRE_KEYWORD_MAP = {
     "terror": "Horror",
     "horror": "Horror",
     "miedo": "Horror",
+    "zombie": "Horror",
+    "zombies": "Horror",
+    "vampiro": "Horror",
+    "vampiros": "Horror",
     "musica": "Music",
     "música": "Music",
     "music": "Music",
@@ -1447,13 +1472,139 @@ GENRE_KEYWORD_MAP = {
     "sci-fi": "Science Fiction",
     "scifi": "Science Fiction",
     "science fiction": "Science Fiction",
+    "alien": "Science Fiction",
+    "aliens": "Science Fiction",
+    "extraterrestre": "Science Fiction",
+    "extraterrestres": "Science Fiction",
+    "robot": "Science Fiction",
+    "robots": "Science Fiction",
+    "espacio": "Science Fiction",
     "suspenso": "Thriller",
+    "suspense": "Thriller",
     "thriller": "Thriller",
+    "thrillers": "Thriller",
+    "espia": "Thriller",
+    "espía": "Thriller",
+    "espias": "Thriller",
+    "espías": "Thriller",
+    "espionaje": "Thriller",
+    "conspiracion": "Thriller",
+    "conspiración": "Thriller",
     "belica": "War",
     "bélica": "War",
     "guerra": "War",
     "war": "War",
     "western": "Western",
+}
+
+# Mapeo semántico y bilingüe (ES -> EN) para conceptos, argumentos y temas recurrentes en sinopsis de TMDB
+THEME_EXPANSION_MAP = {
+    # Planes, atracos, robos, golpes maestros y estafas
+    "plan": ["plan", "scheme", "mastermind", "heist", "elaborate", "operation"],
+    "planes": ["plan", "plans", "scheme", "mastermind", "heist", "elaborate", "operation"],
+    "elaborado": ["elaborate", "clever", "complex", "mastermind", "scheme", "intricate"],
+    "elaborados": ["elaborate", "clever", "complex", "mastermind", "scheme", "intricate"],
+    "maestro": ["mastermind", "master", "clever", "brilliant"],
+    "maestros": ["mastermind", "master", "clever", "brilliant"],
+    "ingenioso": ["clever", "ingenious", "smart", "brilliant", "witty"],
+    "ingeniosos": ["clever", "ingenious", "smart", "brilliant", "witty"],
+    "robo": ["robbery", "rob", "heist", "thief", "thieves", "steal", "bank"],
+    "robos": ["robbery", "rob", "heist", "thief", "thieves", "steal", "bank"],
+    "ladron": ["thief", "robber", "burglar", "con artist"],
+    "ladrón": ["thief", "robber", "burglar", "con artist"],
+    "ladrones": ["thieves", "robbers", "burglars", "heist crew"],
+    "atraco": ["heist", "robbery", "rob", "bank", "vault", "thieves"],
+    "atracos": ["heist", "robbery", "rob", "bank", "vault", "thieves"],
+    "heist": ["heist", "robbery", "rob", "thief", "con", "scheme", "bank"],
+    "estafa": ["con", "con artist", "scam", "fraud", "swindle", "trick"],
+    "estafas": ["con", "con artist", "scam", "fraud", "swindle", "trick"],
+    "estafador": ["con artist", "swindler", "grifter", "scammer"],
+    "estafadores": ["con artists", "swindlers", "grifters"],
+    "trampa": ["trap", "setup", "frame", "trick"],
+    "trampas": ["traps", "setup", "frame", "tricks"],
+
+    # Crimen, mafia, narcotráfico y bajos fondos
+    "crimen": ["crime", "criminal", "underworld", "heist", "robbery"],
+    "crimenes": ["crime", "criminal", "underworld", "crimes"],
+    "crímenes": ["crime", "criminal", "underworld", "crimes"],
+    "mafia": ["mafia", "mob", "gangster", "cartel", "syndicate", "godfather"],
+    "gangster": ["gangster", "mob", "mafia", "mobster"],
+    "gangsters": ["gangsters", "mobsters", "mafia"],
+    "narco": ["cartel", "drug lord", "narcotics", "trafficking"],
+    "narcos": ["cartel", "drug lords", "narcotics", "trafficking"],
+    "drogas": ["drugs", "cartel", "narcotics", "smuggling"],
+
+    # Suspenso, giros y tensión psicológica
+    "thriller": ["thriller", "suspense", "tension", "psychological", "twist"],
+    "thrillers": ["thriller", "suspense", "tension", "psychological", "twist"],
+    "suspenso": ["suspense", "thriller", "tension", "twist", "cliffhanger"],
+    "psicologico": ["psychological", "mind", "mental", "sanity", "madness"],
+    "psicológico": ["psychological", "mind", "mental", "sanity", "madness"],
+    "giro": ["twist", "unexpected", "plot twist", "shocking reveal"],
+    "giros": ["twist", "twists", "unexpected", "plot twist"],
+
+    # Investigación, detectives y policías
+    "detective": ["detective", "investigation", "cop", "police", "clues", "sherlock"],
+    "detectives": ["detectives", "investigation", "cops", "police", "clues"],
+    "investigacion": ["investigation", "detective", "mystery", "solve", "case"],
+    "investigación": ["investigation", "detective", "mystery", "solve", "case"],
+    "policial": ["police", "cop", "detective", "investigation", "law enforcement"],
+    "policiales": ["police", "cops", "detectives", "investigation"],
+    "policia": ["police", "cop", "officer", "sheriff"],
+    "policía": ["police", "cop", "officer", "sheriff"],
+    "policias": ["police", "cops", "officers", "sheriffs"],
+    "policías": ["police", "cops", "officers", "sheriffs"],
+    "misterio": ["mystery", "riddle", "puzzle", "secret", "whodunit"],
+    "misterios": ["mystery", "mysteries", "riddle", "puzzle"],
+
+    # Asesinos, homicidios y violencia
+    "asesino": ["killer", "serial killer", "murderer", "assassin", "hitman"],
+    "asesinos": ["killers", "serial killers", "murderers", "assassins", "hitmen"],
+    "asesinato": ["murder", "homicide", "kill", "crime", "slain"],
+    "asesinatos": ["murders", "homicides", "kills", "crimes"],
+    "sicario": ["hitman", "assassin", "contract killer"],
+    "sicarios": ["hitmen", "assassins", "contract killers"],
+
+    # Espionaje y conspiraciones
+    "espia": ["spy", "secret agent", "espionage", "undercover", "cia", "mi6"],
+    "espía": ["spy", "secret agent", "espionage", "undercover", "cia", "mi6"],
+    "espias": ["spies", "secret agents", "espionage", "undercover"],
+    "espías": ["spies", "secret agents", "espionage", "undercover"],
+    "espionaje": ["espionage", "spy", "intelligence", "covert", "cia", "kgb"],
+    "conspiracion": ["conspiracy", "covert", "cover-up", "plot", "government"],
+    "conspiración": ["conspiracy", "covert", "cover-up", "plot", "government"],
+
+    # Prisión y fuga
+    "carcel": ["prison", "inmate", "jail", "escape", "convict"],
+    "cárcel": ["prison", "inmate", "jail", "escape", "convict"],
+    "prision": ["prison", "inmate", "jail", "escape", "convict"],
+    "prisión": ["prison", "inmate", "jail", "escape", "convict"],
+    "fuga": ["escape", "breakout", "prison break", "getaway"],
+    "escape": ["escape", "breakout", "prison break", "evade"],
+
+    # Venganza y redención
+    "venganza": ["revenge", "vengeance", "retribution", "payback", "vendetta"],
+    "redencion": ["redemption", "atonement", "forgiveness"],
+    "redención": ["redemption", "atonement", "forgiveness"],
+
+    # Magia e ilusionismo
+    "magia": ["magic", "magician", "illusionist", "trick", "sorcery", "prestidigitation"],
+    "mago": ["magician", "illusionist", "magic", "trick", "wizard"],
+    "magos": ["magicians", "illusionists", "magic", "tricks"],
+    "ilusionista": ["illusionist", "magician", "magic", "stage trick"],
+    "ilusionistas": ["illusionists", "magicians", "magic"],
+
+    # Ciencia ficción, tiempo y espacio
+    "temporal": ["time travel", "timeline", "time loop", "time machine"],
+    "tiempo": ["time travel", "timeline", "time loop", "clock"],
+    "espacio": ["space", "galaxy", "orbit", "astronaut", "spaceship"],
+    "alien": ["alien", "extraterrestrial", "invasion", "creature"],
+    "aliens": ["aliens", "extraterrestrials", "invasion"],
+    "robot": ["robot", "android", "cyborg", "artificial intelligence", "ai"],
+    "robots": ["robots", "androids", "cyborgs", "artificial intelligence"],
+    "apocalipsis": ["apocalypse", "post-apocalyptic", "dystopia", "wasteland"],
+    "zombie": ["zombie", "undead", "infected", "virus", "apocalypse"],
+    "zombies": ["zombies", "undead", "infected", "virus"],
 }
 
 
@@ -1593,6 +1744,14 @@ async def get_recommendation_candidates(
     bigrams = [" ".join(raw_tokens[i:i+2]) for i in range(len(raw_tokens)-1)]
     valid_bigrams = [bg for bg in bigrams if len(bg) >= 7 and not any(sw in bg.split() for sw in STOP_WORDS)]
 
+    # Expandir conceptos temáticos bilingües (ES -> EN) para análisis en sinopsis
+    expanded_syn_terms: set[str] = set()
+    for t in search_terms:
+        expanded_syn_terms.add(t)
+        if t in THEME_EXPANSION_MAP:
+            expanded_syn_terms.update(THEME_EXPANSION_MAP[t])
+    syn_search_words = [w for w in expanded_syn_terms if len(w) >= 4]
+
     def apply_base_filters(query):
         if effective_tipo in ("movie", "tv"):
             query = query.where(Titulo.tipo == effective_tipo)
@@ -1611,8 +1770,51 @@ async def get_recommendation_candidates(
 
     collected_titles: dict[int, Titulo] = {}
 
-    # 1. Búsqueda por entidades directas
-    # A) Bigramas prioritarios (Nombres completos de directores o actores, ej: 'Christopher Nolan', 'Christian Bale')
+    target_genres = list(detected_genres)
+    # Solo recurrir a los géneros favoritos del usuario si no hubo géneros ni términos de búsqueda explícitos en el prompt
+    if not target_genres and not search_terms and user_ctx and user_ctx.get("top_genres"):
+        target_genres = user_ctx["top_genres"][:2]
+
+    # 1. BÚSQUEDA TEMÁTICA COMBINADA O POR SINOPSIS DE MÁXIMA PRIORIDAD
+    # Si hay géneros Y conceptos temáticos en el pedido (ej: 'thrillers de crimen' + 'planes elaborados'),
+    # priorizamos las obras que coincidan simultáneamente con ambos criterios.
+    if target_genres and syn_search_words:
+        expanded_genres = []
+        for tg in target_genres:
+            expanded_genres.extend(expand_genre_names(tg))
+        theme_genre_q = (
+            select(Titulo)
+            .options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+            .join(titulos_generos, titulos_generos.c.titulo_id == Titulo.id)
+            .join(Genero, Genero.id == titulos_generos.c.genero_id)
+        )
+        theme_genre_q = apply_base_filters(theme_genre_q)
+        theme_genre_q = theme_genre_q.where(
+            Genero.nombre.in_(expanded_genres),
+            Titulo.vote_count_tmdb >= 80,
+            or_(*[Titulo.sinopsis.ilike(f"%{w}%") for w in syn_search_words])
+        )
+        theme_genre_q = theme_genre_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(25)
+        tg_res = await db.execute(theme_genre_q)
+        for t in tg_res.scalars().all():
+            collected_titles[t.id] = t
+    elif syn_search_words:
+        # Si no se detectaron géneros pero sí conceptos temáticos puntuales, priorizar sinopsis directamente
+        theme_syn_q = (
+            select(Titulo)
+            .options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+        )
+        theme_syn_q = apply_base_filters(theme_syn_q)
+        theme_syn_q = theme_syn_q.where(
+            Titulo.vote_count_tmdb >= 80,
+            or_(*[Titulo.sinopsis.ilike(f"%{w}%") for w in syn_search_words])
+        )
+        theme_syn_q = theme_syn_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(25)
+        ts_res = await db.execute(theme_syn_q)
+        for t in ts_res.scalars().all():
+            collected_titles[t.id] = t
+
+    # 2. Búsqueda por entidades directas (Directores o Actores específicos por nombre completo)
     if valid_bigrams:
         for bg in valid_bigrams:
             # Director por nombre completo
@@ -1634,18 +1836,18 @@ async def get_recommendation_candidates(
             for t in act_bg_res.scalars().all():
                 collected_titles[t.id] = t
 
-    # B) Términos individuales (Directores, Actores, Nombres de títulos, Sinopsis)
+    # 3. Búsqueda por términos individuales (Directores, Actores, Nombres de títulos)
     if search_terms:
         # Directores por término
         dir_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
         dir_q = apply_base_filters(dir_q)
         dir_q = dir_q.where(or_(*[Titulo.director.ilike(f"%{t}%") for t in search_terms]))
-        dir_q = dir_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15)
+        dir_q = dir_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(12)
         dir_res = await db.execute(dir_q)
         for t in dir_res.scalars().all():
             collected_titles[t.id] = t
 
-        # Actores por término (solo términos de 4+ caracteres para no matchear preposiciones)
+        # Actores por término (solo términos de 4+ caracteres)
         long_terms = [t for t in search_terms if len(t) >= 4]
         if long_terms:
             act_q = (
@@ -1656,7 +1858,7 @@ async def get_recommendation_candidates(
             )
             act_q = apply_base_filters(act_q)
             act_q = act_q.where(or_(*[Actor.nombre.ilike(f"%{t}%") for t in long_terms]))
-            act_q = act_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(15)
+            act_q = act_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(12)
             act_res = await db.execute(act_q)
             for t in act_res.scalars().all():
                 collected_titles[t.id] = t
@@ -1665,25 +1867,26 @@ async def get_recommendation_candidates(
         name_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
         name_q = apply_base_filters(name_q)
         name_q = name_q.where(or_(*[Titulo.nombre.ilike(f"%{t}%") for t in search_terms]))
-        name_q = name_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15)
+        name_q = name_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(12)
         name_res = await db.execute(name_q)
         for t in name_res.scalars().all():
             collected_titles[t.id] = t
 
-        # Sinopsis / Temáticas
+    # 4. Búsqueda temática en sinopsis (términos expandidos bilingües)
+    if syn_search_words and len(collected_titles) < 30:
         sin_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
         sin_q = apply_base_filters(sin_q)
-        sin_q = sin_q.where(Titulo.vote_count_tmdb >= 50, or_(*[Titulo.sinopsis.ilike(f"%{t}%") for t in search_terms]))
+        sin_q = sin_q.where(
+            Titulo.vote_count_tmdb >= 80,
+            Titulo.id.notin_(list(collected_titles.keys())) if collected_titles else True,
+            or_(*[Titulo.sinopsis.ilike(f"%{w}%") for w in syn_search_words])
+        )
         sin_q = sin_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(20)
         sin_res = await db.execute(sin_q)
         for t in sin_res.scalars().all():
             collected_titles[t.id] = t
 
-    # 2. Búsqueda por Géneros detectados
-    target_genres = list(detected_genres)
-    if not target_genres and user_ctx and user_ctx.get("top_genres"):
-        target_genres = user_ctx["top_genres"][:2]
-
+    # 5. Búsqueda por Géneros detectados (relleno de alta calidad)
     if target_genres and len(collected_titles) < 35:
         expanded_genres = []
         for tg in target_genres:
@@ -1697,12 +1900,21 @@ async def get_recommendation_candidates(
         g_q = apply_base_filters(g_q)
         g_q = g_q.where(
             Genero.nombre.in_(expanded_genres),
-            Titulo.vote_count_tmdb >= 80,
+            Titulo.vote_count_tmdb >= 150,  # Exigir un piso sólido de votos para evitar anomalías
             Titulo.id.notin_(list(collected_titles.keys())) if collected_titles else True
         )
         g_q = g_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(35 - len(collected_titles))
         g_res = await db.execute(g_q)
         for t in g_res.scalars().all():
+            collected_titles[t.id] = t
+
+    # Si el usuario solicitó exclusivamente títulos vistos (only_watched), asegurar que se incluyan en el pool
+    if only_watched and len(collected_titles) < 30:
+        ow_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+        ow_q = apply_base_filters(ow_q)
+        ow_q = ow_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(30)
+        ow_res = await db.execute(ow_q)
+        for t in ow_res.scalars().all():
             collected_titles[t.id] = t
 
     # 3. Relleno diverso con obras aclamadas y populares (rotativo con semilla / random)
