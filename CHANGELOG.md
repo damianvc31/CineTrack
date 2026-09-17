@@ -15,9 +15,8 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
     - `--genre`: filtro por género puntual (nombre o ID de TMDB); si se omite, itera sobre todos los géneros.
     - `--media-type`: `both` (default), `movie` o `tv`.
     - `--min-vote-count`, `--min-vote-average`, `--target-per-genre`: overrides configurables por CLI.
-  - Soporte de `with_genres` en `TMDBClient.discover`.
-  - Recálculo automático de percentiles y rating unificado tras la ingesta.
-  - Cobertura de tests unitarios completa en `backend/tests/test_tmdb_sync.py` (17 tests pasando).
+  - Endpoint administrativo `POST /api/v1/admin/sync/expand` con ejecución asíncrona mediante `BackgroundTasks` y esquema validado `ExpandCatalogRequest`.
+  - Cobertura de tests unitarios completa en `backend/tests/test_tmdb_sync.py` y `backend/tests/test_admin.py` (8 tests de admin y 17 de sync pasando).
 
 ## [v0.9.0] - 2026-09-16
 ### Agregado & Mejorado

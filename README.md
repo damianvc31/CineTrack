@@ -25,7 +25,16 @@ Variables clave requeridas:
 - `AUTH_SECRET_KEY`: Clave secreta para firma de sesiones/tokens JWT del login
 - `ADMIN_API_KEY`: Clave secreta para endpoints y tareas administrativas automatizadas
 - `TMDB_API_KEY`: Read Access Token o API Key de The Movie Database (TMDB)
-- `AI_PROVIDER_API_KEY`: API Key para el servicio de IA del recomendador (Google Gemini o Groq)
+- **Proveedor de IA para el recomendador (Arquitectura Híbrida Resiliente):**
+  - `GEMINI_API_KEY`: Clave de API de Google AI Studio para Gemini.
+  - `GEMINI_MODEL`: Identificador del modelo Gemini (default: `gemini-3.6-flash`).
+  - `GROQ_API_KEY`: Clave de API de Groq Cloud para modelos de alta velocidad.
+  - `GROQ_MODEL`: Identificador del modelo Groq (default: `openai/gpt-oss-120b`).
+  - `AI_RECOMMENDER_PRIMARY`: Proveedor primario de IA (`gemini` o `groq`, con fallback cruzado automático y degradación elegante al motor heurístico determinista local).
+- **Expansión de Catálogo TMDB (Criterio 1: /discover por géneros con filtros de calidad):**
+  - `TMDB_EXPAND_MIN_VOTE_COUNT`: Umbral mínimo de votos en TMDB (default: `300`).
+  - `TMDB_EXPAND_MIN_VOTE_AVERAGE`: Umbral mínimo de calificación en TMDB (default: `7.0`).
+  - `TMDB_EXPAND_TITLES_PER_GENRE`: Títulos objetivo a ingerir por género (default: `50`).
 - `HOME_*`: Parámetros de ajuste de ventanas temporales, pools y umbrales de Home (`HOME_NEW_RELEASES_DAYS=30`, `HOME_TRENDING_DAYS=90`, `HOME_TRENDING_MIN_POPULARITY_PERCENTILE=0.80`, etc.)
 
 ---
@@ -67,46 +76,58 @@ alembic revision --autogenerate -m "descripcion_del_cambio"
 alembic downgrade -1
 ```
 
-#### Comandos de Ingesta y Sincronización TMDB
+#### Comandos de Ingesta y Sincronización TMDB (CLI)
+Todos los comandos se ejecutan desde el entorno virtual del backend mediante el módulo `app.jobs.sync_tmdb`:
+
 ```powershell
-# Sincronizar catálogo de géneros
+# 1. Sincronizar catálogo de géneros desde TMDB
 python -m app.jobs.sync_tmdb --genres
 
-# Ingesta inicial de catálogo (opciones: --priority popular_first | toprated_first)
-python -m app.jobs.sync_tmdb --initial --priority popular_first
+# 2. Ingesta inicial de catálogo
+#    --priority: 'popular_first' o 'toprated_first'
+#    --movies-target: cantidad de películas a ingerir
+#    --series-target: cantidad de series a ingerir
+#    --allow-unreleased: permitir obras no estrenadas (default: False)
+python -m app.jobs.sync_tmdb --initial --priority popular_first --movies-target 1000 --series-target 1000
 
-# Sincronización diaria estándar (valores por defecto: 48 hs para cambios y 15 días para cartelera)
-python -m app.jobs.sync_tmdb --daily
-
-# Sincronización diaria con parámetros personalizados:
-# --changes-hours: ventana en horas para /changes en series y películas de TMDB (ej. 120 para 5 días, o 0 para omitir cambios)
-# --releases-days: ventana en días para /discover de nuevos estrenos en cartelera de películas y series (ej. 15 días)
-# --allow-unreleased: permitir títulos no estrenados (por defecto False; omite películas futuras y series sin temporadas emitidas)
+# 3. Sincronización diaria estándar (cambios en catálogo y cartelera)
+#    --changes-hours: ventana en horas para /changes de TMDB (default config: 48 hs, ej. 120 para 5 días)
+#    --releases-days: ventana en días para nuevos estrenos en cartelera (default config: 15 días)
+#    --allow-unreleased: permitir títulos no estrenados (default: False)
 python -m app.jobs.sync_tmdb --daily --changes-hours 120 --releases-days 15
 
-# Saneamiento de títulos no estrenados (elimina películas futuras y series sin temporadas de la base de datos)
+# 4. Expansión de catálogo por géneros (Criterio 1: /discover con filtros de calidad)
+#    --genre: nombre o ID de TMDB (ej. "Ciencia ficción", "Crime", 80). Si se omite, procesa todos los géneros
+#    --media-type: 'both' (default), 'movie' o 'tv'
+#    --min-vote-count: umbral mínimo de votos en TMDB (default config: 300)
+#    --min-vote-average: calificación promedio mínima en TMDB (default config: 7.0)
+#    --target-per-genre: cantidad objetivo de títulos por género (default config: 50)
+#    --allow-unreleased: permitir títulos no estrenados (default: False; por defecto filtra solo estrenados)
+#
+# Ejemplos:
+# Para todos los géneros con configuración por defecto:
+python -m app.jobs.sync_tmdb --expand
+# Para un género puntual (por nombre) solo películas:
+python -m app.jobs.sync_tmdb --expand --genre "Crime" --media-type movie --target-per-genre 15
+# Para un género por ID con umbrales personalizados:
+python -m app.jobs.sync_tmdb --expand --genre 878 --min-vote-count 250 --min-vote-average 7.2 --target-per-genre 30
+
+# 5. Saneamiento de títulos no estrenados (elimina películas futuras y series sin temporadas emitidas)
 python -m app.jobs.sync_tmdb --cleanup-unreleased
 
-# Recalcular percentiles de popularidad
+# 6. Recalcular percentiles de popularidad y ratings unificados
 python -m app.jobs.sync_tmdb --percentiles
 
-# Sincronizar reseñas de TMDB para todos los títulos hasta el tope (20)
+# 7. Sincronizar reseñas externas de TMDB para todos los títulos (hasta el tope configurable de 20)
 python -m app.jobs.sync_tmdb --reviews
 
-# Carga manual mediante archivo JSON (ver docs/templates/ para formato)
+# 8. Carga manual mediante archivo JSON estructurado (ver docs/templates/ para formato)
 python -m app.jobs.sync_tmdb --import-json docs/templates/template_pelicula.json
 
-# Importar título individual por ID de TMDB
+# 9. Importar título individual por ID de TMDB
 python -m app.jobs.sync_tmdb --import-tmdb-id 157336 --type movie
 
-# Expansión de catálogo por géneros (Criterio 1: discover con thresholds de votos y rating)
-# Para todos los géneros:
-python -m app.jobs.sync_tmdb --expand
-# Para un género puntual (por nombre o ID de TMDB) con parámetros personalizados:
-python -m app.jobs.sync_tmdb --expand --genre "Ciencia ficción" --min-vote-count 300 --min-vote-average 7.0 --target-per-genre 50
-python -m app.jobs.sync_tmdb --expand --genre 28 --media-type movie
-
-# Vaciar completamente el catálogo (títulos, temporadas, episodios, reseñas y relaciones)
+# 10. Vaciar completamente el catálogo (títulos, temporadas, episodios, reseñas y relaciones; preserva usuarios)
 python -m app.jobs.sync_tmdb --clear
 ```
 
@@ -123,16 +144,54 @@ $$\text{Rating} = \frac{(\text{vote\_average\_tmdb} \times \text{vote\_count\_tm
   - **Pantalla `/reviews`:** Interfaz dedicada con pestañas "My Reviews" (gestión de reseñas propias) y "Pending Reviews" (títulos vistos sin reseñar con redactor rápido in-place).
 
 #### Endpoints Administrativos (API HTTP)
-Todos los jobs de sincronización pueden dispararse también vía HTTP (`HTTP 202 Accepted` con ejecución asíncrona mediante `BackgroundTasks`):
-- `POST /api/v1/admin/sync/genres`: Sincronización de géneros.
-- `POST /api/v1/admin/sync/initial`: Ingesta inicial (`priority`, `movies_target`, `series_target`, `allow_unreleased`).
-- `POST /api/v1/admin/sync/daily`: Sync diaria (`changes_hours_window`, `releases_days_window`, `allow_unreleased`).
-- `POST /api/v1/admin/sync/cleanup-unreleased`: Saneamiento inmediato de títulos no estrenados.
-- `POST /api/v1/admin/sync/percentiles`: Recálculo de percentiles y rating unificado.
-- `POST /api/v1/admin/sync/reviews`: Sincronización de reseñas de TMDB.
-- `POST /api/v1/admin/sync/import-tmdb`: Importación puntual de título por ID TMDB.
-- `POST /api/v1/admin/sync/import-json`: Ingesta por archivo JSON.
-- `DELETE /api/v1/admin/catalog`: Vaciado total de catálogo (preservando usuarios).
+Todos los jobs de sincronización pueden dispararse también vía HTTP (`HTTP 202 Accepted` con ejecución asíncrona en segundo plano mediante `BackgroundTasks`).
+
+*Autenticación requerida:* Enviar cabecera `Authorization: Bearer <token_admin>` (usuario con `es_admin=True`) o cabecera `X-Admin-Key: <ADMIN_API_KEY>`.
+
+- **`POST /api/v1/admin/sync/expand`** (Expansión selectiva por géneros — Criterio 1):
+  ```json
+  {
+    "genre": "Crime",
+    "media_type": "movie",
+    "min_vote_count": 300,
+    "min_vote_average": 7.0,
+    "target_per_genre": 15,
+    "allow_unreleased": false
+  }
+  ```
+  - `genre` (*string | null*, opcional): Nombre o ID del género. Si es `null` o se omite, procesa todos los géneros.
+  - `media_type` (*string*, opcional): `"both"` (default), `"movie"` o `"tv"`.
+  - `min_vote_count` (*integer*, opcional): Umbral mínimo de votos en TMDB (default: valor de `TMDB_EXPAND_MIN_VOTE_COUNT`).
+  - `min_vote_average` (*float*, opcional): Calificación promedio mínima (default: valor de `TMDB_EXPAND_MIN_VOTE_AVERAGE`).
+  - `target_per_genre` (*integer*, opcional): Cantidad objetivo de títulos por género (default: valor de `TMDB_EXPAND_TITLES_PER_GENRE`).
+  - `allow_unreleased` (*boolean*, opcional): Permitir obras no estrenadas (default: `false`).
+
+- **`POST /api/v1/admin/sync/initial`** (Ingesta inicial masiva):
+  - Body: `{"priority": "popular_first" | "toprated_first", "movies_target": 1000, "series_target": 1000, "allow_unreleased": false}`
+
+- **`POST /api/v1/admin/sync/daily`** (Sincronización diaria periódica):
+  - Body: `{"changes_hours_window": 48, "releases_days_window": 15, "allow_unreleased": false}`
+
+- **`POST /api/v1/admin/sync/genres`** (Sincronización del catálogo de géneros):
+  - Dispara la actualización de géneros desde TMDB en background.
+
+- **`POST /api/v1/admin/sync/cleanup-unreleased`** (Saneamiento de catálogo):
+  - Ejecuta de forma síncrona la eliminación de títulos no estrenados y recalcula métricas.
+
+- **`POST /api/v1/admin/sync/percentiles`** (Recálculo de popularidad y ratings):
+  - Recalcula percentiles y ratings unificados en background.
+
+- **`POST /api/v1/admin/sync/reviews`** (Sincronización masiva de reseñas):
+  - Body: `{"limit_per_title": 20}`
+
+- **`POST /api/v1/admin/sync/import-tmdb`** (Importación puntual por ID TMDB):
+  - Body: `{"tmdb_id": 157336, "type": "movie"}`
+
+- **`POST /api/v1/admin/sync/import-json`** (Ingesta por lista JSON estructurada):
+  - Body: arreglo de objetos según plantillas de `docs/templates/`.
+
+- **`DELETE /api/v1/admin/catalog?confirm=true`** (Vaciado de catálogo):
+  - Elimina títulos y datos asociados, preservando usuarios y géneros. Requiere `confirm=true`.
 
 *Autenticación requerida:* Enviar cabecera `Authorization: Bearer <token_admin>` (usuario con `es_admin=True`) o cabecera `X-Admin-Key: <ADMIN_API_KEY>`.
 
@@ -161,7 +220,8 @@ Todos los jobs de sincronización pueden dispararse también vía HTTP (`HTTP 20
 - **Perfil y Métricas del Usuario:**
   - `GET /api/v1/users/me/library`: Biblioteca del usuario dividida en `following`, `favorites`, `watchlist` y `recently_watched`.
   - `GET /api/v1/users/me/stats`: Estadísticas de tiempo invertido (horas en cine vs TV), conteos y Top 5.
-
+- **Recomendador Asistido por IA (Motor Híbrido Resiliente):**
+  - `POST /api/v1/recommendations`: Búsqueda y recomendación inteligente con grounding estricto sobre el catálogo local. Procesa prompts libres en lenguaje natural con soporte para usuarios invitados y autenticados (personalizado según historial de vistos y favoritos), cascada de reintentos resiliente (Gemini -> Groq -> Heurístico local) y explicación contextual (`why_recommended`).
 
 #### Tareas Programadas en Producción (Cron)
 Para mantener actualizado el catálogo automáticamente en un servidor o contenedor, se programa la ejecución diaria del comando `--daily` mediante cron (o invocando el endpoint `/daily` con curl y la API Key):
@@ -195,14 +255,15 @@ VITE_API_URL=http://localhost:8000/api/v1
 ```
 
 #### Pantallas Principales de la Aplicación
-- `/`: **Home** con Hero banner, recomendador IA en columna izquierda y carruseles con snap-scroll.
-- `/catalog`: **Catálogo completo** con filtros multidimensionales (sección, género, actor, tipo, ordenamiento y paginación).
-- `/titles/:id`: **Ficha de Título** con backdrop, sinopsis, reparto con fotos, seguimiento de temporadas/episodios y motor de reseñas (edición/eliminación in-place, puntaje 0.5 opcional).
-- `/reviews`: **Reseñas y Opiniones** con pestañas "My Reviews" (gestión centralizada) y "Pending Reviews" (títulos vistos sin reseñar).
-- `/library`: **Mi Biblioteca** con pestañas de Favoritos, Watchlist, Siguiendo y Vistas.
-- `/profile`: **Perfil de Usuario** con desglose de estadísticas de tiempo invertido (horas/días) y colecciones.
-- `/recommendations`: **Recomendador Inteligente** por estado de ánimo y preferencias guiadas (previsualización Fase 6).
-- **PWA Instalable:** Acceso directo como app nativa en teléfonos móviles gracias al soporte de `manifest.json`.
+- `/`: **Home** con Hero banner dinámico, disparador del Asistente IA en la columna izquierda y carruseles curados con snap-scroll.
+- `/catalog`: **Catálogo completo** con filtros multidimensionales (sección, género, actor, tipo de obra, ordenamiento y paginación).
+- `/titles/:id`: **Ficha de Título** con backdrop cinematográfico, sinopsis, reparto con fotos de actores, seguimiento interactivo de temporadas/episodios y motor integral de reseñas (edición/eliminación in-place, puntaje 0.5 opcional).
+- `/reviews`: **Reseñas y Opiniones** con pestañas "My Reviews" (gestión centralizada de reseñas propias) y "Pending Reviews" (títulos vistos sin reseñar con redactor rápido in-place).
+- `/library`: **Mi Biblioteca** con pestañas de Favoritos, Watchlist, Siguiendo y Vistas (actualización silenciosa en background sin layout shifts).
+- `/profile`: **Perfil de Usuario** con desglose de estadísticas de tiempo invertido (horas/semanas en cine vs TV), Top 5 personalizable y gráfico interactivo Donut SVG de distribución de géneros.
+- `/recommendations`: **Asistente IA de Recomendaciones** con consultas conversacionales en lenguaje natural, disparadores de inspiración variados (subgéneros, décadas, directores, actores, emociones), badges claros de tipo (Película / Serie), visualización del proveedor y modelo utilizado, y botón de reintento ante degradación temporal.
+- `/settings`: **Configuración de Usuario** con cambio seguro de contraseña y selector de idioma reactivo para la interfaz (Español / English).
+- **PWA Instalable:** Acceso directo como aplicación nativa en dispositivos móviles y de escritorio gracias al soporte de `manifest.json` y Web App Manifest.
 
 ---
 

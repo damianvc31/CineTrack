@@ -65,6 +65,27 @@ class ImportTMDBRequest(BaseModel):
     type: Literal["movie", "tv"] = Field(default="movie", description="Tipo de contenido ('movie' o 'tv')")
 
 
+class ExpandCatalogRequest(BaseModel):
+    genre: Optional[str] = Field(
+        default=None, description="Nombre o ID del género a expandir (si es null/omitido, expande todos los géneros)"
+    )
+    media_type: Literal["both", "movie", "tv"] = Field(
+        default="both", description="Tipo de contenido a expandir ('both', 'movie' o 'tv')"
+    )
+    min_vote_count: Optional[int] = Field(
+        default=None, ge=0, description="Umbral mínimo de votos requeridos en TMDB (default: config)"
+    )
+    min_vote_average: Optional[float] = Field(
+        default=None, ge=0.0, le=10.0, description="Calificación promedio mínima en TMDB (default: config)"
+    )
+    target_per_genre: Optional[int] = Field(
+        default=None, ge=1, le=500, description="Cantidad objetivo de títulos por género (default: config)"
+    )
+    allow_unreleased: Optional[bool] = Field(
+        default=False, description="Permitir títulos no estrenados (default: False)"
+    )
+
+
 # -------------------------------------------------------------------------
 # FUNCIONES WRAPPER PARA BACKGROUND TASKS
 # -------------------------------------------------------------------------
@@ -175,6 +196,32 @@ async def _run_job_import_json(items: List[Dict[str, Any]]):
             await service.import_from_json_data(items)
     except Exception as e:
         logger.error(f"[Job Background] Error importando JSON manual: {e}")
+    finally:
+        await client.close()
+
+
+async def _run_job_expand(
+    genre: Optional[str],
+    media_type: str,
+    target_per_genre: Optional[int],
+    min_vote_count: Optional[int],
+    min_vote_average: Optional[float],
+    allow_unreleased: Optional[bool],
+):
+    client = TMDBClient()
+    try:
+        async with AsyncSessionLocal() as db:
+            service = TMDBSyncService(db, client)
+            await service.expand_catalog_by_genres(
+                genre=genre,
+                media_type=media_type,
+                target_per_genre=target_per_genre,
+                min_vote_count=min_vote_count,
+                min_vote_average=min_vote_average,
+                allow_unreleased=allow_unreleased,
+            )
+    except Exception as e:
+        logger.error(f"[Job Background] Error en expansión de catálogo: {e}")
     finally:
         await client.close()
 
@@ -322,6 +369,29 @@ async def trigger_import_json(
     return JobResponse(
         job="import_json",
         message=f"Importación de {len(items)} registros JSON encolada en segundo plano."
+    )
+
+
+@router.post("/sync/expand", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def trigger_expand_catalog(
+    payload: ExpandCatalogRequest,
+    background_tasks: BackgroundTasks,
+    _: Any = Depends(get_current_admin)
+) -> JobResponse:
+    """Ejecuta la expansión selectiva de catálogo por géneros (Criterio 1) en background."""
+    background_tasks.add_task(
+        _run_job_expand,
+        genre=payload.genre,
+        media_type=payload.media_type,
+        target_per_genre=payload.target_per_genre,
+        min_vote_count=payload.min_vote_count,
+        min_vote_average=payload.min_vote_average,
+        allow_unreleased=payload.allow_unreleased,
+    )
+    genre_desc = payload.genre or "todos los géneros"
+    return JobResponse(
+        job="expand_catalog",
+        message=f"Expansión de catálogo iniciada en segundo plano para {genre_desc} (tipo: {payload.media_type})."
     )
 
 

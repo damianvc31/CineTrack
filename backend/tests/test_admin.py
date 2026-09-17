@@ -110,6 +110,19 @@ async def test_admin_sync_jobs_with_parameters(async_client: AsyncClient):
     assert resp_tmdb.status_code == 202
     assert resp_tmdb.json()["job"] == "import_tmdb"
 
+    # Expand catalog
+    expand_payload = {
+        "genre": "Crime",
+        "media_type": "movie",
+        "min_vote_count": 300,
+        "min_vote_average": 7.0,
+        "target_per_genre": 15,
+        "allow_unreleased": False
+    }
+    resp_expand = await async_client.post("/api/v1/admin/sync/expand", json=expand_payload, headers=headers)
+    assert resp_expand.status_code == 202
+    assert resp_expand.json()["job"] == "expand_catalog"
+
     # Import JSON vacío -> 400 Bad Request
     resp_empty_json = await async_client.post("/api/v1/admin/sync/import-json", json=[], headers=headers)
     assert resp_empty_json.status_code == 400
@@ -163,6 +176,16 @@ async def test_admin_background_workers_execution(monkeypatch):
 
     await admin._run_job_import_json(items=[{"tipo": "pelicula", "titulo": "Avatar"}])
     assert mock_service.import_from_json_data.called
+
+    await admin._run_job_expand(
+        genre="Crime",
+        media_type="movie",
+        target_per_genre=10,
+        min_vote_count=200,
+        min_vote_average=7.0,
+        allow_unreleased=False
+    )
+    assert mock_service.expand_catalog_by_genres.called
 
 
 @pytest.mark.asyncio
