@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useOutletContext } from 'react-router-dom'
-import { Filter, Search, ChevronLeft, ChevronRight, Film, Tv, Sparkles, AlertCircle, X, RotateCcw } from 'lucide-react'
+import { Filter, Search, ChevronLeft, ChevronRight, Film, Tv, Sparkles, AlertCircle, X, RotateCcw, Compass, User } from 'lucide-react'
 import { catalogService, type TitlesResponse, type CountryItem, type LanguageItem } from '@/services/catalogService'
 import { TitleCard } from '@/components/common/TitleCard'
+import { CountryFlag } from '@/components/common/CountryFlag'
 import { MultiSelectDropdown, type MultiSelectOption } from '@/components/common/MultiSelectDropdown'
 import { useLanguage } from '@/context/LanguageContext'
 
@@ -31,10 +32,25 @@ export const CatalogPage: React.FC = () => {
   const order = (searchParams.get('order') as any) || 'desc'
   const page = parseInt(searchParams.get('page') || '1', 10)
 
-  // Multi-select filters parsing
+  // Multi-select filters parsing (con desglose automático de duplas de géneros)
   const selectedGenres = useMemo(() => {
     const raw = searchParams.get('generos') || searchParams.get('genero') || ''
-    return raw ? raw.split(',').map((g) => g.trim()).filter(Boolean) : []
+    if (!raw) return []
+    const parsed = raw.split(',').map((g) => g.trim()).filter(Boolean)
+    const expanded: string[] = []
+    for (const g of parsed) {
+      const lower = g.toLowerCase()
+      if (lower === 'sci-fi & fantasy' || lower === 'science fiction & fantasy') {
+        expanded.push('Sci-Fi', 'Fantasy')
+      } else if (lower === 'action & adventure') {
+        expanded.push('Action', 'Adventure')
+      } else if (lower === 'war & politics') {
+        expanded.push('War')
+      } else {
+        expanded.push(g)
+      }
+    }
+    return Array.from(new Set(expanded))
   }, [searchParams])
 
   const genreOp = (searchParams.get('genre_op') as 'or' | 'and') || 'or'
@@ -115,6 +131,7 @@ export const CatalogPage: React.FC = () => {
         value: c.code,
         label: getCountryLabel(c.code),
         count: c.count,
+        icon: <CountryFlag code={c.code} className="w-4 h-3 shrink-0" />,
       }))
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [countries, getCountryLabel])
@@ -253,6 +270,7 @@ export const CatalogPage: React.FC = () => {
 
   const hasActiveFilters = Boolean(
     query ||
+    actor ||
     tipo ||
     section ||
     selectedGenres.length > 0 ||
@@ -275,7 +293,12 @@ export const CatalogPage: React.FC = () => {
                 <Tv className="w-7 h-7 text-amber-400" /> {t('series')}
               </>
             ) : (
-              <>{t('exploreCatalogHeading')}</>
+              <span className="flex items-center gap-2.5">
+                <Compass className="w-7 h-7 text-amber-400" />
+                <span className="bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500 bg-clip-text text-transparent">
+                  {t('exploreCatalogHeading')}
+                </span>
+              </span>
             )}
           </h1>
           <p className="text-xs text-gray-400 mt-1">
@@ -284,14 +307,14 @@ export const CatalogPage: React.FC = () => {
         </div>
 
         {/* Catalog search bar with clear button 'X' */}
-        <form onSubmit={handleSearchSubmit} className="relative w-full md:w-80">
+        <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-96 md:w-[420px] lg:w-[460px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder={t('searchCatalogPlaceholder')}
-            className="w-full pl-9 pr-9 py-2 text-sm bg-[#141414] border border-[#262626] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
+            className="w-full pl-9 pr-9 py-2 text-xs sm:text-sm bg-[#141414] border border-[#262626] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
           />
           {searchInput && (
             <button
@@ -426,6 +449,21 @@ export const CatalogPage: React.FC = () => {
             </span>
           )}
 
+          {actor && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30">
+              <User className="w-3 h-3 text-amber-400 shrink-0" />
+              <span>{actor}</span>
+              <button
+                type="button"
+                onClick={() => updateParam('actor', undefined)}
+                className="hover:text-white transition-colors"
+                title={language === 'es' ? 'Quitar filtro de actor' : 'Remove actor filter'}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
           {tipo && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-[#1f1f1f] text-gray-200 border border-[#333]">
               <span>{tipo === 'movie' ? t('movies') : t('series')}</span>
@@ -470,6 +508,7 @@ export const CatalogPage: React.FC = () => {
               key={c}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-[#1f1f1f] text-gray-200 border border-[#333]"
             >
+              <CountryFlag code={c} className="w-4 h-2.5 shrink-0" />
               <span>{getCountryLabel(c)}</span>
               <button
                 type="button"
@@ -509,7 +548,7 @@ export const CatalogPage: React.FC = () => {
       )}
 
       {/* Grid Content or Empty State */}
-      {loading ? (
+      {loading && !data ? (
         <div className="flex flex-col items-center justify-center min-h-[40vh] gap-3">
           <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
           <p className="text-xs text-gray-400">{t('loadingResults')}</p>
@@ -534,9 +573,19 @@ export const CatalogPage: React.FC = () => {
           </button>
         </div>
       ) : (
-        <>
+        <div className="relative min-h-[400px]">
+          {/* Sutil overlay de carga para transiciones de filtro sin parpadeo de scroll */}
+          {loading && (
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-[0.5px] z-20 flex items-start justify-center pt-24 rounded-2xl animate-in fade-in duration-100 pointer-events-none">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#171717]/95 border border-[#333] shadow-2xl">
+                <div className="w-3.5 h-3.5 border-2 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+                <span className="text-xs font-medium text-gray-200">{t('loadingResults')}</span>
+              </div>
+            </div>
+          )}
+
           {/* Titles Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
+          <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 transition-opacity duration-200 ${loading ? 'opacity-40' : 'opacity-100'}`}>
             {data.items.map((item) => (
               <div key={`${item.tipo}-${item.id}`} className="flex justify-center">
                 <TitleCard title={item} onStateChange={handleCardStateChange} onOpenAuth={openAuth} />
@@ -569,7 +618,7 @@ export const CatalogPage: React.FC = () => {
               </button>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )

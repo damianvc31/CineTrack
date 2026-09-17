@@ -5,6 +5,7 @@ export interface MultiSelectOption {
   value: string
   label: string
   count?: number
+  icon?: React.ReactNode
 }
 
 interface ToggleConfig {
@@ -182,7 +183,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
                   >
                     <div className="flex items-center gap-2 truncate">
                       <div
-                        className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-colors ${
+                        className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-colors shrink-0 ${
                           isSelected
                             ? 'bg-amber-500 border-amber-500 text-black'
                             : 'border-gray-600 bg-[#0d0d0d]'
@@ -190,6 +191,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
                       >
                         {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                       </div>
+                      {opt.icon && <span className="shrink-0 flex items-center">{opt.icon}</span>}
                       <span className="truncate">{opt.label}</span>
                     </div>
 

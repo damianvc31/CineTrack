@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, Link, useOutletContext } from 'react-router-dom'
 import {
   Star,
   Heart,
   Bookmark,
   Eye,
+  EyeOff,
   Play,
   X,
   Clock,
@@ -55,6 +56,16 @@ export const TitleDetailPage: React.FC = () => {
   const [seasonWatchLoading, setSeasonWatchLoading] = useState(false)
   const [episodeNotice, setEpisodeNotice] = useState<string | null>(null)
 
+  // Estados de hover y supresión inmediata post-clic para botones de acción
+  const [isFavHovered, setIsFavHovered] = useState(false)
+  const [justToggledFav, setJustToggledFav] = useState(false)
+
+  const [isWlHovered, setIsWlHovered] = useState(false)
+  const [justToggledWl, setJustToggledWl] = useState(false)
+
+  const [isWatchedHovered, setIsWatchedHovered] = useState(false)
+  const [justToggledWatched, setJustToggledWatched] = useState(false)
+
   // Scroll to top automatically when navigating to any title detail
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
@@ -73,6 +84,16 @@ export const TitleDetailPage: React.FC = () => {
   const [loadingMoreReviews, setLoadingMoreReviews] = useState(false)
 
   const titleId = parseInt(id || '0', 10)
+
+  // Calificación personal del usuario (de su reseña o de user_rating en el título)
+  const userPersonalScore = useMemo(() => {
+    if (!user) return null
+    const userRev = reviews.find((r) => r.usuario_id === user.id)
+    if (userRev && userRev.puntaje !== null && userRev.puntaje !== undefined) {
+      return userRev.puntaje
+    }
+    return title?.user_rating ?? null
+  }, [user, reviews, title])
 
   const loadData = useCallback(async (showSpinner = true) => {
     if (!titleId) return
@@ -125,6 +146,7 @@ export const TitleDetailPage: React.FC = () => {
     try {
       const res = await catalogService.toggleFavorite(titleId)
       setIsFavorite(res.favorito)
+      setJustToggledFav(true)
     } catch (err) {
       console.error('Error toggling favorite:', err)
     }
@@ -138,6 +160,7 @@ export const TitleDetailPage: React.FC = () => {
     try {
       const res = await catalogService.toggleWatchlist(titleId)
       setUserEstado(res.nuevo_estado ?? null)
+      setJustToggledWl(true)
     } catch (err) {
       console.error('Error toggling watchlist:', err)
     }
@@ -149,8 +172,22 @@ export const TitleDetailPage: React.FC = () => {
       return
     }
     try {
+      const isCurrentlyWatched = userEstado === 'vista'
+      // Si estamos desmarcando vista en una serie, limpiamos optimísticamente los episodios vistos en memoria
+      // para evitar que hasWatchedEpisodes quede en true durante el fetch y parpadee el botón "Serie Abandonada"
+      if (isCurrentlyWatched && title?.tipo === 'tv' && title.temporadas) {
+        setTitle((prev) => {
+          if (!prev || !prev.temporadas) return prev
+          const resetTemporadas = prev.temporadas.map((s) => ({
+            ...s,
+            episodios: s.episodios?.map((e) => ({ ...e, visto: false })) || [],
+          }))
+          return { ...prev, temporadas: resetTemporadas }
+        })
+      }
       const res = await catalogService.toggleWatched(titleId)
       setUserEstado(res.nuevo_estado ?? null)
+      setJustToggledWatched(true)
       loadData(false)
     } catch (err) {
       console.error('Error toggling watched:', err)
@@ -544,7 +581,10 @@ export const TitleDetailPage: React.FC = () => {
                 </span>
 
                 {percentilNum > 0 && (
-                  <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-xs">
+                  <span
+                    title={language === 'es' ? `Percentil de popularidad: ${percentilNum}% (en base al catálogo)` : `Popularity percentile: ${percentilNum}% (based on catalog)`}
+                    className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-xs cursor-default"
+                  >
                     <span>🔥</span> {percentilNum}% {language === 'es' ? 'Popularidad' : 'Popularity'}
                   </span>
                 )}
@@ -559,13 +599,33 @@ export const TitleDetailPage: React.FC = () => {
 
               {/* Fila con rating, formato de año/temporadas */}
               <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-gray-300">
-                <div className="flex items-center gap-1.5 text-amber-400 font-bold bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/20">
+                <div
+                  title={
+                    language === 'es'
+                      ? `Calificación de la comunidad: ${title.vote_average_tmdb.toFixed(1)} (${title.vote_count_tmdb} votos)`
+                      : `Community rating: ${title.vote_average_tmdb.toFixed(1)} (${title.vote_count_tmdb} votes)`
+                  }
+                  className="flex items-center gap-1.5 text-amber-400 font-bold bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/20 cursor-default"
+                >
                   <Star className="w-4 h-4 fill-amber-400" />
                   <span>{title.vote_average_tmdb.toFixed(1)}</span>
                   <span className="text-[11px] text-gray-400 font-normal">
                     ({title.vote_count_tmdb} {language === 'es' ? 'votos' : 'votes'})
                   </span>
                 </div>
+
+                {userPersonalScore !== null && (
+                  <div
+                    title={language === 'es' ? `Tu puntaje: ${userPersonalScore.toFixed(1)}` : `Your score: ${userPersonalScore.toFixed(1)}`}
+                    className="flex items-center gap-1.5 text-sky-400 font-bold bg-sky-950/40 px-2.5 py-1 rounded-lg border border-sky-500/40 shadow-sm cursor-default"
+                  >
+                    <Star className="w-4 h-4 fill-sky-400 text-sky-400" />
+                    <span>{userPersonalScore.toFixed(1)}</span>
+                    <span className="text-[11px] text-sky-300/80 font-normal">
+                      ({language === 'es' ? 'tu puntaje' : 'your score'})
+                    </span>
+                  </div>
+                )}
 
                 {title.tipo === 'tv' ? (
                   <div className="flex items-center gap-2 text-gray-300 font-medium">
@@ -626,10 +686,21 @@ export const TitleDetailPage: React.FC = () => {
                 <div className="flex flex-wrap gap-2 pt-1">
                   {title.generos.map((g) => {
                     const gName = typeof g === 'string' ? g : g.nombre
+                    // Desglose de duplas al clickear un género (Sci-Fi & Fantasy -> Sci-Fi + Fantasy OR)
+                    const norm = gName.trim().toLowerCase()
+                    const genreUrl =
+                      norm === 'sci-fi & fantasy' || norm === 'science fiction & fantasy'
+                        ? '/catalog?generos=Sci-Fi,Fantasy&genre_op=or'
+                        : norm === 'action & adventure'
+                        ? '/catalog?generos=Action,Adventure&genre_op=or'
+                        : norm === 'war & politics'
+                        ? '/catalog?generos=War'
+                        : `/catalog?generos=${encodeURIComponent(gName.trim())}`
+
                     return (
                       <Link
                         key={gName}
-                        to={`/catalog?genero=${encodeURIComponent(gName)}`}
+                        to={genreUrl}
                         className="px-2.5 py-1 rounded-md bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/60 text-xs text-gray-300 transition-colors"
                       >
                         {translateGenreName(gName)}
@@ -640,36 +711,82 @@ export const TitleDetailPage: React.FC = () => {
               )}
 
               {/* 4 Action Icons */}
-              <div className="pt-4 border-t border-gray-800 flex flex-wrap items-center gap-3">
-                {/* 1. Favorite button */}
-                <button
-                  onClick={handleFavoriteToggle}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                    isFavorite
-                      ? 'bg-rose-900/40 border-rose-500 text-rose-300 shadow-md'
-                      : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-rose-950/30 hover:border-rose-500/40 hover:text-rose-300'
-                  }`}
-                >
-                  <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
-                  <span>{language === 'es' ? 'Favorito' : 'Favorite'}</span>
-                </button>
+              {(() => {
+                const favUnfilled = isFavorite && isFavHovered && !justToggledFav
+                const wlUnfilled = userEstado === 'watchlist' && isWlHovered && !justToggledWl
+                const isWatched = userEstado === 'vista'
+                const effectiveHoverWatched = isWatchedHovered && !justToggledWatched
+                const showingWatched = effectiveHoverWatched ? !isWatched : isWatched
 
-                {/* 2. Watched button */}
-                <button
-                  onClick={handleWatchedToggle}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                    userEstado === 'vista'
-                      ? 'bg-emerald-900/40 border-emerald-500 text-emerald-300 shadow-md'
-                      : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-emerald-950/30 hover:border-emerald-500/40 hover:text-emerald-300'
-                  }`}
-                >
-                  <Eye className="w-4 h-4" />
-                  <span>
-                    {userEstado === 'vista'
-                      ? (language === 'es' ? 'Vista' : 'Watched')
-                      : (language === 'es' ? 'Marcar Vista' : 'Mark Watched')}
-                  </span>
-                </button>
+                return (
+                  <div className="pt-4 border-t border-gray-800 flex flex-wrap items-center gap-3">
+                    {/* 1. Favorite button */}
+                    <button
+                      onClick={handleFavoriteToggle}
+                      onMouseEnter={() => setIsFavHovered(true)}
+                      onMouseLeave={() => {
+                        setIsFavHovered(false)
+                        setJustToggledFav(false)
+                      }}
+                      title={
+                        isFavorite
+                          ? (language === 'es' ? 'Quitar de favoritos' : 'Remove from favorites')
+                          : (language === 'es' ? 'Agregar a favoritos' : 'Add to favorites')
+                      }
+                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                        isFavorite
+                          ? 'bg-rose-900/40 border-rose-500 text-rose-300 hover:bg-rose-900/60 hover:border-rose-400 shadow-md'
+                          : 'bg-[#141414] border-[#262626] text-gray-300 hover:bg-rose-950/30 hover:border-rose-500/40 hover:text-rose-300'
+                      }`}
+                    >
+                      <Heart
+                        className={`w-4 h-4 transition-all ${
+                          isFavorite && !favUnfilled ? 'fill-current' : ''
+                        }`}
+                      />
+                      <span>{language === 'es' ? 'Favorito' : 'Favorite'}</span>
+                    </button>
+
+                    {/* 2. Watched button (muestra Not Watched en reposo si no está vista, Vista al posar el mouse) */}
+                    <button
+                      onClick={handleWatchedToggle}
+                      onMouseEnter={() => setIsWatchedHovered(true)}
+                      onMouseLeave={() => {
+                        setIsWatchedHovered(false)
+                        setJustToggledWatched(false)
+                      }}
+                      title={
+                        isWatched
+                          ? (language === 'es' ? 'Marcar como no vista' : 'Mark as unwatched')
+                          : (language === 'es' ? 'Marcar como vista' : 'Mark as watched')
+                      }
+                      className={`flex items-center justify-center gap-1.5 min-w-[124px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                        showingWatched
+                          ? 'bg-emerald-900/40 border-emerald-500 text-emerald-300 shadow-md'
+                          : isWatched && effectiveHoverWatched
+                          ? 'bg-[#18261e] border-emerald-600/70 text-emerald-300 shadow-sm'
+                          : effectiveHoverWatched
+                          ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300'
+                          : 'bg-[#141414] border-[#262626] text-gray-400 hover:border-emerald-500/40'
+                      }`}
+                    >
+                      {showingWatched ? (
+                        <Eye className="w-4 h-4 text-emerald-300 transition-colors" />
+                      ) : (
+                        <EyeOff
+                          className={`w-4 h-4 transition-colors ${
+                            isWatched && effectiveHoverWatched
+                              ? 'text-emerald-400'
+                              : 'text-gray-400'
+                          }`}
+                        />
+                      )}
+                      <span>
+                        {showingWatched
+                          ? (language === 'es' ? 'Vista' : 'Watched')
+                          : (language === 'es' ? 'No vista' : 'Not watched')}
+                      </span>
+                    </button>
 
                 {/* 3 & 4. Series Logic: Following / Drop Series vs Watchlist */}
                 {title.tipo === 'tv' ? (
@@ -721,13 +838,27 @@ export const TitleDetailPage: React.FC = () => {
                         {userEstado !== 'siguiendo' && userEstado !== 'vista' && !isAbandoned && (
                           <button
                             onClick={handleWatchlistToggle}
+                            onMouseEnter={() => setIsWlHovered(true)}
+                            onMouseLeave={() => {
+                              setIsWlHovered(false)
+                              setJustToggledWl(false)
+                            }}
+                            title={
+                              userEstado === 'watchlist'
+                                ? (language === 'es' ? 'Quitar de lista de seguimiento' : 'Remove from watchlist')
+                                : (language === 'es' ? 'Agregar a lista de seguimiento' : 'Add to watchlist')
+                            }
                             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
                               userEstado === 'watchlist'
-                                ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-md'
+                                ? 'bg-amber-500/20 border-amber-500 text-amber-300 hover:bg-amber-500/30 hover:border-amber-400 shadow-md'
                                 : 'bg-[#141414] border-[#262626] text-gray-300 hover:bg-amber-500/10 hover:border-amber-500/40 hover:text-amber-300'
                             }`}
                           >
-                            <Bookmark className={`w-4 h-4 ${userEstado === 'watchlist' ? 'fill-current' : ''}`} />
+                            <Bookmark
+                              className={`w-4 h-4 transition-all ${
+                                userEstado === 'watchlist' && !wlUnfilled ? 'fill-current' : ''
+                              }`}
+                            />
                             <span>{language === 'es' ? 'Lista de seguimiento' : 'Watchlist'}</span>
                           </button>
                         )}
@@ -739,18 +870,34 @@ export const TitleDetailPage: React.FC = () => {
                   userEstado !== 'vista' && (
                     <button
                       onClick={handleWatchlistToggle}
+                      onMouseEnter={() => setIsWlHovered(true)}
+                      onMouseLeave={() => {
+                        setIsWlHovered(false)
+                        setJustToggledWl(false)
+                      }}
+                      title={
+                        userEstado === 'watchlist'
+                          ? (language === 'es' ? 'Quitar de lista de seguimiento' : 'Remove from watchlist')
+                          : (language === 'es' ? 'Agregar a lista de seguimiento' : 'Add to watchlist')
+                      }
                       className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
                         userEstado === 'watchlist'
-                          ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-md'
-                          : 'bg-[#141414] border-[#262626] text-gray-300 hover:bg-amber-500/10 hover:border-amber-500/40 hover:text-amber-300'
+                          ? 'bg-amber-500/20 border-amber-500 text-amber-300 hover:bg-amber-500/30 hover:border-amber-400 shadow-md'
+                        : 'bg-[#141414] border-[#262626] text-gray-300 hover:bg-amber-500/10 hover:border-amber-500/40 hover:text-amber-300'
                       }`}
                     >
-                      <Bookmark className={`w-4 h-4 ${userEstado === 'watchlist' ? 'fill-current' : ''}`} />
+                      <Bookmark
+                        className={`w-4 h-4 transition-all ${
+                          userEstado === 'watchlist' && !wlUnfilled ? 'fill-current' : ''
+                        }`}
+                      />
                       <span>{language === 'es' ? 'Lista de seguimiento' : 'Watchlist'}</span>
                     </button>
                   )
                 )}
               </div>
+            )
+          })()}
             </div>
           </div>
         </div>

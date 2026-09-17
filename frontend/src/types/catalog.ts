@@ -38,6 +38,7 @@ export interface TitleCard {
   idioma_original?: string | null
   seasons_progress?: SeasonProgress[] | null
   following_status_text?: string | null
+  user_rating?: number | null
 }
 
 export interface HomeSections {

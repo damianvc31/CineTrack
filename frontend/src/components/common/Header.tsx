@@ -111,14 +111,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   <div className="relative">
                     <button
                       onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                      className="flex items-center gap-2.5 p-0.5 rounded-full hover:bg-[#171717] transition-colors focus:outline-none"
+                      className="group flex items-center gap-2.5 p-1 rounded-full hover:bg-[#1a1a1a] transition-all duration-200 cursor-pointer focus:outline-none"
                     >
-                      <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-amber-500/50 bg-[#181818] flex items-center justify-center text-black text-sm font-bold shadow-md shrink-0">
+                      <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-amber-500/50 bg-[#181818] flex items-center justify-center text-black text-sm font-bold shadow-md shrink-0 transition-all duration-200 group-hover:scale-105 group-hover:ring-2 group-hover:ring-amber-400/80 group-hover:border-amber-400 group-hover:shadow-lg group-hover:shadow-amber-500/20">
                         {getAvatarUrl(user.avatar_url) ? (
                           <img
                             src={getAvatarUrl(user.avatar_url)!}
                             alt={user.nombre_usuario}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                             onError={(e) => {
                               ;(e.target as HTMLElement).style.display = 'none'
                             }}
@@ -129,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                           </div>
                         )}
                       </div>
-                      <span className="hidden lg:inline text-xs font-semibold text-gray-200">
+                      <span className="hidden lg:inline text-xs font-semibold text-gray-200 group-hover:text-amber-300 transition-colors">
                         {user.nombre_usuario}
                       </span>
                     </button>
@@ -175,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
                         >
-                          <PlaySquare className="w-4 h-4 text-amber-400" /> {t('following')}
+                          <PlaySquare className="w-4 h-4 text-blue-400" /> {t('following')}
                         </Link>
                         <Link
                           to="/reviews"
@@ -321,7 +321,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
                 >
-                  <PlaySquare className="w-4 h-4 text-amber-400" /> {t('following')}
+                  <PlaySquare className="w-4 h-4 text-blue-400" /> {t('following')}
                 </Link>
                 <Link
                   to="/reviews"

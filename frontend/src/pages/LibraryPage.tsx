@@ -22,9 +22,11 @@ export const LibraryPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadLibrary = useCallback(async () => {
+  const loadLibrary = useCallback(async (isBackground = false) => {
     if (!user) return
-    setLoading(true)
+    if (!isBackground) {
+      setLoading(true)
+    }
     setError(null)
     try {
       const res = await catalogService.getLibrary()
@@ -36,7 +38,9 @@ export const LibraryPage: React.FC = () => {
         setError(language === 'es' ? 'Error al cargar la biblioteca.' : 'Failed to load library.')
       }
     } finally {
-      setLoading(false)
+      if (!isBackground) {
+        setLoading(false)
+      }
     }
   }, [user, language])
 
@@ -44,9 +48,13 @@ export const LibraryPage: React.FC = () => {
     if (!user) {
       setLoading(false)
     } else {
-      loadLibrary()
+      loadLibrary(false)
     }
   }, [user, loadLibrary])
+
+  const handleCardStateChange = () => {
+    loadLibrary(true)
+  }
 
   const setTab = (newTab: string) => {
     setSearchParams({ tab: newTab })
@@ -155,7 +163,7 @@ export const LibraryPage: React.FC = () => {
             <div key={`${item.tipo}-${item.id}`} className="flex justify-center">
               <TitleCard
                 title={item}
-                onStateChange={loadLibrary}
+                onStateChange={handleCardStateChange}
                 onOpenAuth={openAuth}
               />
             </div>

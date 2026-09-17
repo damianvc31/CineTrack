@@ -68,7 +68,8 @@ def _build_title_card(
     user_state: Optional[EstadoUsuarioTitulo] = None,
     is_abandoned: bool = False,
     seasons_progress: Optional[List[SeasonProgressResponse]] = None,
-    following_status_text: Optional[str] = None
+    following_status_text: Optional[str] = None,
+    user_rating: Optional[float] = None,
 ) -> TitleCardResponse:
     total_seasons = len(titulo.temporadas) if titulo.tipo == "tv" and hasattr(titulo, "temporadas") and titulo.temporadas else None
     genres = [GenreResponse(id=g.id, nombre=g.nombre) for g in titulo.generos] if hasattr(titulo, "generos") and titulo.generos else []
@@ -108,6 +109,7 @@ def _build_title_card(
         idioma_original=titulo.idioma_original,
         seasons_progress=seasons_progress,
         following_status_text=following_status_text,
+        user_rating=user_rating,
     )
 
 
@@ -361,8 +363,9 @@ async def get_titles(
     res = await db.execute(query)
     titulos = res.scalars().all()
 
-    # Cargar estados de usuario si está autenticado
+    # Cargar estados de usuario y calificaciones si está autenticado
     user_states_map = {}
+    user_ratings_map = {}
     tv_abandoned_ids = set()
     if usuario_id and titulos:
         title_ids = [t.id for t in titulos]
@@ -374,6 +377,16 @@ async def get_titles(
         )
         for st in st_res.scalars().all():
             user_states_map[st.titulo_id] = st
+
+        r_res = await db.execute(
+            select(Resena.titulo_id, Resena.puntaje).where(
+                Resena.usuario_id == usuario_id,
+                Resena.titulo_id.in_(title_ids),
+                Resena.puntaje.isnot(None)
+            )
+        )
+        for r_tid, r_score in r_res.all():
+            user_ratings_map[r_tid] = r_score
 
         tv_ids = [t.id for t in titulos if t.tipo == "tv"]
         if tv_ids:
@@ -394,7 +407,12 @@ async def get_titles(
                     tv_abandoned_ids.add(tid)
 
     items = [
-        _build_title_card(t, user_states_map.get(t.id), is_abandoned=(t.id in tv_abandoned_ids))
+        _build_title_card(
+            t,
+            user_states_map.get(t.id),
+            is_abandoned=(t.id in tv_abandoned_ids),
+            user_rating=user_ratings_map.get(t.id)
+        )
         for t in titulos
     ]
     return TitleListResponse(items=items, total=total, page=page, page_size=page_size)
@@ -585,6 +603,7 @@ async def get_home_sections(
         all_selected.extend(g_list)
 
     user_states_map = {}
+    user_ratings_map = {}
     tv_abandoned_ids = set()
     if usuario_id and all_selected:
         unique_ids = list({t.id for t in all_selected})
@@ -595,6 +614,16 @@ async def get_home_sections(
             )
         )
         user_states_map = {st.titulo_id: st for st in st_res.scalars().all()}
+
+        r_res = await db.execute(
+            select(Resena.titulo_id, Resena.puntaje).where(
+                Resena.usuario_id == usuario_id,
+                Resena.titulo_id.in_(unique_ids),
+                Resena.puntaje.isnot(None)
+            )
+        )
+        for r_tid, r_score in r_res.all():
+            user_ratings_map[r_tid] = r_score
 
         tv_ids = [t.id for t in all_selected if t.tipo == "tv"]
         if tv_ids:
@@ -615,7 +644,12 @@ async def get_home_sections(
                     tv_abandoned_ids.add(tid)
 
     def _build_card(t):
-        return _build_title_card(t, user_states_map.get(t.id), is_abandoned=(t.id in tv_abandoned_ids))
+        return _build_title_card(
+            t,
+            user_states_map.get(t.id),
+            is_abandoned=(t.id in tv_abandoned_ids),
+            user_rating=user_ratings_map.get(t.id)
+        )
 
     return HomeSectionsResponse(
         trending=[_build_card(t) for t in trending_titulos],
@@ -735,7 +769,19 @@ async def get_title_detail(
         and (user_state is None or user_state.estado not in ("siguiendo", "vista"))
         and total_vistos_serie > 0
     )
-    card = _build_title_card(titulo, user_state, is_abandoned=is_abandoned)
+
+    user_rating = None
+    if usuario_id:
+        r_res = await db.execute(
+            select(Resena.puntaje).where(
+                Resena.usuario_id == usuario_id,
+                Resena.titulo_id == titulo_id,
+                Resena.puntaje.isnot(None)
+            )
+        )
+        user_rating = r_res.scalar_one_or_none()
+
+    card = _build_title_card(titulo, user_state, is_abandoned=is_abandoned, user_rating=user_rating)
     return TitleDetailResponse(
         **card.model_dump(),
         director=titulo.director,
@@ -977,6 +1023,20 @@ async def get_user_library(
     vistos_res = await db.execute(vistos_q)
     watched_ep_ids = set(vistos_res.scalars().all())
 
+    # Obtener calificaciones del usuario si existen
+    user_ratings_map = {}
+    if rows:
+        title_ids = [t.id for t, _ in rows]
+        r_res = await db.execute(
+            select(Resena.titulo_id, Resena.puntaje).where(
+                Resena.usuario_id == usuario_id,
+                Resena.titulo_id.in_(title_ids),
+                Resena.puntaje.isnot(None)
+            )
+        )
+        for r_tid, r_score in r_res.all():
+            user_ratings_map[r_tid] = r_score
+
     today = date.today()
 
     following_items = []
@@ -1023,7 +1083,7 @@ async def get_user_library(
                 if s_st == "in_progress":
                     status_text = f"S{s_num} in progress"
                 else:
-                    status_text = f"S{s_num} watchlist"
+                    status_text = f"S{s_num} pending"
             elif seasons_prog:
                 status_text = "All caught up"
 
@@ -1031,7 +1091,8 @@ async def get_user_library(
             titulo,
             user_state=st,
             seasons_progress=seasons_prog,
-            following_status_text=status_text
+            following_status_text=status_text,
+            user_rating=user_ratings_map.get(titulo.id),
         )
 
         min_date = datetime.min.replace(tzinfo=timezone.utc)

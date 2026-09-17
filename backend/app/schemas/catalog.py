@@ -94,6 +94,7 @@ class TitleCardResponse(BaseModel):
     idioma_original: str | None = None
     seasons_progress: list[SeasonProgressResponse] | None = None
     following_status_text: str | None = None
+    user_rating: float | None = None
 
 
 class TitleDetailResponse(TitleCardResponse):

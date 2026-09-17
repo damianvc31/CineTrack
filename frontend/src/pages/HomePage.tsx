@@ -481,7 +481,7 @@ export const HomePage: React.FC = () => {
                   to="/library?tab=siguiendo"
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-300 hover:text-white hover:bg-[#202020] transition-colors"
                 >
-                  <PlaySquare className="w-4 h-4 text-amber-400" />
+                  <PlaySquare className="w-4 h-4 text-blue-400" />
                   <span className="font-medium">{t('following')}</span>
                 </Link>
 

@@ -2,7 +2,28 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
-## [v0.8.5] - 2026-09-16
+## [v0.8.6] - 2026-09-16
+### Agregado & Mejorado
+- **Refinamiento Integral de Frontend, Interacciones y UX:**
+  - **Interacción y Retención Post-Clic en Favorito y Watchlist:** Supresión de inversión inmediata (`justToggledFav`, `justToggledWl`). Al hacer clic para marcar, el botón se rellena con su color correspondiente y permanece activo sin desrellenarse mientras el cursor siga encima; la animación de desrellenado se reactiva únicamente al retirar y reingresar el cursor.
+  - **Comportamiento Dinámico y Reactivo de "Vista / No vista":**
+    - En reposo muestra `"No vista"` / `<EyeOff />` cuando el título no está visto, e invierte dinámicamente en hover a `"Vista"` / `<Eye />` en verde esmeralda.
+    - Cuando ya está visto, en hover previsualiza el desmarcado mostrando `<EyeOff />` en verde esmeralda en armonía con el botón, pasando al estado neutral gris únicamente al desmarcar y retirar el cursor.
+    - Ancho mínimo estable (`min-w-[124px] justify-center`) para eliminar parpadeos de borde (*layout jitter*) producidos por la variación de longitud del texto.
+  - **Carga Silenciosa en "Mi Biblioteca" (`LibraryPage.tsx`):**
+    - Desacoplamiento de `loadLibrary` con parámetro de segundo plano (`isBackground = true`), evitando desmontar la grilla ni disparar el spinner animado de pantalla completa al interactuar con las tarjetas.
+  - **Tag de Filtro por Actor en Catálogo (`CatalogPage.tsx`):**
+    - Al navegar desde el reparto principal de un título (`?actor=...`), el catálogo muestra su respectivo chip interactivo en la barra de filtros activos con icono `<User />`, permitiendo descartar el filtro individualmente con `X` o en conjunto con *"Limpiar filtros"*.
+  - **Ampliación de la Barra de Búsqueda del Catálogo:**
+    - Redimensionamiento responsivo (`sm:w-96 md:w-[420px] lg:w-[460px]`) y tipografía `text-xs sm:text-sm`, asegurando que el placeholder completo (*"Buscar títulos, actores, directores, guionistas..."*) entre con holgura sin recortarse.
+  - **Banderas SVG Twemoji y Desglose de Géneros:**
+    - Integración de `<CountryFlag />` en el dropdown de países y chips activos para renderizar banderas en Windows sin depender de fuentes con soporte de emojis regionales.
+    - Desglose interactivo de duplas de género en la pantalla de detalle (`Sci-Fi & Fantasy` navega al catálogo con `Sci-Fi` y `Fantasy` combinados con operador `OR`).
+  - **Tooltips y Calificación Directa:**
+    - Visualización directa del conteo de votos en el badge superior del póster (`★ 8.4 (1.2k)`).
+    - Clarificación de la calificación unificada como proveniente de la comunidad (TMDB + CineTrack) y tooltip del percentil de popularidad.
+    - Corrección de tooltips en el botón visto en tarjetas según el estado real (`isWatched`).
+    - Unificación del término *"puntaje"* (reemplazando *"nota"*).
 ### Agregado & Mejorado
 - **Refinamiento Integral de Home (`HomePage.tsx` y `catalog_service.py`):**
   - **Eliminación de Carruseles con Duplas de Series:** Se excluyeron del listado de carruseles de la Home las duplas híbridas de TMDB (`Action & Adventure`, `Sci-Fi & Fantasy`, `War & Politics`). En su lugar, los carruseles canónicos individuales (`Action`, `Adventure`, `Science Fiction`, `Fantasy`, `War`) expanden automáticamente sus consultas para consolidar películas y series de manera unificada y orgánica.
