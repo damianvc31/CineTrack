@@ -40,9 +40,13 @@
   - Localización reactiva completa al español en toda la interfaz (menú, catálogo "Explore", detalle de títulos, temporadas, reseñas y configuración).
   - Pantalla dedicada de Configuración (`/settings`): cambio de contraseña seguro y selector de idioma de interfaz.
   - Suite de 54 tests en backend y pruebas en Vitest (100% pasando).
-- [ ] **Fase 6: Recomendador Inteligente con IA Embebida**
-  - Integración de API (Google Gemini / Groq / Ollama) con prompt estructurado y contexto de perfil.
-  - Verificación y política de incertidumbre.
+- [x] **Fase 6: Recomendador Inteligente con IA Embebida (v0.9.0)**
+  - Integración híbrida de IA: Google Gemini 2.0 Flash (`gemini-2.0-flash`) primario con fallback a Groq API (`llama-3.3-70b-versatile`) y motor heurístico local determinista.
+  - Grounding estricto sobre pool de 30-45 candidatos locales de PostgreSQL con extracción de sinopsis y fragmentos de reseñas locales.
+  - Heurística de resolución ante ambigüedad y sugerencias interactivas (*chips*) para prompts confusos.
+  - Endpoint `POST /api/v1/recommendations` con hidratación completa de `TitleCard`.
+  - Pantalla dedicada `/recommendations` (`RecommendationsPage.tsx`), sincronización con query param `?prompt=...`, botón de acceso rápido con chispa en navbar y menú mobile, y filtros rápidos por tipo de obra.
+  - Suite de 65 tests automatizados en backend con cobertura de conmutación por error y fallback (100% pasando).
 
 ---
 

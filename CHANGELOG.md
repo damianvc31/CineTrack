@@ -2,6 +2,31 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.9.0] - 2026-09-16
+### Agregado & Mejorado
+- **Fase 6: Recomendador Inteligente con IA (Cierre de la Versión Mínima / MVP):**
+  - **Motor Híbrido Resiliente con Doble Fallback:**
+    - Integración de Google Gemini 2.0 Flash (`gemini-2.0-flash`) como motor primario por velocidad y capacidad de razonamiento.
+    - Conmutación automática por error a Groq API (`llama-3.3-70b-versatile`) ante demoras o límites de tasa (HTTP 429).
+    - Motor heurístico determinista local de respaldo que entra en acción ante ausencia de claves o fallos de red, asegurando una disponibilidad del 100%.
+  - **Grounding Estricto sobre el Catálogo de CineTrack:**
+    - Selección previa de un pool de 30 a 45 títulos candidatos en PostgreSQL evaluando coincidencias temáticas, géneros, décadas, calificaciones de la comunidad y fragmentos de reseñas locales.
+    - El LLM opera con prohibición estricta de alucinación y devuelve únicamente IDs validados del pool con formato JSON estructurado.
+  - **Política de Resolución y Manejo de Incertidumbre:**
+    - Ante consultas amplias o genéricas (*"sorpréndeme"*, *"algo bueno"*), el recomendador resuelve con confianza destacando las obras mejor valoradas.
+    - Ante consultas específicas o de nicho, prioriza la concordancia temática sobre la nota masiva.
+    - Ante entradas incomprensibles o contradictorias, responde con `clarification_needed` y ofrece sugerencias interactivas (*chips* accionables con un clic).
+  - **Endpoint Backend e Hidratación Completa:**
+    - `POST /api/v1/recommendations` con validación Pydantic v2, soporte para usuarios invitados y autenticados (con personalización por favoritos y vistos), e hidratación de tarjetas `TitleCardResponse`.
+  - **Interfaz de Usuario Dedicada (`RecommendationsPage.tsx`):**
+    - Pantalla accesible desde `/recommendations` con estética cinemática carbón/púrpura.
+    - Acceso rápido desde el botón con chispa ✨ en la barra de navegación y en el menú móvil.
+    - Integración con el buscador de IA de la Home mediante parámetros de URL (`?prompt=...`).
+    - Disparadores rápidos (*presets* temáticos) y filtro por tipo de contenido (*Todos*, *Películas*, *Series*).
+    - Renderizado de tarjetas `TitleCard` con cápsula explicativa inferior de la IA (*"Por qué te la recomendamos"*).
+  - **Cobertura y Tests Automatizados:**
+    - 5 nuevos tests unitarios en `backend/tests/test_recommendations.py` validando flujo con Gemini, conmutación por error a Groq, fallback heurístico determinista, clarificación de incertidumbre y filtrado por tipo (65 tests totales en backend pasando).
+
 ## [v0.8.6] - 2026-09-16
 ### Agregado & Mejorado
 - **Refinamiento Integral de Frontend, Interacciones y UX:**

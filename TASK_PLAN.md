@@ -98,11 +98,22 @@
     - [x] Unificación a paleta dorado/carbón (`#141414`, `#262626`, `#f59e0b`), modal de autenticación (`AuthModal`) localizado a inglés con campos completos de perfil en registro, y avatares ampliados en Home (`w-14 h-14`), Header (`w-10 h-10`) y Perfil (`w-32 h-32`).
     - [x] Suite de 53 tests en backend (`pytest`) y tests unitarios en Vitest (100% pasando).
 
+  - [x] **Fase 6: Recomendador Inteligente con IA (v0.9.0 — Versión Mínima / MVP)**
+    - [x] Integración de API híbrida: Google Gemini 2.0 Flash (`gemini-2.0-flash`) como primario, con conmutación por error a Groq API (`llama-3.3-70b-versatile`) y motor heurístico local determinista.
+    - [x] Grounding estricto sobre pool de 30-45 candidatos locales de PostgreSQL con extracción de sinopsis y fragmentos de reseñas locales.
+    - [x] Heurística de resolución ante ambigüedad y sugerencias interactivas (*chips*) para prompts confusos (`clarification_needed`).
+    - [x] Endpoint `POST /api/v1/recommendations` con validación Pydantic v2 e hidratación completa de tarjetas `TitleCardResponse`.
+    - [x] Pantalla dedicada `/recommendations` (`RecommendationsPage.tsx`), sincronización con query param `?prompt=...`, botón de acceso rápido con chispa en navbar y menú mobile, disparadores temáticos y filtros rápidos por tipo de obra.
+    - [x] Suite de 65 tests automatizados en backend con cobertura completa de conmutación por error y fallback (100% pasando).
+
 ---
 
-## Próximos Hitos:
-- [ ] **Fase 6: Recomendador Inteligente por IA (Ollama / Hubs)**
-  - [ ] Enriquecimiento de contexto y vectorización semántica de catálogo.
-  - [ ] Agente de recomendación con selección por estado de ánimo y análisis de preferencias del usuario.
+## Próximos Hitos (Versión Superior):
+- [ ] **Recomendador Avanzado con IA Embebida (Branch `feature/recomendador-avanzado`):**
+  - [ ] Enriquecimiento de contexto y vectorización semántica de catálogo (Embeddings / `pgvector`).
+  - [ ] Agente agéntico con selección por estado de ánimo, function calling y análisis profundo de reseñas/comunidad.
+- [ ] **Sistema de Notificaciones In-App:**
+  - [ ] Avisos de cambio de status de series en listas del usuario (renovación, cancelación, finalización, hiatus).
+  - [ ] Alertas y transición automática a "Siguiendo" cuando una serie en "Vista" estrena nueva temporada/episodios.
 
 

@@ -94,6 +94,15 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
     - Job asíncrono `app.jobs.populate_actor_photos` para consultar en lote fotos de actores en TMDB con control de rate limit.
     - Componente visual de Top Cast en `TitleDetailPage` con avatares circulares de actores, fotos oficiales, nombres y personajes.
 
+11. **Motor del Recomendador Inteligente por IA (Fase 6 — MVP):**
+    - **Estrategia Híbrida y Resiliencia con Fallback Multinivel:** Google Gemini 2.0 Flash (`gemini-2.0-flash`) como motor primario por velocidad y ventana de contexto, con conmutación automática por error a Groq API (`llama-3.3-70b-versatile`) ante demoras o límites de tasa (HTTP 429), y fallback final a un motor heurístico determinista local. Esto asegura que la aplicación responda siempre con recomendaciones válidas, incluso sin conexión a la nube o sin API keys configuradas.
+    - **Grounding Estricto sobre el Catálogo Local:** El backend selecciona un pool de 30 a 45 títulos candidatos de PostgreSQL en base a palabras clave de género, décadas, tipo de obra (`movie`/`tv`), sinopsis y fragmentos de reseñas locales, enriquecido con el perfil del usuario (favoritos, historial de visualizaciones y exclusión opcional de vistos). El modelo de lenguaje tiene prohibido inventar títulos externos y debe seleccionar exclusivamente entre los IDs del pool, respondiendo en JSON estructurado validado.
+    - **Política de Resolución y Manejo de Incertidumbre:**
+      - Ante prompts genéricos (*"recomiéndame algo bueno"*, *"sorpréndeme"*), el recomendador resuelve con confianza basándose en títulos aclamados y populares del catálogo.
+      - Ante prompts específicos o de nicho, prioriza concordancia temática por sobre popularidad masiva.
+      - Solo ante prompts incomprensibles responde con `status: clarification_needed`, ofreciendo sugerencias interactivas (*chips*) para orientar la búsqueda.
+    - **Hidratación y Contrato OpenAPI:** Endpoint `POST /api/v1/recommendations`, que devuelve cada título recomendado completamente hidratado como `TitleCardResponse` junto a la justificación personalizada de la IA (`reason`) y el proveedor utilizado (`provider_used`).
+
 ---
 
 ## 4. Arquitectura de Frontend (React 19 + Vite 8 + Tailwind CSS v4)
