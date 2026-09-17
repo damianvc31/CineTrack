@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import {
+  Bot,
   Sparkles,
   Film,
   Tv,
@@ -19,7 +20,6 @@ import {
   MessageSquare,
   Settings,
   LogOut,
-  Send,
   Gem,
   Zap,
   Theater,
@@ -42,6 +42,7 @@ import {
   Newspaper,
   Rose,
   Mic,
+  Dices,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
@@ -53,6 +54,91 @@ import { getAvatarUrl } from '@/utils/avatarUtils'
 interface OutletContextType {
   openAuth: (mode?: 'login' | 'register') => void
 }
+
+interface SidebarPreset {
+  label: { es: string; en: string }
+  prompt: { es: string; en: string }
+}
+
+const HOME_SIDEBAR_PRESETS: SidebarPreset[] = [
+  {
+    label: { es: '🚀 Ciencia Ficción', en: '🚀 Sci-Fi' },
+    prompt: {
+      es: 'Películas y series de ciencia ficción fascinantes con viajes espaciales, futuros distópicos o alta tecnología',
+      en: 'Fascinating sci-fi movies and TV series featuring space exploration, dystopian futures, or high technology',
+    },
+  },
+  {
+    label: { es: '🔪 Terror & Suspenso', en: '🔪 Suspense & Horror' },
+    prompt: {
+      es: 'Obras oscuras de terror y suspenso psicológico que mantengan una atmósfera inquietante e inmersiva',
+      en: 'Dark horror and psychological suspense stories with an unsettling and immersive atmosphere',
+    },
+  },
+  {
+    label: { es: '🏦 Robos (Heist)', en: '🏦 Clever Heists' },
+    prompt: {
+      es: 'Películas de atracos, robos ingeniosos y planes maestros con giros inesperados',
+      en: 'Clever heist and robbery movies with intricate planning and twists',
+    },
+  },
+  {
+    label: { es: '🎬 Nolan & Villeneuve', en: '🎬 Nolan & Villeneuve' },
+    prompt: {
+      es: 'Obras maestras dirigidas por Christopher Nolan o Denis Villeneuve',
+      en: 'Masterpieces directed by Christopher Nolan or Denis Villeneuve',
+    },
+  },
+  {
+    label: { es: '🏛️ Tarantino & Scorsese', en: '🏛️ Tarantino & Scorsese' },
+    prompt: {
+      es: 'Películas de autor con crimen, tensión dramática y diálogos icónicos dirigidas por Tarantino o Scorsese',
+      en: 'Masterclass auteur cinema featuring sharp dialogue, crime, and dramatic tension by Tarantino or Scorsese',
+    },
+  },
+  {
+    label: { es: '🌌 Paradojas temporales', en: '🌌 Time Travel' },
+    prompt: {
+      es: 'Obras fascinantes sobre bucles temporales, paradojas y viajes en el tiempo',
+      en: 'Fascinating stories exploring time loops, temporal paradoxes, and time travel',
+    },
+  },
+  {
+    label: { es: '📼 Clásicos 80s/90s', en: '📼 80s & 90s' },
+    prompt: {
+      es: 'Clásicos de culto inolvidables de las décadas de 1980 y 1990',
+      en: 'Unforgettable 80s and 90s cult classics',
+    },
+  },
+  {
+    label: { es: '☕ Feel-good', en: '☕ Feel-good' },
+    prompt: {
+      es: 'Una película cálida, reconfortante y optimista que te deje de buen ánimo',
+      en: 'A warm, uplifting, feel-good comfort movie',
+    },
+  },
+  {
+    label: { es: '💎 Joyas Ocultas', en: '💎 Hidden Gems' },
+    prompt: {
+      es: 'Películas o series poco conocidas pero con excelente calificación y críticas',
+      en: 'Underrated movies or series that flew under the radar yet received critical acclaim',
+    },
+  },
+  {
+    label: { es: '⭐ Aclamadas (+8.5★)', en: '⭐ Top Rated (+8.5★)' },
+    prompt: {
+      es: 'Obras maestras con más de 8.5 estrellas aclamadas por la comunidad',
+      en: 'Universally acclaimed cinema masterpieces rated 8.5 stars and above',
+    },
+  },
+  {
+    label: { es: '🔁 Volver a ver', en: '🔁 Rewatch' },
+    prompt: {
+      es: 'Recomiéndame una gran obra destacada de los títulos que ya vi que valga la pena revivir hoy',
+      en: 'Recommend a standout title from what I have already watched that is well worth rewatching today',
+    },
+  },
+]
 
 export const HomePage: React.FC = () => {
   const { openAuth } = useOutletContext<OutletContextType>()
@@ -66,6 +152,18 @@ export const HomePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [activeTipo, setActiveTipo] = useState<'all' | 'movie' | 'tv'>('all')
   const [aiPrompt, setAiPrompt] = useState('')
+  const [sidebarPresetOffset, setSidebarPresetOffset] = useState(0)
+
+  const visibleSidebarPresets = useMemo(() => {
+    const total = HOME_SIDEBAR_PRESETS.length
+    const size = 6
+    const start = (sidebarPresetOffset * size) % total
+    const slice = []
+    for (let i = 0; i < size; i++) {
+      slice.push(HOME_SIDEBAR_PRESETS[(start + i) % total])
+    }
+    return slice
+  }, [sidebarPresetOffset])
 
   const loadHome = async (tipo: 'all' | 'movie' | 'tv' = activeTipo, isFilterChange = false) => {
     if (isFilterChange) {
@@ -237,11 +335,13 @@ export const HomePage: React.FC = () => {
           <div className="p-5 rounded-2xl bg-[#141414] border border-[#262626] shadow-xl space-y-4">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-amber-400" />
+                <Bot className="w-4 h-4 text-amber-400" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white leading-tight">AI Assistant</h3>
-                <p className="text-[11px] text-gray-400">What are you in the mood for?</p>
+                <h3 className="text-sm font-bold text-white leading-tight">{t('aiAssistant')}</h3>
+                <p className="text-[11px] text-gray-400">
+                  {language === 'es' ? '¿Qué tienes ganas de ver?' : 'What are you in the mood for?'}
+                </p>
               </div>
             </div>
 
@@ -249,46 +349,50 @@ export const HomePage: React.FC = () => {
               <textarea
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Tell us what you feel or what kind of story you're looking for..."
+                placeholder={
+                  language === 'es'
+                    ? 'Cuéntanos qué sientes o qué tipo de historia buscas...'
+                    : "Tell us what you feel or what kind of story you're looking for..."
+                }
                 rows={4}
                 className="w-full p-3 text-xs bg-[#0d0d0d] border border-[#262626] rounded-xl text-gray-200 placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors resize-none leading-relaxed"
               />
 
-              {/* Quick suggestions */}
+              {/* Quick suggestions with rotation */}
               <div className="space-y-1.5">
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-500 block">
-                  Ideas to inspire you:
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-500 block">
+                    {t('aiIdeasHeader')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarPresetOffset((prev) => prev + 1)}
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                    title={language === 'es' ? 'Mostrar más ideas' : 'Show more ideas'}
+                  >
+                    <Dices className="w-3 h-3" />
+                    <span>{t('aiShufflePresets')}</span>
+                  </button>
+                </div>
                 <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setPresetPrompt('A gripping mystery movie with a mind-bending twist')}
-                    className="px-2 py-1 rounded-lg bg-[#1c1c1c] hover:bg-amber-500/10 border border-[#262626] hover:border-amber-500/40 text-[10px] text-gray-300 hover:text-amber-300 transition-all text-left"
-                  >
-                    🔍 Gripping mystery
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPresetPrompt('Lighthearted and fun comedy to unwind on a Friday night')}
-                    className="px-2 py-1 rounded-lg bg-[#1c1c1c] hover:bg-amber-500/10 border border-[#262626] hover:border-amber-500/40 text-[10px] text-gray-300 hover:text-amber-300 transition-all text-left"
-                  >
-                    😂 Light comedy
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPresetPrompt('A dystopian sci-fi series with complex, layered characters')}
-                    className="px-2 py-1 rounded-lg bg-[#1c1c1c] hover:bg-amber-500/10 border border-[#262626] hover:border-amber-500/40 text-[10px] text-gray-300 hover:text-amber-300 transition-all text-left"
-                  >
-                    🚀 Deep Sci-Fi
-                  </button>
+                  {visibleSidebarPresets.map((item, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setPresetPrompt(item.prompt[language === 'en' ? 'en' : 'es'])}
+                      className="px-2 py-1 rounded-lg bg-[#1c1c1c] hover:bg-amber-500/10 border border-[#262626] hover:border-amber-500/40 text-[10px] text-gray-300 hover:text-amber-300 transition-all text-left cursor-pointer"
+                    >
+                      {item.label[language === 'en' ? 'en' : 'es']}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 active:scale-98"
+                className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
               >
-                <Send className="w-3.5 h-3.5" /> Recommend
+                <Bot className="w-3.5 h-3.5" /> {t('aiSubmitButton')}
               </button>
             </form>
           </div>

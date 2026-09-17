@@ -56,7 +56,9 @@ class Settings(BaseSettings):
 
     # AI Recommender (Híbrido: Gemini Primario + Groq Fallback)
     GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.6-flash"
     GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
     AI_RECOMMENDER_PRIMARY: str = "gemini"  # "gemini" o "groq"
 
     # Home Sections & Pools Configuration

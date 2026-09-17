@@ -179,7 +179,7 @@ async def test_recommendations_heuristic_fallback(
         assert len(data["recommendations"]) > 0
         first_rec = data["recommendations"][0]
         assert first_rec["title"] is not None
-        assert "con un puntaje de" in first_rec["reason"]
+        assert "★" in first_rec["reason"]
 
 
 @pytest.mark.asyncio
@@ -231,4 +231,53 @@ async def test_recommendations_filter_by_tipo(
     for rec in data.get("recommendations", []):
         if rec.get("title"):
             assert rec["title"]["tipo"] == "tv"
+
+
+@pytest.mark.asyncio
+async def test_recommendations_only_watched(
+    async_client: AsyncClient,
+    sample_catalog_for_recs
+):
+    """Test recommending only from watched titles when requested in prompt."""
+    reg = await async_client.post(
+        "/api/v1/auth/register",
+        json={"nombre_usuario": "watcher1", "password": "password123"}
+    )
+    token = reg.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Mark title 1 (Interstellar) as watched
+    await async_client.post("/api/v1/titles/1/watched", headers=headers)
+
+    res = await async_client.post(
+        "/api/v1/recommendations",
+        json={"prompt": "Recomiéndame de las que ya vi"},
+        headers=headers
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "recommended"
+    assert len(data["recommendations"]) == 1
+    assert data["recommendations"][0]["title_id"] == 1
+
+
+@pytest.mark.asyncio
+async def test_recommendations_language_support(
+    async_client: AsyncClient,
+    sample_catalog_for_recs
+):
+    """Test passing explicit language to recommendation endpoint."""
+    with patch("app.services.ai_recommender_service.settings.GEMINI_API_KEY", ""), \
+         patch("app.services.ai_recommender_service.settings.GROQ_API_KEY", ""):
+
+        res = await async_client.post(
+            "/api/v1/recommendations",
+            json={"prompt": "sci-fi space travel", "language": "en"}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "recommended"
+        assert "handpicked selection" in data["message"]
+        assert len(data["recommendations"]) > 0
+        assert "★" in data["recommendations"][0]["reason"]
 

@@ -15,6 +15,10 @@ class RecommendationRequest(BaseModel):
         default="all",
         description="Filtro opcional por tipo: 'all' (ambos), 'movie' o 'tv'"
     )
+    language: Optional[Literal["es", "en"]] = Field(
+        default="es",
+        description="Idioma preferido de respuesta ('es' o 'en')"
+    )
 
 
 class RecommendationItem(BaseModel):
@@ -29,6 +33,7 @@ class RecommendationResponse(BaseModel):
     recommendations: list[RecommendationItem] = Field(default_factory=list)
     clarification_suggestions: list[str] = Field(default_factory=list)
     provider_used: str = "gemini"
+    model_used: Optional[str] = None
 
 
 class CandidateTitle(BaseModel):

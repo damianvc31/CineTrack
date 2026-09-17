@@ -32,7 +32,8 @@ async def get_recommendations(
     ai_response = await ai_recommender_service.get_recommendation(
         prompt=request.prompt,
         user_context=user_ctx,
-        candidates=candidates
+        candidates=candidates,
+        language=request.language or "es"
     )
 
     # 3. Si se generaron recomendaciones, hidratar las TitleCard completas

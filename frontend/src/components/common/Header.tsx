@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Search, Compass, Sparkles, User as UserIcon, LogOut, Menu, X, Heart, MessageSquare, Settings, Bell, Bookmark, Eye, PlaySquare } from 'lucide-react'
+import { Search, Compass, Bot, User as UserIcon, LogOut, Menu, X, Heart, MessageSquare, Settings, Bell, Bookmark, Eye, PlaySquare } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
 import tmdbLogo from '@/assets/branding/tmdb-logo.svg'
@@ -58,7 +58,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
             </a>
           </div>
 
-          {/* Área Central: Botón Explore + Barra de Búsqueda (Fija al centro, oculta en /catalog) */}
+          {/* Área Central: Botón Explore + Botón IA + Barra de Búsqueda */}
           {!isCatalog && (
             <div className="hidden md:flex items-center justify-center gap-3 absolute left-1/2 -translate-x-1/2 w-full max-w-sm md:max-w-md lg:max-w-lg pointer-events-auto z-10">
               {/* Botón Explore Catálogo */}
@@ -73,10 +73,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
               {/* Botón Asistente IA */}
               <Link
                 to="/recommendations"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-950/60 to-indigo-950/60 hover:from-purple-900/70 hover:to-indigo-900/70 border border-purple-500/40 hover:border-purple-400/60 text-purple-300 hover:text-white transition-all shrink-0 shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 hover:border-amber-400 text-amber-400 hover:text-amber-300 transition-all shrink-0 shadow-sm shadow-amber-500/10"
                 title={t('recommendationsNav')}
               >
-                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                <Bot className="w-4 h-4 text-amber-400" />
                 <span>{t('aiAssistant')}</span>
               </Link>
 
@@ -195,13 +195,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                           <MessageSquare className="w-4 h-4 text-amber-400" /> {t('reviews')}
                         </Link>
                         <Link
-                          to="/recommendations"
-                          onClick={() => setUserDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-purple-300 hover:text-white hover:bg-purple-950/20"
-                        >
-                          <Sparkles className="w-4 h-4 text-purple-400" /> {t('recommendationsNav')}
-                        </Link>
-                        <Link
                           to="/settings"
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2 text-gray-300 hover:text-white hover:bg-[#1f1f1f]"
@@ -295,9 +288,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
             <Link
               to="/recommendations"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-indigo-300 hover:bg-[#171717]"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-amber-400 hover:text-amber-300 hover:bg-[#171717]"
             >
-              <Sparkles className="w-4 h-4 text-amber-500" /> {t('aiAssistant')}
+              <Bot className="w-4 h-4 text-amber-400" /> {t('aiAssistant')}
             </Link>
 
             {user && (

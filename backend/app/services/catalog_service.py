@@ -1,7 +1,8 @@
 import random
+import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
-from sqlalchemy import and_, delete, desc, func, or_, select, union
+from sqlalchemy import and_, delete, desc, extract, func, or_, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -1523,97 +1524,218 @@ async def get_recommendation_candidates(
     usuario_id: Optional[int] = None,
     tipo_filtro: Optional[str] = "all"
 ) -> tuple[list[dict], Optional[dict]]:
-    """Selecciona un pool acotado (30-45 títulos) de candidatos relevantes de PostgreSQL."""
+    """Selecciona un pool inteligente y acotado (35-45 títulos) de candidatos relevantes de PostgreSQL."""
     lower_prompt = prompt.lower()
     user_ctx = await get_user_recommendation_context(db, usuario_id) if usuario_id else None
 
-    # Detección de géneros mencionados en el prompt
-    detected_genres = set()
-    for kw, gname in GENRE_KEYWORD_MAP.items():
-        if kw in lower_prompt:
-            detected_genres.add(gname)
+    # Detección de intenciones sobre títulos ya vistos
+    watched_phrases = [
+        "ya vi", "ya he visto", "que vi", "que ya vi", "mis vistas", "tengo vistas",
+        "de las vistas", "solo vistas", "already watched", "already seen", "from what i watched",
+        "from my watched", "among my watched", "de las que vi", "de lo que ya vi"
+    ]
+    only_watched = any(wp in lower_prompt for wp in watched_phrases)
 
-    # Si no detectó en prompt pero el usuario tiene géneros favoritos, apoyarse en ellos
-    target_genres = list(detected_genres)
-    if not target_genres and user_ctx and user_ctx.get("top_genres"):
-        target_genres = user_ctx["top_genres"][:2]
+    rewatch_phrases = [
+        "volver a ver", "repetir", "rewatch", "rever", "revivir", "incluso ya vistas",
+        "incluir vistas", "pueden ser repetidas", "include watched"
+    ]
+    allow_rewatch = only_watched or any(rp in lower_prompt for rp in rewatch_phrases)
+
+    watched_ids = set(user_ctx.get("watched_ids", [])) if user_ctx else set()
+
+    if user_ctx:
+        user_ctx["only_watched"] = only_watched
+        user_ctx["allow_rewatch"] = allow_rewatch
 
     # Detección de tipo en el prompt si no vino impuesto por tipo_filtro
     effective_tipo = tipo_filtro
     if effective_tipo == "all":
-        if "serie" in lower_prompt or "series" in lower_prompt or "temporada" in lower_prompt:
+        if any(w in lower_prompt for w in ("serie", "series", "temporada", "temporadas", "tv show", "tv series")):
             effective_tipo = "tv"
-        elif "pelicula" in lower_prompt or "película" in lower_prompt or "peli" in lower_prompt or "movie" in lower_prompt:
+        elif any(w in lower_prompt for w in ("pelicula", "película", "peliculas", "películas", "peli", "pelis", "movie", "movies", "film", "films")):
             effective_tipo = "movie"
 
-    # Detección de décadas
-    min_year = None
-    max_year = None
+    # Detección de décadas o rangos temporales
+    min_year, max_year = None, None
     if "80" in lower_prompt or "ochenta" in lower_prompt:
         min_year, max_year = 1980, 1989
     elif "90" in lower_prompt or "noventa" in lower_prompt:
         min_year, max_year = 1990, 1999
     elif "2000" in lower_prompt or "dos mil" in lower_prompt:
         min_year, max_year = 2000, 2009
-    elif "clasico" in lower_prompt or "clásico" in lower_prompt or "classic" in lower_prompt:
+    elif "50" in lower_prompt or "60" in lower_prompt or "70" in lower_prompt or "dorado" in lower_prompt:
+        min_year, max_year = 1950, 1979
+    elif any(w in lower_prompt for w in ("clasico", "clásico", "classic", "antigua", "antiguo")):
         max_year = datetime.now().year - 20
+    elif any(w in lower_prompt for w in ("reciente", "recientes", "estreno", "estrenos", "recent", "new")):
+        min_year = datetime.now().year - 3
 
-    # Construir consulta base
-    q = (
-        select(Titulo)
-        .options(selectinload(Titulo.generos))
-        .where(Titulo.vote_count_tmdb >= 50)
-    )
+    # Detección de géneros del mapeo
+    detected_genres = set()
+    for kw, gname in GENRE_KEYWORD_MAP.items():
+        if kw in lower_prompt:
+            detected_genres.add(gname)
 
-    if effective_tipo in ("movie", "tv"):
-        q = q.where(Titulo.tipo == effective_tipo)
+    # Extraer términos significativos del prompt para búsqueda de directores, actores, títulos y temáticas
+    STOP_WORDS = {
+        "pelicula", "peliculas", "película", "películas", "serie", "series", "temporada", "temporadas",
+        "movie", "movies", "film", "films", "show", "shows", "quiero", "ver", "algo", "sobre", "con",
+        "para", "como", "buena", "buenas", "bueno", "buenos", "recomiendame", "recomendame", "recomienda",
+        "dame", "busco", "algun", "alguna", "algunas", "algunos", "mejor", "mejores", "top", "great",
+        "want", "watch", "give", "look", "looking", "about", "like", "some", "best", "good", "recommend",
+        "please", "por", "favor", "cual", "cuales", "cuál", "cuáles", "que", "qué", "los", "las", "les",
+        "una", "uno", "unos", "unas", "del", "de", "en", "el", "la", "un", "and", "the", "with", "from",
+        "entre", "ambos", "estilo", "tipo", "mucho", "muchas", "donde", "dondequiera", "alguien"
+    }
+    raw_tokens = re.findall(r"[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]+", lower_prompt)
+    search_terms = [t for t in raw_tokens if len(t) >= 3 and t not in STOP_WORDS]
+    bigrams = [" ".join(raw_tokens[i:i+2]) for i in range(len(raw_tokens)-1)]
+    valid_bigrams = [bg for bg in bigrams if len(bg) >= 7 and not any(sw in bg.split() for sw in STOP_WORDS)]
 
-    if min_year:
-        q = q.where(Titulo.anio_estreno >= min_year)
-    if max_year:
-        q = q.where(Titulo.anio_estreno <= max_year)
-
-    # Excluir ya vistos salvo que pida volver a ver
-    allow_rewatch = "volver a ver" in lower_prompt or "repetir" in lower_prompt or "rewatch" in lower_prompt
-    if user_ctx and user_ctx.get("watched_ids") and not allow_rewatch:
-        q = q.where(Titulo.id.notin_(user_ctx["watched_ids"]))
-
-    # Si hay géneros target, unirse a titulos_generos
-    if target_genres:
-        expanded = []
-        for tg in target_genres:
-            expanded.extend(expand_genre_names(tg))
-        q = (
-            q.join(titulos_generos, titulos_generos.c.titulo_id == Titulo.id)
-            .join(Genero, Genero.id == titulos_generos.c.genero_id)
-            .where(Genero.nombre.in_(expanded))
-            .distinct()
-        )
-
-    # Ordenar por rating_unificado y popularidad
-    q = q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(40)
-    res = await db.execute(q)
-    candidate_titles = list(res.scalars().all())
-
-    # Si el pool fue muy chico (< 15), complementar con los títulos más aclamados del catálogo general
-    if len(candidate_titles) < 20:
-        existing_ids = {t.id for t in candidate_titles}
-        if user_ctx and not allow_rewatch:
-            existing_ids.update(user_ctx.get("watched_ids", []))
-
-        fill_q = (
-            select(Titulo)
-            .options(selectinload(Titulo.generos))
-            .where(
-                Titulo.id.notin_(list(existing_ids)),
-                Titulo.vote_count_tmdb >= 100
-            )
-        )
+    def apply_base_filters(query):
         if effective_tipo in ("movie", "tv"):
-            fill_q = fill_q.where(Titulo.tipo == effective_tipo)
-        fill_q = fill_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(35 - len(candidate_titles))
+            query = query.where(Titulo.tipo == effective_tipo)
+        if min_year:
+            query = query.where(extract("year", Titulo.fecha_estreno) >= min_year)
+        if max_year:
+            query = query.where(extract("year", Titulo.fecha_estreno) <= max_year)
+        if only_watched:
+            if watched_ids:
+                query = query.where(Titulo.id.in_(list(watched_ids)))
+            else:
+                query = query.where(Titulo.id == -1)
+        elif watched_ids and not allow_rewatch:
+            query = query.where(Titulo.id.notin_(list(watched_ids)))
+        return query
+
+    collected_titles: dict[int, Titulo] = {}
+
+    # 1. Búsqueda por entidades directas
+    # A) Bigramas prioritarios (Nombres completos de directores o actores, ej: 'Christopher Nolan', 'Christian Bale')
+    if valid_bigrams:
+        for bg in valid_bigrams:
+            # Director por nombre completo
+            dir_bg_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+            dir_bg_q = apply_base_filters(dir_bg_q).where(Titulo.director.ilike(f"%{bg}%"))
+            dir_bg_res = await db.execute(dir_bg_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(12))
+            for t in dir_bg_res.scalars().all():
+                collected_titles[t.id] = t
+
+            # Actor por nombre completo
+            act_bg_q = (
+                select(Titulo)
+                .options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+                .join(titulos_elenco, titulos_elenco.c.titulo_id == Titulo.id)
+                .join(Actor, Actor.id == titulos_elenco.c.actor_id)
+            )
+            act_bg_q = apply_base_filters(act_bg_q).where(Actor.nombre.ilike(f"%{bg}%"))
+            act_bg_res = await db.execute(act_bg_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(12))
+            for t in act_bg_res.scalars().all():
+                collected_titles[t.id] = t
+
+    # B) Términos individuales (Directores, Actores, Nombres de títulos, Sinopsis)
+    if search_terms:
+        # Directores por término
+        dir_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+        dir_q = apply_base_filters(dir_q)
+        dir_q = dir_q.where(or_(*[Titulo.director.ilike(f"%{t}%") for t in search_terms]))
+        dir_q = dir_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15)
+        dir_res = await db.execute(dir_q)
+        for t in dir_res.scalars().all():
+            collected_titles[t.id] = t
+
+        # Actores por término (solo términos de 4+ caracteres para no matchear preposiciones)
+        long_terms = [t for t in search_terms if len(t) >= 4]
+        if long_terms:
+            act_q = (
+                select(Titulo)
+                .options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+                .join(titulos_elenco, titulos_elenco.c.titulo_id == Titulo.id)
+                .join(Actor, Actor.id == titulos_elenco.c.actor_id)
+            )
+            act_q = apply_base_filters(act_q)
+            act_q = act_q.where(or_(*[Actor.nombre.ilike(f"%{t}%") for t in long_terms]))
+            act_q = act_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(15)
+            act_res = await db.execute(act_q)
+            for t in act_res.scalars().all():
+                collected_titles[t.id] = t
+
+        # Títulos por nombre
+        name_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+        name_q = apply_base_filters(name_q)
+        name_q = name_q.where(or_(*[Titulo.nombre.ilike(f"%{t}%") for t in search_terms]))
+        name_q = name_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15)
+        name_res = await db.execute(name_q)
+        for t in name_res.scalars().all():
+            collected_titles[t.id] = t
+
+        # Sinopsis / Temáticas
+        sin_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+        sin_q = apply_base_filters(sin_q)
+        sin_q = sin_q.where(Titulo.vote_count_tmdb >= 50, or_(*[Titulo.sinopsis.ilike(f"%{t}%") for t in search_terms]))
+        sin_q = sin_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(20)
+        sin_res = await db.execute(sin_q)
+        for t in sin_res.scalars().all():
+            collected_titles[t.id] = t
+
+    # 2. Búsqueda por Géneros detectados
+    target_genres = list(detected_genres)
+    if not target_genres and user_ctx and user_ctx.get("top_genres"):
+        target_genres = user_ctx["top_genres"][:2]
+
+    if target_genres and len(collected_titles) < 35:
+        expanded_genres = []
+        for tg in target_genres:
+            expanded_genres.extend(expand_genre_names(tg))
+        g_q = (
+            select(Titulo)
+            .options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+            .join(titulos_generos, titulos_generos.c.titulo_id == Titulo.id)
+            .join(Genero, Genero.id == titulos_generos.c.genero_id)
+        )
+        g_q = apply_base_filters(g_q)
+        g_q = g_q.where(
+            Genero.nombre.in_(expanded_genres),
+            Titulo.vote_count_tmdb >= 80,
+            Titulo.id.notin_(list(collected_titles.keys())) if collected_titles else True
+        )
+        g_q = g_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(35 - len(collected_titles))
+        g_res = await db.execute(g_q)
+        for t in g_res.scalars().all():
+            collected_titles[t.id] = t
+
+    # 3. Relleno diverso con obras aclamadas y populares (rotativo con semilla / random)
+    if len(collected_titles) < 30 and not only_watched:
+        needed = 40 - len(collected_titles)
+        fill_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+        fill_q = apply_base_filters(fill_q)
+        fill_q = fill_q.where(
+            Titulo.vote_count_tmdb >= 150,
+            Titulo.rating_unificado >= 7.5,
+            Titulo.id.notin_(list(collected_titles.keys())) if collected_titles else True
+        )
+        # Usamos func.random() para que consultas genéricas no devuelvan siempre los mismos 3 títulos
+        fill_q = fill_q.order_by(func.random()).limit(needed)
         fill_res = await db.execute(fill_q)
-        candidate_titles.extend(list(fill_res.scalars().all()))
+        for t in fill_res.scalars().all():
+            collected_titles[t.id] = t
+
+    # 4. Si aún es chico y no tiene suficientes, añadir de popularidad general
+    if len(collected_titles) < 20 and not only_watched:
+        needed = 35 - len(collected_titles)
+        gen_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+        gen_q = apply_base_filters(gen_q)
+        gen_q = gen_q.where(
+            Titulo.vote_count_tmdb >= 50,
+            Titulo.id.notin_(list(collected_titles.keys())) if collected_titles else True
+        )
+        gen_q = gen_q.order_by(desc(Titulo.popularidad)).limit(needed)
+        gen_res = await db.execute(gen_q)
+        for t in gen_res.scalars().all():
+            collected_titles[t.id] = t
+
+    candidate_titles = list(collected_titles.values())[:45]
 
     # Buscar fragmentos de reseñas locales para los candidatos
     cand_ids = [t.id for t in candidate_titles]
@@ -1632,10 +1754,11 @@ async def get_recommendation_candidates(
             if tid not in snippets_map and cont:
                 snippets_map[tid] = cont[:140] + ("..." if len(cont) > 140 else "")
 
-    # Mapear a estructura compacta para el LLM
+    # Mapear a estructura compacta para el LLM y motor heurístico
     formatted_candidates = []
     for t in candidate_titles:
         g_names = [g.nombre for g in t.generos]
+        actor_names = [a.nombre for a in t.actores[:3]] if hasattr(t, "actores") and t.actores else []
         short_synopsis = (t.sinopsis[:160] + "...") if t.sinopsis and len(t.sinopsis) > 160 else (t.sinopsis or "")
         formatted_candidates.append({
             "id": t.id,
@@ -1644,10 +1767,12 @@ async def get_recommendation_candidates(
             "anio": t.anio_estreno,
             "generos": g_names,
             "director": t.director,
+            "actores": actor_names,
             "vote_average": round(t.rating_unificado or t.vote_average_tmdb, 1),
             "vote_count": t.vote_count_tmdb,
             "sinopsis_corta": short_synopsis,
-            "community_review_snippet": snippets_map.get(t.id)
+            "community_review_snippet": snippets_map.get(t.id),
+            "is_watched": (t.id in watched_ids)
         })
 
     return formatted_candidates, user_ctx

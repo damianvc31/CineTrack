@@ -169,13 +169,58 @@ const UI_STRINGS: Record<string, { en: string; es: string }> = {
   recommendationsNav: { en: 'AI Recommendations', es: 'Recomendaciones IA' },
   aiRecommenderTitle: { en: 'AI Recommender', es: 'Recomendador Inteligente con IA' },
   aiRecommenderSubtitle: {
-    en: 'Describe what you feel like watching and our AI will handpick the best matches from the catalog.',
-    es: 'Describe qué tienes ganas de ver y nuestra IA seleccionará las mejores opciones de nuestro catálogo.'
+    en: 'Describe what you feel like watching in plain words and our AI will handpick the best matches from the catalog.',
+    es: 'Describe qué tienes ganas de ver en tus propias palabras y nuestra IA seleccionará las mejores opciones de nuestro catálogo.'
   },
   aiWhyRecommended: { en: 'Why we recommend it:', es: 'Por qué te la recomendamos:' },
   aiGuestTip: {
     en: 'Sign in or register to let CineTrack tailor recommendations to your favorites and watch history!',
     es: '¡Iniciá sesión o registrate para que CineTrack adapte las recomendaciones a tus favoritos e historial!'
+  },
+  aiPromptPlaceholder: {
+    en: "e.g. 'I want a mind-bending space sci-fi movie with time paradoxes like Interstellar or Arrival...'",
+    es: "Ej: 'Quiero una película cerebral de ciencia ficción espacial o viajes en el tiempo emotiva como Interstellar...'"
+  },
+  aiSearchHint: {
+    en: 'Press Enter to search or click a preset idea below.',
+    es: 'Presiona Enter para buscar o prueba un ejemplo debajo.'
+  },
+  aiSubmitButton: { en: 'Recommend Titles', es: 'Recomendar Títulos' },
+  aiThinking: { en: 'Reasoning...', es: 'Razonando...' },
+  aiIdeasHeader: { en: 'Inspiration & starters:', es: 'Ideas y disparadores:' },
+  aiLoadingTitle: {
+    en: 'Consulting catalog and evaluating your taste...',
+    es: 'Consultando catálogo y ponderando preferencias...'
+  },
+  aiLoadingDesc: {
+    en: 'Analyzing synopses, community ratings and your profile to formulate tailor-made recommendations.',
+    es: 'Analizando sinopsis, puntajes de la comunidad y tu perfil para formular una recomendación a medida.'
+  },
+  aiErrorTitle: { en: 'An issue occurred', es: 'Ocurrió un inconveniente' },
+  aiErrorDesc: {
+    en: 'Could not connect to the recommendation service. Please try again.',
+    es: 'No se pudo conectar con el servicio de recomendaciones. Por favor, intenta de nuevo.'
+  },
+  aiClarificationTitle: {
+    en: 'Looking for any of these options?',
+    es: '¿Buscamos por alguna de estas opciones?'
+  },
+  aiSelectedTitles: { en: 'Handpicked Titles', es: 'Títulos Seleccionados' },
+  aiNewQuery: { en: 'New query', es: 'Nueva consulta' },
+  aiMovie: { en: 'Movie', es: 'Película' },
+  aiSeries: { en: 'TV Series', es: 'Serie de TV' },
+  aiEngineProvider: { en: 'Provider', es: 'Proveedor' },
+  aiEngineModel: { en: 'Model', es: 'Modelo' },
+  aiEngineLocal: { en: 'Local Heuristic Engine', es: 'Motor Heurístico Local' },
+  aiResetSearch: { en: 'Clear & start over', es: 'Limpiar y reiniciar' },
+  aiShufflePresets: { en: 'Shuffle ideas', es: 'Rotar ideas' },
+  aiHeuristicNotice: {
+    en: 'Generated via local catalog rules (cloud AI services busy or unavailable).',
+    es: 'Generado mediante motor de catálogo local (servicios de IA en la nube ocupados o no disponibles).'
+  },
+  aiRetryWithAi: {
+    en: 'Retry with AI Assistant',
+    es: 'Reintentar con Asistente IA'
   },
 }
 

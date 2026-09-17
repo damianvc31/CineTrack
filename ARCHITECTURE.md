@@ -102,6 +102,7 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
       - Ante prompts específicos o de nicho, prioriza concordancia temática por sobre popularidad masiva.
       - Solo ante prompts incomprensibles responde con `status: clarification_needed`, ofreciendo sugerencias interactivas (*chips*) para orientar la búsqueda.
     - **Hidratación y Contrato OpenAPI:** Endpoint `POST /api/v1/recommendations`, que devuelve cada título recomendado completamente hidratado como `TitleCardResponse` junto a la justificación personalizada de la IA (`reason`) y el proveedor utilizado (`provider_used`).
+    - **Especificación Completa y Diagrama de Arquitectura:** El flujo detallado, la cascada de resiliencia y el diagrama Mermaid están documentados en [docs/ARQUITECTURA_RECOMENDADOR.md](docs/ARQUITECTURA_RECOMENDADOR.md) y [docs/UML/recomendador/arquitectura_recomendador_minimo.mmd](docs/UML/recomendador/arquitectura_recomendador_minimo.mmd).
 
 ---
 
