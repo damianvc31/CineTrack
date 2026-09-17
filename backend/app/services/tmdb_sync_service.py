@@ -272,8 +272,9 @@ class TMDBSyncService:
 
         allow_unrel = settings.TMDB_ALLOW_UNRELEASED if allow_unreleased is None else allow_unreleased
         today = date.today()
-        if not allow_unrel and (fecha_estreno is None or fecha_estreno > today):
-            logger.info(f"Omitiendo película no estrenada (TMDB ID: {tmdb_id}, fecha_estreno: {fecha_estreno})")
+        status = details.get("status")
+        if not allow_unrel and (fecha_estreno is None or fecha_estreno > today or (status and status != "Released")):
+            logger.info(f"Omitiendo película no estrenada (TMDB ID: {tmdb_id}, fecha_estreno: {fecha_estreno}, status: {status})")
             return None
 
         director, guionista, elenco_list = self._parse_credits(details.get("credits", {}))
@@ -380,8 +381,8 @@ class TMDBSyncService:
                     except ValueError:
                         pass
 
-        if not allow_unrel and not has_aired_season:
-            logger.info(f"Omitiendo serie sin temporadas estrenadas (TMDB ID: {tmdb_id}, fecha_estreno: {fecha_estreno})")
+        if not allow_unrel and (fecha_estreno is None or fecha_estreno > today or not has_aired_season):
+            logger.info(f"Omitiendo serie no estrenada (TMDB ID: {tmdb_id}, fecha_estreno: {fecha_estreno})")
             return None
 
         fecha_fin = None
