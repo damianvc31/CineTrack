@@ -45,7 +45,7 @@
   - Cascada jerárquica multi-modelo de 2 niveles entre proveedores priorizando modelos insignia (v0.9.3).
   - Optimización de cuota con reducción del 70% en el payload de candidatos (v0.9.3).
   - Afinación semántica bilingüe (`THEME_EXPANSION_MAP`) y búsqueda temática cruzada en SQL (v0.9.2).
-  - Validación determinista de entradas ininteligibles, cancelación instantánea de peticiones en vuelo y flujo de repregunta interactivo (v0.9.4).
+  - Filtro de rango temporal en estadísticas de perfil, tarjetas de seguimiento con póster vertical 2:3, avatares de actores con iniciales completas, validación determinista de entradas ininteligibles, cancelación instantánea de peticiones en vuelo y flujo de repregunta interactivo (v0.9.4).
   - Endpoint `POST /api/v1/recommendations` con hidratación completa de `TitleCard`.
   - Pantalla dedicada `/recommendations` (`RecommendationsPage.tsx`), filtros temáticos y suite de 71 tests en backend.
 - [ ] **Fase 7: Despliegue a Producción y Entrega Final (v1.0.0)**

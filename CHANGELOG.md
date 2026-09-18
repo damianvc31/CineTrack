@@ -4,6 +4,16 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ## [v0.9.4] - 2026-09-18
 ### Corregido & Mejorado
+- **Perfil de Usuario: Ventana Temporal en Estadísticas y Rediseño de Siguiendo:**
+  - **Filtro de Rango Temporal en Estadísticas (`time_window`):**
+    - Selector interactivo con opciones: *Histórico* (`all_time`), *Último mes* (`1m`), *Últimos 3 meses* (`3m`), *Últimos 6 meses* (`6m`), *Último año* (`1y`), *Últimos 5 años* (`5y`) y *Últimos 10 años* (`10y`).
+    - Soporte en backend en `GET /api/v1/users/me/stats` con filtrado dinámico sobre `visto_el` y `agregado_el` para recalcular horas totales, promedio semanal, temporadas completadas, distribución de géneros y top títulos del periodo.
+    - Actualización reactiva con indicador de carga y soporte de internacionalización completa en español e inglés.
+    - Cobertura con test unitario específico en `backend/tests/test_users.py`.
+  - **Rediseño de Tarjetas "Siguiendo" en Perfil:**
+    - Reemplazo del recorte panorámico deformado por tarjetas horizontales con póster vertical en proporción original 2:3 (`aspect-[2/3]`), garantizando nitidez de imagen, jerarquía estética y lectura clara del progreso de episodios.
+- **Detalle de Título: Avatares de Elenco con Iniciales Robustas (`ActorAvatar`):**
+  - Componente modular `ActorAvatar` con función generadora de iniciales completas (ej. *"RDJ"* para Robert Downey Jr., o dos caracteres para nombres simples) ante fotos faltantes o errores de red (`onError`), eliminando rupturas de layout.
 - **Recomendador con IA: Resiliencia, Validación Determinista y Control de Flujo:**
   - **Detección Determinista de Texto Ininteligible (Validador de Entrada Local):**
     - Intercepción temprana sin consumo de cuota de LLMs para texto basura, teclado machacado, tokens mezclados y dígitos aislados.
@@ -15,7 +25,8 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
     - Mensaje diferenciado para el validador local cuando se solicita aclaración (*"Consulta validada localmente por CineTrack para solicitar aclaración sin consumir cuota de IA"*), eliminando la confusión con caídas de los servicios de IA en la nube.
     - Limpieza automática del prompt previo no comprendido al pedir aclaración y reemplazo en tiempo real del prompt superior a medida que el usuario escribe o envía su aclaración.
     - Desacoplamiento de estados en `RecommendationsPage.tsx` eliminando dependencias volátiles en `executeRecommendation` y previniendo bucles infinitos con `searchParams`.
-    - Limpieza total y aborto de peticiones al iniciar o cerrar sesión desde cualquier punto de la aplicación.
+  - **Aislamiento de Sesión:**
+    - Limpieza total de recomendaciones cacheadas, prompt y aborto de peticiones al iniciar o cerrar sesión desde cualquier punto de la aplicación.
 
 ## [v0.9.3] - 2026-09-17
 ### Rendimiento & Resiliencia

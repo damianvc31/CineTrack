@@ -122,6 +122,9 @@
     - [x] Suite de 70 tests de backend pasando al 100%.
 
   - [x] **Validación Determinista, Resiliencia y Control de Flujo del Recomendador (v0.9.4)**
+    - [x] Filtro de ventana temporal en Estadísticas del Perfil (`time_window`: `1m`, `3m`, `6m`, `1y`, `5y`, `10y`, `all_time`) en backend y frontend con dropdown interactivo e i18n.
+    - [x] Rediseño de tarjetas "Siguiendo" en Perfil con póster original 2:3 vertical nítido en lugar de recorte horizontal.
+    - [x] Avatares de elenco en detalle de título con componente `ActorAvatar` y fallback elegante de iniciales completas (ej. *"RDJ"*).
     - [x] Detección determinista de texto basura/ininteligible (`is_unintelligible_prompt`) que evita consumo de LLMs sin interferir con consultas legítimas que contienen números (décadas, secuelas, ratings, años relativos).
     - [x] Cancelación inmediata de búsquedas en curso ("Frenar búsqueda") mediante `AbortController` en el navegador y `http_request.is_disconnected()` en el servidor FastAPI.
     - [x] Mensaje informativo claro y específico para el Validador de Entrada Local al requerir aclaración, diferenciándolo del aviso de caída de IA.
