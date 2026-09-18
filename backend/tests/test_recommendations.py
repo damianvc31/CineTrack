@@ -208,7 +208,7 @@ async def test_recommendations_clarification_needed(
 
         res = await async_client.post(
             "/api/v1/recommendations",
-            json={"prompt": "xyz123 ?????"}
+            json={"prompt": "dame algo pero no se que ver"}
         )
 
         assert res.status_code == 200
@@ -217,6 +217,16 @@ async def test_recommendations_clarification_needed(
         assert len(data["recommendations"]) == 0
         assert len(data["clarification_suggestions"]) == 3
         assert data["provider_used"] == "gemini"
+
+    # Test de detección temprana determinista de texto ininteligible (letras y números aleatorios)
+    res_gibberish = await async_client.post(
+        "/api/v1/recommendations",
+        json={"prompt": "xyz123 ?????"}
+    )
+    assert res_gibberish.status_code == 200
+    data_gib = res_gibberish.json()
+    assert data_gib["status"] == "clarification_needed"
+    assert len(data_gib["clarification_suggestions"]) == 4
 
 
 @pytest.mark.asyncio
@@ -283,4 +293,37 @@ async def test_recommendations_language_support(
         assert "handpicked selection" in data["message"]
         assert len(data["recommendations"]) > 0
         assert "★" in data["recommendations"][0]["reason"]
+
+
+@pytest.mark.asyncio
+async def test_recommendations_with_clarification_context(
+    async_client: AsyncClient,
+    sample_catalog_for_recs
+):
+    """Test resolving a relative response using clarification_context."""
+    with patch("app.services.ai_recommender_service.settings.GEMINI_API_KEY", ""), \
+         patch("app.services.ai_recommender_service.settings.GROQ_API_KEY", ""):
+
+        res = await async_client.post(
+            "/api/v1/recommendations",
+            json={
+                "prompt": "la primera",
+                "clarification_context": {
+                    "previous_prompt": "asdfghjkl",
+                    "assistant_message": "¿Prefieres ciencia ficción o comedia?",
+                    "suggestions": [
+                        "Películas de ciencia ficción y viajes espaciales",
+                        "Comedias ligeras y familiares"
+                    ]
+                }
+            }
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "recommended"
+        assert len(data["recommendations"]) > 0
+        # Should recommend science fiction (Interstellar is in sample_catalog_for_recs)
+        rec_ids = [r["title_id"] for r in data["recommendations"]]
+        assert 1 in rec_ids
+
 

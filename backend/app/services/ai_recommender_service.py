@@ -29,6 +29,8 @@ Tu objetivo es recomendar entre 2 y 5 títulos de películas o series al usuario
    - Si el usuario pide algo genérico o amplio ("recomiéndame algo bueno", "sorpréndeme", "qué puedo ver"): DEBES RESOLVER con confianza seleccionando 3 a 5 de los títulos con mayor puntaje y popularidad del pool.
    - ÚNICAMENTE si el prompt es un texto ininteligible o caracteres aleatorios sin ningún sentido lingüístico o temático (ej: "asdasd", "12345", "qwerty") responde con:
      "status": "clarification_needed", "recommendations": [], y en "clarification_suggestions" incluye de 3 a 4 opciones de búsqueda concretas y atractivas para que el usuario explore (ej: ["Películas de ciencia ficción y viajes espaciales", "Thrillers y misterio policial", "Clásicos aclamados (+8.5★)", "Películas de Christopher Nolan"]). NUNCA hagas preguntas retóricas en clarification_suggestions.
+   - PROHIBICIÓN ESTRICTA DE SOBREINTERPRETACIÓN:
+     Está TERMINANTEMENTE PROHIBIDO interpretar combinaciones aleatorias de caracteres, letras y números, palabras inexistentes o secuencias sin sentido (ej: "asdf123", "x89f2a", "zxcvbnm", etc.) como si fueran "códigos secretos", "enigmas misteriosos", "criptografía", "hackers" o "películas de misterio/suspenso". Ante cualquier texto sin significado lingüístico ni temático real, DEBES responder OBLIGATORIAMENTE con "status": "clarification_needed", NUNCA asociarlo creativamente con el género de misterio.
 
 ### FORMATO DE RESPUESTA OBLIGATORIO (JSON ESTRICTO):
 Debes responder ÚNICAMENTE un objeto JSON válido con esta estructura:
@@ -74,7 +76,8 @@ def _build_user_message(
     prompt: str,
     user_context: Optional[Dict[str, Any]],
     candidates: List[Dict[str, Any]],
-    language: Optional[str] = None
+    language: Optional[str] = None,
+    clarification_context: Optional[Dict[str, Any]] = None
 ) -> str:
     """Construye el payload de contexto y candidatos que se envía al modelo."""
     lang = language or _detect_language(prompt)
@@ -110,8 +113,25 @@ Perfil del usuario:
     elif user_context and user_context.get("allow_rewatch"):
         instructions_extra = "\nNOTA: El usuario permite o solicitó títulos para volver a ver (rewatch). Puedes incluir tanto obras ya vistas como no vistas."
 
+    clarification_section = ""
+    if clarification_context:
+        prev_p = clarification_context.get("previous_prompt", "")
+        asst_m = clarification_context.get("assistant_message", "")
+        suggs = clarification_context.get("suggestions", [])
+        suggs_str = ", ".join(f'"{s}"' for s in suggs) if suggs else "Ninguna"
+        clarification_section = f"""
+DIÁLOGO PREVIO / ACLARACIÓN EN CURSO:
+- Consulta inicial previa del usuario: "{prev_p}"
+- Repregunta o aclaración que formuló el Asistente: "{asst_m}"
+- Opciones o sugerencias que se ofrecieron: [{suggs_str}]
+- Aclaración que responde el usuario ahora: "{prompt}"
+
+DIRECTIVA OBLIGATORIA DE DIÁLOGO:
+El usuario está respondiendo a la repregunta previa del asistente. Si su respuesta es breve (ej: "la primera", "la 2", "ambas", "sí", o un género específico), interpreta su intención en base a ese diálogo y a las opciones ofrecidas, y procede a recomendar los títulos afines del pool con "status": "recommended".
+"""
+
     return f"""CONSULTA DEL USUARIO:
-"{prompt}"
+"{prompt}"{clarification_section}
 
 IDIOMA OBLIGATORIO DE RESPUESTA: {lang_name} ({lang.upper()})
 DIRECTIVA CRÍTICA: Debes redactar el mensaje de apertura ('message') y ABSOLUTAMENTE TODAS las justificaciones ('reason') en {lang_name}. NO uses otro idioma bajo ninguna circunstancia.
@@ -123,6 +143,88 @@ POOL DE CANDIDATOS DISPONIBLES EN CINETRACK ({len(candidates)} títulos):
 {chr(10).join(candidates_summary)}
 
 Genera la respuesta en formato JSON estricto siguiendo las reglas del sistema:"""
+
+
+CINEMA_KNOWN_KEYWORDS = {
+    "pelicula", "peliculas", "película", "películas", "serie", "series", "temporada", "temporadas",
+    "film", "films", "movie", "movies", "show", "shows", "cinema", "cine", "ver", "quiero",
+    "recomiendame", "recomendame", "recomienda", "dame", "busco",
+    "top", "mejor", "mejores", "best", "good", "actor", "actriz", "director", "directores",
+    "accion", "acción", "action", "comedia", "comedy", "drama", "terror", "horror", "suspenso",
+    "thriller", "misterio", "mystery", "ciencia", "ficcion", "ficción", "sci-fi", "scifi",
+    "animacion", "animación", "animation", "anime", "documental", "documentary", "fantasia",
+    "fantasía", "fantasy", "aventura", "aventuras", "adventure", "crimen", "crime", "romance",
+    "romantica", "romántica", "western", "clasico", "clásico", "classic", "antigua", "reciente",
+    "estreno", "estrenos", "nolan", "tarantino", "scorsese", "dicaprio", "spiderman", "batman",
+    "sorprendeme", "sorpréndeme", "surprise", "popular", "populares", "visto", "vistas"
+}
+
+KEYBOARD_ROWS = [
+    "qwertyuiop", "asdfghjkl", "zxcvbnm",
+    "poiuytrewq", "lkjhgfdsa", "mnbvcxz"
+]
+
+
+def is_unintelligible_prompt(prompt: str) -> bool:
+    """Detecta deterministamente si el prompt es teclado machacado, sopa de caracteres o texto ininteligible."""
+    clean = prompt.strip().lower()
+    if len(clean) < 2:
+        return True
+
+    # Año de lanzamiento válido aislado (ej: '1999', '2024')
+    if clean.isdigit():
+        return not (len(clean) == 4 and 1900 <= int(clean) <= 2030)
+
+    words = re.findall(r"[a-záéíóúñ0-9]+", clean)
+    if not words:
+        return True
+
+    # 1. Tokens que mezclan letras y dígitos sin ser especificaciones técnicas comunes (ej: 'asdf123', 'h4', 'a1', 'x89f2a')
+    for w in words:
+        if re.search(r"[a-z]", w) and re.search(r"[0-9]", w):
+            if not re.match(r"^(4k|3d|2d|1080p|720p|imax|se7en)$", w):
+                return True
+
+    # 2. Filas continuas de teclado o subcadenas evidentes
+    for kr in KEYBOARD_ROWS:
+        if clean in kr or kr in clean or any(w in kr and len(w) >= 3 for w in words if not w.isdigit()):
+            return True
+
+    # 3. Repetición cíclica (ej: 'asdasd', 'qweqwe', 'lalala')
+    for w in words:
+        if len(w) >= 4 and not w.isdigit():
+            for chunk_size in (2, 3):
+                chunk = w[:chunk_size]
+                if chunk * (len(w) // chunk_size) == w:
+                    return True
+
+    # 4. Consonantes consecutivas o sin vocales en tokens de letras
+    for w in words:
+        if not w.isdigit():
+            if re.search(r"[bcdfghjklmnpqrstvwxyz]{4,}", w):
+                return True
+            vowels = len(re.findall(r"[aeiouáéíóú]", w))
+            if len(w) >= 4 and vowels == 0:
+                return True
+            if len(w) >= 5 and (vowels / len(w)) < 0.2:
+                return True
+
+    # 5. Palabra única corta sin vocales o que no existe
+    if len(words) == 1 and not words[0].isdigit():
+        w = words[0]
+        if len(w) <= 3 and w not in {"el", "la", "un", "una", "de", "del", "en", "por", "con", "sin", "top", "ver", "cine", "film", "the", "war"}:
+            if not re.search(r"[aeiouáéíóú]", w):
+                return True
+
+    # 6. Combinación de 2 tokens: dígito arbitrario + token corto desconocido (ej: 'asd 123', 'abc 123', 'xyz 999')
+    if len(words) == 2 and any(w.isdigit() for w in words) and any(not w.isdigit() for w in words):
+        non_dig = [w for w in words if not w.isdigit()][0]
+        dig = [w for w in words if w.isdigit()][0]
+        is_year = len(dig) == 4 and 1900 <= int(dig) <= 2030
+        if not is_year and len(non_dig) <= 3 and non_dig not in CINEMA_KNOWN_KEYWORDS:
+            return True
+
+    return False
 
 
 class AIRecommenderService:
@@ -236,14 +338,28 @@ class AIRecommenderService:
         prompt: str,
         user_context: Optional[Dict[str, Any]],
         candidates: List[Dict[str, Any]],
-        language: Optional[str] = None
+        language: Optional[str] = None,
+        clarification_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Respaldo offline de último recurso: puntúa y selecciona dinámicamente los candidatos más afines al prompt."""
         lower = prompt.strip().lower()
         lang = language or _detect_language(prompt)
 
-        # Detectar caso incomprensible (menos de 2 caracteres o letras repetidas sin sentido)
-        if len(lower) < 2 or (re.match(r"^[asdfghjklqwertyuiopzxcvbnm]+$", lower) and len(set(lower)) <= 2):
+        is_valid_clarification_choice = False
+        if clarification_context:
+            clean_choice = lower
+            valid_choices = {
+                "1", "2", "3", "4", "5", "primera", "primero", "1era", "1ra", "segunda", "segundo",
+                "2da", "tercera", "tercero", "3ra", "cuarta", "cuarto", "quinta", "quinto",
+                "la 1", "la 2", "la 3", "la primera", "la segunda", "la tercera", "el primero", "el segundo", "el tercero",
+                "ambas", "ambos", "todos", "todas", "ninguna", "ninguno", "cualquiera",
+                "first", "second", "third", "both", "all", "none", "either", "the first", "the second", "the third"
+            }
+            if clean_choice in valid_choices:
+                is_valid_clarification_choice = True
+
+        # Detectar caso incomprensible
+        if not is_valid_clarification_choice and is_unintelligible_prompt(prompt):
             if lang == "es":
                 return {
                     "status": "clarification_needed",
@@ -270,7 +386,20 @@ class AIRecommenderService:
                 }
 
         is_only_watched = bool(user_context and user_context.get("only_watched"))
-        prompt_words = set(re.findall(r"[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]{3,}", lower))
+        augmented_text = lower
+        if clarification_context:
+            prev_p = clarification_context.get("previous_prompt", "").lower()
+            suggs = [s.lower() for s in clarification_context.get("suggestions", [])]
+            if any(w in lower for w in ("primera", "primero", "1", "first")) and len(suggs) >= 1:
+                augmented_text = f"{lower} {suggs[0]}"
+            elif any(w in lower for w in ("segunda", "segundo", "2", "second")) and len(suggs) >= 2:
+                augmented_text = f"{lower} {suggs[1]}"
+            elif any(w in lower for w in ("tercera", "tercero", "3", "third")) and len(suggs) >= 3:
+                augmented_text = f"{lower} {suggs[2]}"
+            else:
+                augmented_text = f"{lower} {prev_p} {' '.join(suggs)}"
+
+        prompt_words = set(re.findall(r"[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]{3,}", augmented_text))
 
         # Enriquecer términos temáticos bilingües (ES -> EN) para análisis en sinopsis y géneros
         thematic_syn_words: set[str] = set()
@@ -379,9 +508,65 @@ class AIRecommenderService:
         prompt: str,
         user_context: Optional[Dict[str, Any]],
         candidates: List[Dict[str, Any]],
-        language: Optional[str] = "es"
+        language: Optional[str] = "es",
+        clarification_context: Optional[Dict[str, Any]] = None,
+        is_cancelled: Optional[Any] = None
     ) -> RecommendationResponse:
         """Punto de entrada principal: orquesta llamada con reintentos antes de caer en heurístico."""
+        # 0. Si el cliente ya canceló la petición en vuelo, salir inmediatamente
+        if is_cancelled and await is_cancelled():
+            return RecommendationResponse(
+                status="clarification_needed",
+                message="Búsqueda cancelada por el usuario.",
+                recommendations=[],
+                clarification_suggestions=[],
+                provider_used="heuristic",
+                model_used="Cancelado"
+            )
+
+        # 1. Detección temprana determinista de texto ininteligible (caracteres aleatorios, teclado machacado, códigos)
+        # Si hay contexto de aclaración, solo se permiten respuestas válidas (ej: "1", "la primera", "ambas").
+        # Si el texto es ininteligible/basura, se rechaza de inmediato SIN llamar a LLMs.
+        is_valid_clarification_choice = False
+        if clarification_context:
+            clean_choice = prompt.strip().lower()
+            valid_choices = {
+                "1", "2", "3", "4", "5", "primera", "primero", "1era", "1ra", "segunda", "segundo",
+                "2da", "tercera", "tercero", "3ra", "cuarta", "cuarto", "quinta", "quinto",
+                "la 1", "la 2", "la 3", "la primera", "la segunda", "la tercera", "el primero", "el segundo", "el tercero",
+                "ambas", "ambos", "todos", "todas", "ninguna", "ninguno", "cualquiera",
+                "first", "second", "third", "both", "all", "none", "either", "the first", "the second", "the third"
+            }
+            if clean_choice in valid_choices:
+                is_valid_clarification_choice = True
+
+        if not is_valid_clarification_choice and is_unintelligible_prompt(prompt):
+            lang = language or _detect_language(prompt)
+            if lang == "es":
+                msg = "No he podido comprender tu mensaje. Por favor, dime qué género, actor, director o temática tienes ganas de ver hoy para poder darte una buena recomendación."
+                suggestions = [
+                    "Películas de ciencia ficción y viajes espaciales",
+                    "Thrillers y misterio policial",
+                    "Clásicos aclamados (+8.5★)",
+                    "Películas de Christopher Nolan"
+                ]
+            else:
+                msg = "I couldn't quite understand your query. Please tell me what genre, actor, director or theme you are in the mood for today."
+                suggestions = [
+                    "Space sci-fi and time travel",
+                    "Police mystery and thrillers",
+                    "Top rated classics (+8.5★)",
+                    "Christopher Nolan masterpieces"
+                ]
+            return RecommendationResponse(
+                status="clarification_needed",
+                message=msg,
+                recommendations=[],
+                clarification_suggestions=suggestions,
+                provider_used="heuristic",
+                model_used="Validador de Entrada (CineTrack Recommender Engine)"
+            )
+
         if not candidates:
             lang = language or _detect_language(prompt)
             if user_context and user_context.get("only_watched"):
@@ -398,7 +583,13 @@ class AIRecommenderService:
                 model_used="N/A"
             )
 
-        user_message = _build_user_message(prompt, user_context, candidates, language=language)
+        user_message = _build_user_message(
+            prompt,
+            user_context,
+            candidates,
+            language=language,
+            clarification_context=clarification_context
+        )
         candidate_ids = {c["id"] for c in candidates}
 
         raw_result: Optional[Dict[str, Any]] = None
@@ -434,6 +625,9 @@ class AIRecommenderService:
         for prov, model in cascade_schedule:
             if raw_result:
                 break
+            if is_cancelled and await is_cancelled():
+                logger.info("Cliente canceló la solicitud durante la cascada. Deteniendo ejecución.")
+                break
 
             if prov == "gemini" and settings.GEMINI_API_KEY:
                 try:
@@ -453,10 +647,27 @@ class AIRecommenderService:
                 except Exception as e:
                     logger.warning("Falla en Groq API con modelo '%s': %s", model, e)
 
+        # Si el cliente canceló durante la cascada, retornar de inmediato
+        if is_cancelled and await is_cancelled():
+            return RecommendationResponse(
+                status="clarification_needed",
+                message="Búsqueda cancelada por el usuario.",
+                recommendations=[],
+                clarification_suggestions=[],
+                provider_used="heuristic",
+                model_used="Cancelado"
+            )
+
         # Último recurso: Motor heurístico offline si fallaron ambos servicios en la nube
         if not raw_result:
             logger.info("Todos los servicios de IA en la nube fallaron o no están disponibles. Activando motor heurístico local como último recurso...")
-            raw_result = self._fallback_heuristic(prompt, user_context, candidates, language=language)
+            raw_result = self._fallback_heuristic(
+                prompt,
+                user_context,
+                candidates,
+                language=language,
+                clarification_context=clarification_context
+            )
             provider_used = "heuristic"
             model_used = "Motor Heurístico Local (CineTrack Recommender Engine)"
 

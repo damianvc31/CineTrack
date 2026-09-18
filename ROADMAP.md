@@ -40,13 +40,14 @@
   - Localización reactiva completa al español en toda la interfaz (menú, catálogo "Explore", detalle de títulos, temporadas, reseñas y configuración).
   - Pantalla dedicada de Configuración (`/settings`): cambio de contraseña seguro y selector de idioma de interfaz.
   - Suite de 54 tests en backend y pruebas en Vitest (100% pasando).
-- [x] **Fase 6: Recomendador Inteligente con IA Embebida (v0.9.0 - v0.9.3)**
+- [x] **Fase 6: Recomendador Inteligente con IA Embebida (v0.9.0 - v0.9.4)**
   - Integración híbrida de IA: Google Gemini 2.0/3.6 Flash primario con fallback a Groq API y motor heurístico local determinista.
   - Cascada jerárquica multi-modelo de 2 niveles entre proveedores priorizando modelos insignia (v0.9.3).
   - Optimización de cuota con reducción del 70% en el payload de candidatos (v0.9.3).
   - Afinación semántica bilingüe (`THEME_EXPANSION_MAP`) y búsqueda temática cruzada en SQL (v0.9.2).
+  - Validación determinista de entradas ininteligibles, cancelación instantánea de peticiones en vuelo y flujo de repregunta interactivo (v0.9.4).
   - Endpoint `POST /api/v1/recommendations` con hidratación completa de `TitleCard`.
-  - Pantalla dedicada `/recommendations` (`RecommendationsPage.tsx`), filtros temáticos y suite de 70 tests en backend.
+  - Pantalla dedicada `/recommendations` (`RecommendationsPage.tsx`), filtros temáticos y suite de 71 tests en backend.
 - [ ] **Fase 7: Despliegue a Producción y Entrega Final (v1.0.0)**
   - Arquitectura PaaS cloud de costo cero (Render Web Service + Vercel Edge + Neon PostgreSQL).
   - Script de migración y volcado del catálogo de desarrollo (`cinetrack.db`) a la base de datos PostgreSQL remota.

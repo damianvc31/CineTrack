@@ -85,8 +85,17 @@ async def test_user_stats_extended_fields(async_client: AsyncClient):
     data = stats_resp.json()
     assert "avg_movies_per_week" in data
     assert "seasons_completed_count" in data
+    assert data["window"] == "all_time"
     assert isinstance(data["avg_movies_per_week"], (int, float))
     assert isinstance(data["seasons_completed_count"], int)
+
+    # Test con ventana de 1 mes y validación de parámetro inválido
+    stats_1m = await async_client.get("/api/v1/users/me/stats?window=1m", headers=headers)
+    assert stats_1m.status_code == 200
+    assert stats_1m.json()["window"] == "1m"
+
+    stats_inv = await async_client.get("/api/v1/users/me/stats?window=invalid_window", headers=headers)
+    assert stats_inv.status_code == 422
 
 
 @pytest.mark.asyncio

@@ -2,6 +2,21 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v0.9.4] - 2026-09-18
+### Corregido & Mejorado
+- **Recomendador con IA: Resiliencia, Validación Determinista y Control de Flujo:**
+  - **Detección Determinista de Texto Ininteligible (Validador de Entrada Local):**
+    - Intercepción temprana sin consumo de cuota de LLMs para texto basura, teclado machacado, tokens mezclados y dígitos aislados.
+    - Preservación total de consultas naturales legítimas que contienen números (décadas como *"los 80"*, secuelas como *"iron man 3"*, conteos como *"últimos 3 años"*, calificaciones como *"+8.5 estrellas"* y presets de catálogo).
+  - **Cancelación Inmediata de Búsqueda ("Frenar búsqueda"):**
+    - Desconexión del cliente con `AbortController` en el navegador y propagación en backend vía `http_request.is_disconnected()` para abortar la cascada de IA de inmediato sin gastar tokens.
+    - Sincronización instantánea de estado y limpieza del parámetro `?prompt=` en la URL para evitar re-ejecuciones espurias.
+  - **Clarificación y Experiencia de Usuario:**
+    - Mensaje diferenciado para el validador local cuando se solicita aclaración (*"Consulta validada localmente por CineTrack para solicitar aclaración sin consumir cuota de IA"*), eliminando la confusión con caídas de los servicios de IA en la nube.
+    - Limpieza automática del prompt previo no comprendido al pedir aclaración y reemplazo en tiempo real del prompt superior a medida que el usuario escribe o envía su aclaración.
+    - Desacoplamiento de estados en `RecommendationsPage.tsx` eliminando dependencias volátiles en `executeRecommendation` y previniendo bucles infinitos con `searchParams`.
+    - Limpieza total y aborto de peticiones al iniciar o cerrar sesión desde cualquier punto de la aplicación.
+
 ## [v0.9.3] - 2026-09-17
 ### Rendimiento & Resiliencia
 - **Optimización de Cuota y Cascada Jerárquica Multi-Nivel entre Proveedores:**

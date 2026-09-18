@@ -120,7 +120,8 @@ export const catalogService = {
 
   getLibrary: () => api.get<UserLibrary>('/users/me/library'),
 
-  getStats: () => api.get<UserStats>('/users/me/stats'),
+  getStats: (window: string = 'all_time') =>
+    api.get<UserStats>(`/users/me/stats?window=${encodeURIComponent(window)}`),
 
   getUserReviews: (page: number = 1, pageSize: number = 20) =>
     api.get<UserReviewsListResponse>('/users/me/reviews', { page, page_size: pageSize }),

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Clock,
+  Calendar,
   Film,
   Tv,
   Flame,
@@ -33,6 +34,8 @@ export const ProfilePage: React.FC = () => {
   const [stats, setStats] = useState<UserStats | null>(null)
   const [library, setLibrary] = useState<UserLibrary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [statsLoading, setStatsLoading] = useState(false)
+  const [selectedWindow, setSelectedWindow] = useState<string>('all_time')
   const [error, setError] = useState<string | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [avatarImgError, setAvatarImgError] = useState(false)
@@ -41,7 +44,7 @@ export const ProfilePage: React.FC = () => {
     setLoading(true)
     try {
       const [statsData, libData] = await Promise.all([
-        catalogService.getStats(),
+        catalogService.getStats(selectedWindow),
         catalogService.getLibrary(),
       ])
       setStats(statsData)
@@ -57,6 +60,19 @@ export const ProfilePage: React.FC = () => {
     }
   }
 
+  const handleWindowChange = async (newWindow: string) => {
+    setSelectedWindow(newWindow)
+    setStatsLoading(true)
+    try {
+      const updatedStats = await catalogService.getStats(newWindow)
+      setStats(updatedStats)
+    } catch (err) {
+      console.error('Failed to load stats for window:', newWindow, err)
+    } finally {
+      setStatsLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!user) {
       navigate('/')
@@ -69,9 +85,10 @@ export const ProfilePage: React.FC = () => {
 
   const formatTitleSubtitle = (item: TopTitleStatItem): string => {
     if (item.tipo === 'tv') {
-      const seasons = item.total_seasons
-        ? `${item.total_seasons} season${item.total_seasons > 1 ? 's' : ''}`
-        : '1 season'
+      const count = item.total_seasons || 1
+      const seasons = language === 'es'
+        ? `${count} ${count === 1 ? 'temporada' : 'temporadas'}`
+        : `${count} ${count === 1 ? 'season' : 'seasons'}`
       const years = item.anio_fin && item.anio_fin !== item.anio_estreno
         ? `${item.anio_estreno || '?'}-${item.anio_fin}`
         : `${item.anio_estreno || ''}`
@@ -81,8 +98,8 @@ export const ProfilePage: React.FC = () => {
   }
 
   const memberSinceText = user.fecha_registro
-    ? new Date(user.fecha_registro).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-    : 'Recently'
+    ? new Date(user.fecha_registro).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', { month: 'long', year: 'numeric' })
+    : (language === 'es' ? 'Recientemente' : 'Recently')
 
   const totalWatchedTitles = (stats?.movies_watched_count || 0) + (stats?.series_watched_count || 0)
 
@@ -139,7 +156,7 @@ export const ProfilePage: React.FC = () => {
           </div>
 
           {/* Bio text */}
-          <p className="text-xs text-gray-300 leading-relaxed italic">
+          <p className="text-xs text-gray-300 leading-relaxed italic whitespace-pre-line">
             {user.descripcion || (language === 'es' ? 'Amante del cine y las series.' : 'Lover of cinema and series.')}
           </p>
 
@@ -167,11 +184,34 @@ export const ProfilePage: React.FC = () => {
         {/* Right Column: Statistics Panel */}
         <section className="lg:col-span-8 bg-[#141414] border border-[#262626] rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl">
           {/* Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#262626]">
             <h2 className="text-xl font-bold text-white tracking-tight">{t('statistics')}</h2>
-            <span className="px-2.5 py-1 rounded-full bg-[#1e1e1e] border border-[#2c2c2c] text-[10px] font-bold uppercase tracking-wider text-gray-300">
-              {language === 'es' ? 'Histórico' : 'All Time'}
-            </span>
+
+            {/* Selector de ventana de tiempo */}
+            <div className="flex items-center gap-1.5 bg-[#181818] border border-[#2b2b2b] hover:border-amber-500/50 rounded-xl px-2.5 py-1 text-xs text-gray-200 focus-within:border-amber-500 shadow-sm transition-all">
+              <Calendar className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <label htmlFor="stats-window-select" className="sr-only">
+                {t('timeWindow')}
+              </label>
+              <select
+                id="stats-window-select"
+                value={selectedWindow}
+                onChange={(e) => handleWindowChange(e.target.value)}
+                disabled={statsLoading || loading}
+                className="bg-transparent border-none text-xs font-semibold text-gray-200 focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="all_time" className="bg-[#141414] text-white">{t('allTime')}</option>
+                <option value="1m" className="bg-[#141414] text-white">{t('lastMonth')}</option>
+                <option value="3m" className="bg-[#141414] text-white">{t('last3Months')}</option>
+                <option value="6m" className="bg-[#141414] text-white">{t('last6Months')}</option>
+                <option value="1y" className="bg-[#141414] text-white">{t('lastYear')}</option>
+                <option value="5y" className="bg-[#141414] text-white">{t('last5Years')}</option>
+                <option value="10y" className="bg-[#141414] text-white">{t('last10Years')}</option>
+              </select>
+              {statsLoading && (
+                <div className="w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin shrink-0 ml-1" />
+              )}
+            </div>
           </div>
 
           {loading ? (
@@ -184,7 +224,7 @@ export const ProfilePage: React.FC = () => {
               <span>{error}</span>
             </div>
           ) : stats ? (
-            <div className="space-y-6">
+            <div className={`space-y-6 transition-opacity duration-200 ${statsLoading ? 'opacity-50 pointer-events-none' : ''}`}>
               {/* Row 1: Top 3 Metric Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Total Hours */}
@@ -425,10 +465,13 @@ export const ProfilePage: React.FC = () => {
             {library.following.slice(0, 3).map((item) => (
               <div
                 key={item.id}
-                className="group relative rounded-2xl bg-[#141414] border border-[#262626] overflow-hidden hover:border-amber-500/40 transition-all flex flex-col shadow-lg"
+                className="group relative rounded-2xl bg-[#141414] border border-[#262626] p-3.5 sm:p-4 hover:border-amber-500/40 transition-all flex gap-4 items-center shadow-lg"
               >
-                {/* Backdrop / Landscape image */}
-                <Link to={`/titles/${item.id}`} className="relative aspect-video w-full overflow-hidden bg-[#1c1c1c] block">
+                {/* Póster 2:3 en proporción original nítida sin recortar */}
+                <Link
+                  to={`/titles/${item.id}`}
+                  className="relative w-20 sm:w-24 aspect-[2/3] rounded-xl overflow-hidden bg-[#1c1c1c] shrink-0 border border-[#262626] group-hover:border-amber-500/50 shadow-md block"
+                >
                   {item.portada_url ? (
                     <img
                       src={item.portada_url}
@@ -437,17 +480,17 @@ export const ProfilePage: React.FC = () => {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-600">
-                      <Tv className="w-10 h-10" />
+                      <Tv className="w-8 h-8" />
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-transparent to-transparent" />
                 </Link>
 
                 {/* Info & Progress */}
-                <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                <div className="min-w-0 flex-1 space-y-2.5">
                   <Link
                     to={`/titles/${item.id}`}
                     className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors truncate block"
+                    title={item.nombre}
                   >
                     {item.nombre}
                   </Link>

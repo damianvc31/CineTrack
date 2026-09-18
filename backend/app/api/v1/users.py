@@ -34,11 +34,12 @@ async def get_my_library(
 
 @router.get("/me/stats", response_model=UserStatsResponse)
 async def get_my_stats(
+    window: str = Query(default="all_time", pattern="^(all_time|1m|3m|6m|1y|5y|10y)$"),
     current_user: Usuario = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> UserStatsResponse:
-    """Calcula y retorna todas las métricas estadísticas del perfil (horas, conteos, top 5 y distribución de géneros)."""
-    return await catalog_service.get_user_stats(db, usuario_id=current_user.id)
+    """Calcula y retorna todas las métricas estadísticas del perfil (horas, conteos, top 5 y distribución de géneros) según la ventana de tiempo."""
+    return await catalog_service.get_user_stats(db, usuario_id=current_user.id, window=window)
 
 
 @router.get("/me/reviews", response_model=UserReviewsListResponse)

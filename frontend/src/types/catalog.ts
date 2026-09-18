@@ -135,6 +135,7 @@ export interface UserStats {
   top_by_community_rating: TopTitleStatItem[]
   top_by_user_rating: TopTitleStatItem[]
   genres_distribution?: Record<string, number>
+  window?: string
 }
 
 export interface UserReviewItem {

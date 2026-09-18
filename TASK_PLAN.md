@@ -121,6 +121,15 @@
     - [x] Variables de entorno `GEMINI_FALLBACK_MODELS`, `GROQ_FALLBACK_MODELS`, `RECOMMENDATION_CANDIDATES_LIMIT` y `AI_RECOMMENDER_PRIMARY` en `.env`, `.env.example` y `config.py`.
     - [x] Suite de 70 tests de backend pasando al 100%.
 
+  - [x] **Validación Determinista, Resiliencia y Control de Flujo del Recomendador (v0.9.4)**
+    - [x] Detección determinista de texto basura/ininteligible (`is_unintelligible_prompt`) que evita consumo de LLMs sin interferir con consultas legítimas que contienen números (décadas, secuelas, ratings, años relativos).
+    - [x] Cancelación inmediata de búsquedas en curso ("Frenar búsqueda") mediante `AbortController` en el navegador y `http_request.is_disconnected()` en el servidor FastAPI.
+    - [x] Mensaje informativo claro y específico para el Validador de Entrada Local al requerir aclaración, diferenciándolo del aviso de caída de IA.
+    - [x] Limpieza del prompt no entendido y reemplazo sincronizado en tiempo real de la barra superior al responder la aclaración.
+    - [x] Desacoplamiento de dependencias reactivas volátiles en `executeRecommendation` para prevenir bucles de re-ejecución con `searchParams`.
+    - [x] Limpieza completa y aborto de peticiones al iniciar o cerrar sesión desde cualquier punto de la aplicación.
+    - [x] Suite de 71 tests en backend pasando al 100% y builds limpios en frontend.
+
   - [ ] **Fase 7: Despliegue a Producción y Entrega Final (v1.0.0)**
     - [ ] Paso 7.1: Documentación de la arquitectura de despliegue en `ARCHITECTURE.md` y `README.md`.
     - [ ] Paso 7.2: Script de migración y volcado de base de datos (`export_to_postgres.py`) para trasladar el catálogo local `cinetrack.db` a PostgreSQL en la nube.

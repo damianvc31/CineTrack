@@ -4,6 +4,12 @@ from pydantic import BaseModel, Field
 from app.schemas.catalog import TitleCardResponse
 
 
+class ClarificationContext(BaseModel):
+    previous_prompt: str
+    assistant_message: Optional[str] = None
+    suggestions: Optional[list[str]] = Field(default_factory=list)
+
+
 class RecommendationRequest(BaseModel):
     prompt: str = Field(
         ...,
@@ -18,6 +24,10 @@ class RecommendationRequest(BaseModel):
     language: Optional[Literal["es", "en"]] = Field(
         default="es",
         description="Idioma preferido de respuesta ('es' o 'en')"
+    )
+    clarification_context: Optional[ClarificationContext] = Field(
+        default=None,
+        description="Contexto previo si el usuario está respondiendo a una solicitud de aclaración del asistente"
     )
 
 

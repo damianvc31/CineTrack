@@ -106,9 +106,9 @@ const UI_STRINGS: Record<string, { en: string; es: string }> = {
   seriesLabel: { en: 'Series', es: 'Series' },
   avgMoviesPerWeek: { en: 'movies / week', es: 'películas / sem.' },
   seasonsCompletedText: { en: 'completed', es: 'completadas' },
-  top5Popularity: { en: 'Top 5 Watched by Popularity', es: 'Top 5 Más Vistas por Popularidad' },
-  top5Rating: { en: 'Top 5 Watched by Average Rating', es: 'Top 5 Más Vistas por Calificación Promedio' },
-  top5MyRating: { en: 'Top 5 Watched by My Rating', es: 'Top 5 Más Vistas por Mi Calificación' },
+  top5Popularity: { en: 'Top 5 Watched by Popularity', es: 'Top 5 Vistas por Popularidad' },
+  top5Rating: { en: 'Top 5 Watched by Average Rating', es: 'Top 5 Vistas por Calificación Promedio' },
+  top5MyRating: { en: 'Top 5 Watched by My Rating', es: 'Top 5 Vistas por Mi Calificación' },
   genresWatched: { en: 'Genres Watched', es: 'Géneros Vistos' },
   titlesCountCenter: { en: 'TITLES', es: 'TÍTULOS' },
   recentlyWatched: { en: 'Recently Watched', es: 'Vistos Recientemente' },
@@ -205,6 +205,22 @@ const UI_STRINGS: Record<string, { en: string; es: string }> = {
     en: 'Looking for any of these options?',
     es: '¿Buscamos por alguna de estas opciones?'
   },
+  aiClarificationInputPlaceholder: {
+    en: 'Type your reply or clarify what you want to watch...',
+    es: 'Escribe tu respuesta o aclara qué tienes ganas de ver...'
+  },
+  aiClarificationSubmit: {
+    en: 'Clarify & Search',
+    es: 'Aclarar y buscar'
+  },
+  aiClarificationInitialPrompt: {
+    en: 'Initial query',
+    es: 'Consulta previa'
+  },
+  aiClarificationAnswerHint: {
+    en: 'You can pick an option above or answer the assistant in your own words:',
+    es: 'Puedes elegir una opción arriba o responderle al asistente con tus palabras:'
+  },
   aiSelectedTitles: { en: 'Handpicked Titles', es: 'Títulos Seleccionados' },
   aiNewQuery: { en: 'New query', es: 'Nueva consulta' },
   aiMovie: { en: 'Movie', es: 'Película' },
@@ -214,13 +230,58 @@ const UI_STRINGS: Record<string, { en: string; es: string }> = {
   aiEngineLocal: { en: 'Local Heuristic Engine', es: 'Motor Heurístico Local' },
   aiResetSearch: { en: 'Clear & start over', es: 'Limpiar y reiniciar' },
   aiShufflePresets: { en: 'Shuffle ideas', es: 'Rotar ideas' },
+  aiCancelSearch: { en: 'Cancel search', es: 'Frenar búsqueda' },
   aiHeuristicNotice: {
     en: 'Generated via local catalog rules (cloud AI services busy or unavailable).',
     es: 'Generado mediante motor de catálogo local (servicios de IA en la nube ocupados o no disponibles).'
   },
+  aiClarificationHeuristicNotice: {
+    en: 'Query validated locally by CineTrack to request clarification without consuming AI quota.',
+    es: 'Consulta validada localmente por CineTrack para solicitar aclaración sin consumir cuota de IA.'
+  },
   aiRetryWithAi: {
     en: 'Retry with AI Assistant',
     es: 'Reintentar con Asistente IA'
+  },
+  // Time Windows (Profile Stats)
+  timeWindow: { en: 'Time Window', es: 'Ventana de Tiempo' },
+  allTime: { en: 'All Time', es: 'Todo el Historial' },
+  lastMonth: { en: 'Last Month', es: 'Último Mes' },
+  last3Months: { en: 'Last 3 Months', es: 'Últimos 3 Meses' },
+  last6Months: { en: 'Last 6 Months', es: 'Últimos 6 Meses' },
+  lastYear: { en: 'Last Year', es: 'Último Año' },
+  last5Years: { en: 'Last 5 Years', es: 'Últimos 5 Años' },
+  last10Years: { en: 'Last 10 Years', es: 'Últimos 10 Años' },
+  // Footer
+  footerTagline: {
+    en: 'Your ultimate movie and TV series tracker, with intelligent AI-powered recommendations.',
+    es: 'Tu gestor definitivo de películas y series, con recomendaciones inteligentes asistidas por IA.'
+  },
+  footerExplore: { en: 'Explore', es: 'Explorar' },
+  footerMovies: { en: 'Movies', es: 'Películas' },
+  footerSeries: { en: 'TV Series', es: 'Series de TV' },
+  footerTrending: { en: 'Trending', es: 'Tendencias' },
+  footerClassics: { en: 'Gems & Classics', es: 'Joyas y Clásicos' },
+  footerMySpace: { en: 'My Space', es: 'Mi Espacio' },
+  footerMyLibrary: { en: 'My Library', es: 'Mi Biblioteca' },
+  footerWatchlist: { en: 'Watchlist', es: 'Por Ver' },
+  footerFavorites: { en: 'Favorites', es: 'Favoritos' },
+  footerProfile: { en: 'Stats & Profile', es: 'Estadísticas y Perfil' },
+  footerTmdbNotice: {
+    en: 'This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.',
+    es: 'Este producto utiliza TMDB y sus APIs pero no está respaldado, certificado ni aprobado por TMDB.'
+  },
+  footerCopyrightOwners: {
+    en: 'All metadata, posters and images are the property of their respective owners.',
+    es: 'Todos los metadatos, pósters e imágenes son propiedad de sus respectivos dueños.'
+  },
+  footerDevelopedFor: {
+    en: 'Project developed for UTN E-Learning.',
+    es: 'Proyecto desarrollado para UTN E-Learning.'
+  },
+  footerResponsive: {
+    en: 'Mobile-First Responsive',
+    es: 'Diseño Responsivo Mobile-First'
   },
 }
 

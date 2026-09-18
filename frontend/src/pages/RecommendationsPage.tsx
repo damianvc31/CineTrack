@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Bot, RefreshCw, AlertCircle, Clapperboard, Lightbulb, ArrowRight, CornerDownLeft, Film, Tv, Info, X, Dices } from 'lucide-react'
+import { Bot, RefreshCw, AlertCircle, Clapperboard, Lightbulb, ArrowRight, CornerDownLeft, Film, Tv, Info, Dices, Send, Trash2, HelpCircle, Square } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
 import { recommendationService } from '@/services/recommendationService'
-import type { RecommendationResponse, RecommendationItem } from '@/services/recommendationService'
+import type { RecommendationResponse, RecommendationItem, ClarificationContext } from '@/services/recommendationService'
 import { catalogService } from '@/services/catalogService'
 import { TitleCard } from '@/components/common/TitleCard'
 
@@ -208,15 +208,24 @@ export const RecommendationsPage: React.FC = () => {
   const { user } = useAuth()
   const { t, language } = useLanguage()
 
-  const getInitialCache = () => {
+  const getInitialCache = useCallback(() => {
     try {
       const raw = sessionStorage.getItem(CACHE_KEY)
-      if (raw) return JSON.parse(raw)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        const currentUserId = user?.id || null
+        // Si el caché pertenece a otro usuario o cambió el estado de login, invalidar
+        if (parsed.userId !== currentUserId) {
+          sessionStorage.removeItem(CACHE_KEY)
+          return null
+        }
+        return parsed
+      }
     } catch {
       // ignore
     }
     return null
-  }
+  }, [user?.id])
 
   const cached = getInitialCache()
   const urlPrompt = searchParams.get('prompt')
@@ -228,54 +237,191 @@ export const RecommendationsPage: React.FC = () => {
     if (urlPrompt && urlPrompt !== cached?.prompt) return null
     return cached?.result || null
   })
+  const [clarificationContext, setClarificationContext] = useState<ClarificationContext | null>(() => {
+    if (cached?.result?.status === 'clarification_needed') {
+      return {
+        previous_prompt: cached.prompt,
+        assistant_message: cached.result.message,
+        suggestions: cached.result.clarification_suggestions || []
+      }
+    }
+    return null
+  })
+  const [clarificationInput, setClarificationInput] = useState<string>('')
 
-  const executeRecommendation = useCallback(async (queryText: string) => {
-    const cleanQuery = queryText.trim()
-    if (!cleanQuery) return
+  const lastExecutedPromptRef = useRef<string | null>(cached?.prompt || null)
+  const requestIdRef = useRef<number>(0)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const loadingRef = useRef<boolean>(false)
+  const clarificationContextRef = useRef<ClarificationContext | null>(clarificationContext)
+  clarificationContextRef.current = clarificationContext
+  const prevUserRef = useRef(user?.id)
+  const isAuthChangingRef = useRef<boolean>(false)
 
-    setLoading(true)
-    setError(null)
-    setSearchParams(cleanQuery ? { prompt: cleanQuery } : {})
+  // Cancelar búsqueda en curso
+  const handleCancelSearch = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    requestIdRef.current++
+    loadingRef.current = false
+    lastExecutedPromptRef.current = null
+    setLoading(false)
+    setSearchParams({}, { replace: true })
+  }, [setSearchParams])
 
-    try {
-      const data = await recommendationService.getRecommendations({
-        prompt: cleanQuery,
-        tipo_filtro: 'all', // El prompt en lenguaje natural determina automáticamente el tipo
-        language,
-      })
-      setResult(data)
+  // Limpiar recomendaciones en memoria, URL y caché si cambia el usuario (login o logout)
+  useEffect(() => {
+    if (prevUserRef.current !== user?.id) {
+      prevUserRef.current = user?.id
+      isAuthChangingRef.current = true
+      // Invalidar de inmediato cualquier petición en vuelo
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+      }
+      requestIdRef.current++
+      loadingRef.current = false
+      lastExecutedPromptRef.current = null
+      setClarificationContext(null)
+      setClarificationInput('')
+      setPrompt('')
+      setResult(null)
+      setLoading(false)
+      setError(null)
+      setSearchParams({}, { replace: true })
       try {
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ prompt: cleanQuery, result: data }))
+        sessionStorage.removeItem(CACHE_KEY)
       } catch {
         // ignore
       }
-    } catch (err: unknown) {
-      console.error('Error fetching recommendations:', err)
-      setError(t('aiErrorDesc', 'No se pudo conectar con el servicio de recomendaciones. Por favor, intenta de nuevo.'))
-    } finally {
-      setLoading(false)
     }
-  }, [t, language, setSearchParams])
+  }, [user?.id, setSearchParams])
 
-  // Ejecutar automáticamente al montar si vino con query param ?prompt=... y no coincide con el cache
-  useEffect(() => {
-    const initialPrompt = searchParams.get('prompt')
-    if (initialPrompt && (!result || cached?.prompt !== initialPrompt) && !loading) {
-      setPrompt(initialPrompt)
-      executeRecommendation(initialPrompt)
+  const executeRecommendation = useCallback(async (
+    queryText: string,
+    explicitClarificationContext?: ClarificationContext | null
+  ) => {
+    const cleanQuery = queryText.trim()
+    if (!cleanQuery) return
+
+    const activeContext = explicitClarificationContext !== undefined
+      ? explicitClarificationContext
+      : clarificationContextRef.current
+
+    // Evitar llamadas duplicadas si es el mismo prompt y ya está en proceso
+    if (loadingRef.current && lastExecutedPromptRef.current === cleanQuery && !activeContext) return
+
+    // Abortar cualquier petición previa en vuelo
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    lastExecutedPromptRef.current = cleanQuery
+    const thisRequestId = ++requestIdRef.current
+
+    loadingRef.current = true
+    setLoading(true)
+    setError(null)
+    setSearchParams(cleanQuery ? { prompt: cleanQuery } : {}, { replace: true })
+
+    try {
+      const data = await recommendationService.getRecommendations(
+        {
+          prompt: cleanQuery,
+          tipo_filtro: 'all', // El prompt en lenguaje natural determina automáticamente el tipo
+          language,
+          clarification_context: activeContext || undefined
+        },
+        controller.signal
+      )
+
+      // Aplicar el resultado ÚNICAMENTE si coincide con la última solicitud en vuelo
+      if (thisRequestId === requestIdRef.current) {
+        setResult(data)
+        if (data.status === 'clarification_needed') {
+          // Si el asistente solicita aclaración, guardamos el contexto y quitamos el prompt anterior no comprendido
+          setClarificationContext({
+            previous_prompt: cleanQuery,
+            assistant_message: data.message,
+            suggestions: data.clarification_suggestions || []
+          })
+          setPrompt('')
+          setClarificationInput('')
+          // lastExecutedPromptRef.current se mantiene en cleanQuery para que el router no vuelva a disparar
+        } else {
+          // Si fue exitoso, limpiamos el contexto de aclaración
+          setClarificationContext(null)
+          setClarificationInput('')
+        }
+
+        try {
+          sessionStorage.setItem(
+            CACHE_KEY,
+            JSON.stringify({ prompt: cleanQuery, result: data, userId: user?.id || null })
+          )
+        } catch {
+          // ignore
+        }
+      }
+    } catch (err: unknown) {
+      // Ignorar silenciosamente cancelaciones voluntarias (AbortError)
+      if (err instanceof Error && (err.name === 'AbortError' || err.message?.includes('aborted'))) {
+        return
+      }
+      if (thisRequestId === requestIdRef.current) {
+        console.error('Error fetching recommendations:', err)
+        setError(t('aiErrorDesc', 'No se pudo conectar con el servicio de recomendaciones. Por favor, intenta de nuevo.'))
+      }
+    } finally {
+      if (thisRequestId === requestIdRef.current) {
+        loadingRef.current = false
+        setLoading(false)
+        abortControllerRef.current = null
+      }
+    }
+  }, [t, language, setSearchParams, user?.id])
+
+  // Reaccionar a cambios en el query param ?prompt=... SOLO si proviene de navegación externa con prompt no vacío
+  useEffect(() => {
+    const queryPrompt = searchParams.get('prompt')?.trim()
+
+    // Si estamos en medio de una transición de sesión (login / logout), ignorar query params residuales
+    if (isAuthChangingRef.current) {
+      if (!queryPrompt) {
+        isAuthChangingRef.current = false
+      }
+      return
+    }
+
+    if (!queryPrompt) {
+      return
+    }
+
+    if (queryPrompt === lastExecutedPromptRef.current) {
+      return
+    }
+
+    setPrompt(queryPrompt)
+    setResult(null) // Sobrescribe y limpia inmediatamente la recomendación anterior
+    executeRecommendation(queryPrompt)
+  }, [searchParams, executeRecommendation])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (prompt.trim()) {
-      executeRecommendation(prompt.trim())
+      executeRecommendation(prompt.trim(), clarificationContext)
     }
   }
 
   const handleSelectPreset = (presetPrompt: string) => {
+    setClarificationContext(null)
+    setClarificationInput('')
     setPrompt(presetPrompt)
-    executeRecommendation(presetPrompt)
+    executeRecommendation(presetPrompt, null)
   }
 
   const [presetOffset, setPresetOffset] = useState(0)
@@ -313,7 +459,7 @@ export const RecommendationsPage: React.FC = () => {
       })
       const updated = { ...prev, recommendations: updatedRecs }
       try {
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ prompt, result: updated }))
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ prompt, result: updated, userId: user?.id || null }))
       } catch {
         // ignore
       }
@@ -323,7 +469,7 @@ export const RecommendationsPage: React.FC = () => {
 
   const syncFreshStates = useCallback(async () => {
     if (!user) return
-    const current = result || cached?.result
+    const current = result
     if (!current?.recommendations?.length) return
 
     try {
@@ -366,7 +512,7 @@ export const RecommendationsPage: React.FC = () => {
         if (!hasChanges) return prev || current
         const updated = { ...target, recommendations: updatedRecs }
         try {
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ prompt, result: updated }))
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ prompt, result: updated, userId: user?.id || null }))
         } catch {
           // ignore
         }
@@ -386,9 +532,20 @@ export const RecommendationsPage: React.FC = () => {
   }, [syncFreshStates])
 
   const handleClear = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    requestIdRef.current++
+    loadingRef.current = false
+    lastExecutedPromptRef.current = null
+    setClarificationContext(null)
+    setClarificationInput('')
     setPrompt('')
     setResult(null)
-    setSearchParams({})
+    setError(null)
+    setLoading(false)
+    setSearchParams({}, { replace: true })
     try {
       sessionStorage.removeItem(CACHE_KEY)
     } catch {
@@ -414,10 +571,10 @@ export const RecommendationsPage: React.FC = () => {
     } else if (provider === 'heuristic') {
       providerLabel = t('aiEngineLocal')
       providerClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-      modelLabel = language === 'es' ? 'Reglas Ponderadas de Catálogo' : 'Weighted Catalog Rules'
+      modelLabel = model || (language === 'es' ? 'Reglas Ponderadas de Catálogo' : 'Weighted Catalog Rules')
       tooltip = language === 'es'
-        ? 'Generado localmente sin APIs externas mediante filtrado ponderado de catálogo (concordancia temática, puntaje unificado y volumen de votos).'
-        : 'Generated locally without external APIs using weighted catalog filtering (thematic match, scores and vote count).'
+        ? `Generado localmente sin APIs externas mediante ${modelLabel}.`
+        : `Generated locally without external APIs via ${modelLabel}.`
     }
 
     return (
@@ -469,13 +626,24 @@ export const RecommendationsPage: React.FC = () => {
       {/* Input Box & Presets */}
       <div className="p-5 sm:p-6 rounded-2xl bg-[#121212] border border-[#262626] shadow-xl space-y-4">
         {result && (
-          <div className="flex justify-end border-b border-[#222222] pb-3">
+          <div className="flex items-center justify-between border-b border-[#222222] pb-3">
+            {clarificationContext ? (
+              <span className="text-xs text-amber-300/90 font-medium flex items-center gap-1.5 truncate max-w-xs sm:max-w-md">
+                <HelpCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>{t('aiClarificationInitialPrompt')}:</span>
+                <strong className="text-amber-400 font-semibold italic truncate">"{clarificationContext.previous_prompt}"</strong>
+              </span>
+            ) : (
+              <span className="text-xs text-gray-400 font-medium truncate max-w-xs sm:max-w-md">
+                {t('aiSearchActive')}: <strong className="text-amber-400 font-semibold">"{prompt || lastExecutedPromptRef.current}"</strong>
+              </span>
+            )}
             <button
               type="button"
               onClick={handleClear}
-              className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 font-semibold underline underline-offset-2 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 font-semibold underline underline-offset-2 transition-colors cursor-pointer shrink-0 ml-2"
             >
-              <X className="w-3.5 h-3.5" />
+              <Trash2 className="w-3.5 h-3.5 text-red-400" />
               <span>{t('aiResetSearch')}</span>
             </button>
           </div>
@@ -488,7 +656,7 @@ export const RecommendationsPage: React.FC = () => {
               rows={3}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder={t('aiPromptPlaceholder')}
+              placeholder={clarificationContext ? t('aiClarificationInputPlaceholder') : t('aiPromptPlaceholder')}
               className="w-full p-4 text-sm bg-[#181818] border border-[#2d2d2d] focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-xl text-white placeholder-gray-500 outline-none transition-all resize-none shadow-inner"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -503,23 +671,35 @@ export const RecommendationsPage: React.FC = () => {
             <span className="text-[11px] text-gray-500 hidden sm:inline-flex items-center gap-1">
               {t('aiSearchHint')} <CornerDownLeft className="w-3 h-3 ml-0.5 text-gray-400" />
             </span>
-            <button
-              type="submit"
-              disabled={loading || !prompt.trim()}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:from-gray-700 disabled:to-gray-800 disabled:text-gray-500 text-black text-xs sm:text-sm font-bold shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin text-black" />
-                  <span>{t('aiThinking')}</span>
-                </>
-              ) : (
-                <>
-                  <Bot className="w-4 h-4 text-black" />
-                  <span>{t('aiSubmitButton')}</span>
-                </>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {loading && (
+                <button
+                  type="button"
+                  onClick={handleCancelSearch}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-md hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current text-red-400" />
+                  <span>{t('aiCancelSearch')}</span>
+                </button>
               )}
-            </button>
+              <button
+                type="submit"
+                disabled={loading || !prompt.trim()}
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:from-gray-700 disabled:to-gray-800 disabled:text-gray-500 text-black text-xs sm:text-sm font-bold shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                    <span>{t('aiThinking')}</span>
+                  </>
+                ) : (
+                  <>
+                    <Bot className="w-4 h-4 text-black" />
+                    <span>{t('aiSubmitButton')}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
 
@@ -573,6 +753,16 @@ export const RecommendationsPage: React.FC = () => {
             <p className="text-xs text-gray-400 max-w-md mx-auto">
               {t('aiLoadingDesc')}
             </p>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleCancelSearch}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 text-xs font-semibold transition-all cursor-pointer shadow-md hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Square className="w-3.5 h-3.5 fill-current text-red-400" />
+                <span>{t('aiCancelSearch')}</span>
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-4">
             {[1, 2, 3].map((n) => (
@@ -615,43 +805,88 @@ export const RecommendationsPage: React.FC = () => {
             {result.provider_used === 'heuristic' && (
               <div className="pt-3 mt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-amber-500/20 text-xs text-amber-200/80">
                 <span>
-                  {t('aiHeuristicNotice')}
+                  {result.status === 'clarification_needed'
+                    ? t('aiClarificationHeuristicNotice')
+                    : t('aiHeuristicNotice')}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => executeRecommendation(prompt)}
-                  disabled={loading}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 border border-amber-500/30 text-xs font-semibold transition-all cursor-pointer w-fit shrink-0 shadow-sm"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                  <span>{t('aiRetryWithAi')}</span>
-                </button>
+                {result.status !== 'clarification_needed' && (
+                  <button
+                    type="button"
+                    onClick={() => executeRecommendation(prompt)}
+                    disabled={loading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 border border-amber-500/30 text-xs font-semibold transition-all cursor-pointer w-fit shrink-0 shadow-sm"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    <span>{t('aiRetryWithAi')}</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
 
           {/* Caso 1: Clarification Needed (Incertidumbre / Ambiguo) */}
-          {result.status === 'clarification_needed' && result.clarification_suggestions.length > 0 && (
-            <div className="p-6 rounded-2xl bg-[#121212] border border-[#262626] space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
-                <Lightbulb className="w-4 h-4" /> {t('aiClarificationTitle')}
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {result.clarification_suggestions.map((suggestion, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      setPrompt(suggestion)
-                      executeRecommendation(suggestion)
+          {result.status === 'clarification_needed' && (
+            <div className="p-6 rounded-2xl bg-[#121212] border border-[#262626] space-y-5">
+              {result.clarification_suggestions.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                    <Lightbulb className="w-4 h-4" /> {t('aiClarificationTitle')}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {result.clarification_suggestions.map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setPrompt(suggestion)
+                          executeRecommendation(suggestion, clarificationContext)
+                        }}
+                        className="p-3.5 rounded-xl bg-[#181818] hover:bg-amber-950/20 border border-[#2d2d2d] hover:border-amber-500/50 text-left text-xs text-gray-200 hover:text-white transition-all flex items-center justify-between group shadow-sm cursor-pointer"
+                      >
+                        <span>{suggestion}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-gray-500 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Formulario directo para responder la repregunta con texto propio */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  const clean = clarificationInput.trim()
+                  if (clean) {
+                    setPrompt(clean)
+                    executeRecommendation(clean, clarificationContext)
+                  }
+                }}
+                className="pt-4 border-t border-[#222222] space-y-2.5"
+              >
+                <label className="text-xs text-gray-300 font-medium block">
+                  {t('aiClarificationAnswerHint')}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={clarificationInput}
+                    onChange={(e) => {
+                      setClarificationInput(e.target.value)
+                      setPrompt(e.target.value)
                     }}
-                    className="p-3.5 rounded-xl bg-[#181818] hover:bg-amber-950/20 border border-[#2d2d2d] hover:border-amber-500/50 text-left text-xs text-gray-200 hover:text-white transition-all flex items-center justify-between group shadow-sm cursor-pointer"
+                    placeholder={t('aiClarificationInputPlaceholder')}
+                    className="flex-1 px-4 py-2.5 text-xs sm:text-sm bg-[#181818] border border-[#2d2d2d] focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-xl text-white placeholder-gray-500 outline-none transition-all shadow-inner"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading || !clarificationInput.trim()}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:from-gray-700 disabled:to-gray-800 disabled:text-gray-500 text-black text-xs font-bold transition-all cursor-pointer disabled:cursor-not-allowed shadow-md shrink-0"
                   >
-                    <span>{suggestion}</span>
-                    <ArrowRight className="w-3.5 h-3.5 text-gray-500 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{t('aiClarificationSubmit')}</span>
                   </button>
-                ))}
-              </div>
+                </div>
+              </form>
             </div>
           )}
 

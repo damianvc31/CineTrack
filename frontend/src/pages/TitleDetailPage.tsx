@@ -37,6 +37,36 @@ interface OutletContextType {
   openAuth: (mode?: 'login' | 'register') => void
 }
 
+const getActorInitials = (fullName: string): string => {
+  if (!fullName) return '?'
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return parts.map(p => p[0]).join('').toUpperCase().slice(0, 3)
+}
+
+const ActorAvatar: React.FC<{ nombre: string; fotoUrl?: string | null }> = ({ nombre, fotoUrl }) => {
+  const [hasError, setHasError] = useState(false)
+  const initials = getActorInitials(nombre)
+
+  return (
+    <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-[#2b2b2b] group-hover:border-amber-500/50 bg-[#1c1c1c] flex items-center justify-center shrink-0 shadow-md transition-all">
+      {fotoUrl && !hasError ? (
+        <img
+          src={fotoUrl}
+          alt={nombre}
+          loading="lazy"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          onError={() => setHasError(true)}
+        />
+      ) : (
+        <span className="text-lg font-black text-gray-400 group-hover:text-amber-400 transition-colors tracking-wider">
+          {initials}
+        </span>
+      )}
+    </div>
+  )
+}
+
 export const TitleDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
@@ -937,24 +967,8 @@ export const TitleDetailPage: React.FC = () => {
                   to={`/catalog?actor=${encodeURIComponent(actor.nombre)}`}
                   className="p-3 rounded-2xl bg-[#141414] border border-[#262626] hover:border-amber-500/40 transition-all flex flex-col items-center text-center space-y-2.5 group shadow-sm block"
                 >
-                  {/* Foto de perfil del actor con fallback */}
-                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-[#2b2b2b] group-hover:border-amber-500/50 bg-[#1c1c1c] flex items-center justify-center shrink-0 shadow-md transition-all">
-                    {actor.foto_url ? (
-                      <img
-                        src={actor.foto_url}
-                        alt={actor.nombre}
-                        loading="lazy"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          ;(e.target as HTMLElement).style.display = 'none'
-                        }}
-                      />
-                    ) : (
-                      <span className="text-xl font-black text-gray-500 group-hover:text-amber-400 transition-colors">
-                        {actor.nombre.charAt(0)}
-                      </span>
-                    )}
-                  </div>
+                  {/* Foto de perfil del actor con fallback e iniciales completas */}
+                  <ActorAvatar nombre={actor.nombre} fotoUrl={actor.foto_url} />
 
                   <div className="min-w-0 w-full space-y-0.5">
                     <h4

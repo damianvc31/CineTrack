@@ -40,10 +40,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUser()
   }, [])
 
+  const clearRecommendationsCache = () => {
+    try {
+      sessionStorage.removeItem('cinetrack_recs_cache')
+    } catch {
+      // ignore
+    }
+  }
+
   const login = async (credentials: LoginCredentials) => {
     setLoading(true)
     try {
       const res = await authService.login(credentials)
+      clearRecommendationsCache()
       setUser(res.user)
     } finally {
       setLoading(false)
@@ -54,6 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true)
     try {
       const res = await authService.register(credentials)
+      clearRecommendationsCache()
       setUser(res.user)
     } finally {
       setLoading(false)
@@ -62,6 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     authService.logout()
+    clearRecommendationsCache()
     setUser(null)
   }
 

@@ -211,3 +211,4 @@ class UserStatsResponse(BaseModel):
     top_by_community_rating: list[TopTitleStat] = Field(default_factory=list)
     top_by_user_rating: list[TopTitleStat] = Field(default_factory=list)
     genres_distribution: dict[str, int] = Field(default_factory=dict)
+    window: str = "all_time"

@@ -1134,11 +1134,27 @@ async def get_user_library(
     )
 
 
+WINDOW_DAYS_MAP: dict[str, int] = {
+    "1m": 30,
+    "3m": 90,
+    "6m": 180,
+    "1y": 365,
+    "5y": 365 * 5,
+    "10y": 365 * 10,
+}
+
+
 async def get_user_stats(
     db: AsyncSession,
-    usuario_id: int
+    usuario_id: int,
+    window: str = "all_time"
 ) -> UserStatsResponse:
-    """Calcula las estadísticas del perfil conforme a los wireframes."""
+    """Calcula las estadísticas del perfil conforme a los wireframes y la ventana de tiempo seleccionada."""
+    days = WINDOW_DAYS_MAP.get(window)
+    since_date: Optional[datetime] = None
+    if days:
+        since_date = datetime.now(timezone.utc) - timedelta(days=days)
+
     # 1. Películas vistas
     q_movies = (
         select(Titulo)
@@ -1150,12 +1166,14 @@ async def get_user_stats(
             Titulo.tipo == "movie"
         )
     )
+    if since_date:
+        q_movies = q_movies.where(EstadoUsuarioTitulo.fecha_estado >= since_date)
     res_m = await db.execute(q_movies)
     watched_movies = res_m.scalars().all()
     movies_count = len(watched_movies)
     movie_minutes = sum(m.duracion or 100 for m in watched_movies)
 
-    # 2. Episodios vistos
+    # 2. Episodios vistos (para las horas de visionado se cuentan solo los episodios vistos durante la ventana)
     q_eps = (
         select(Episodio, Titulo)
         .join(EpisodioVisto, EpisodioVisto.episodio_id == Episodio.id)
@@ -1164,12 +1182,14 @@ async def get_user_stats(
         .options(selectinload(Titulo.generos))
         .where(EpisodioVisto.usuario_id == usuario_id)
     )
+    if since_date:
+        q_eps = q_eps.where(EpisodioVisto.fecha_visto >= since_date)
     res_e = await db.execute(q_eps)
     watched_ep_rows = res_e.all()
     episodes_count = len(watched_ep_rows)
     tv_minutes = sum(ep.duracion or 45 for ep, _ in watched_ep_rows)
 
-    # Series vistas (completadas)
+    # Series vistas (cuentan si se marcaron como 'vista' en ese periodo de tiempo)
     q_series = (
         select(Titulo)
         .join(EstadoUsuarioTitulo, EstadoUsuarioTitulo.titulo_id == Titulo.id)
@@ -1180,6 +1200,8 @@ async def get_user_stats(
             Titulo.tipo == "tv"
         )
     )
+    if since_date:
+        q_series = q_series.where(EstadoUsuarioTitulo.fecha_estado >= since_date)
     res_s = await db.execute(q_series)
     watched_series = res_s.scalars().all()
     series_count = len(watched_series)
@@ -1188,7 +1210,7 @@ async def get_user_stats(
     tv_hours = round(tv_minutes / 60.0, 1)
     total_hours = round((movie_minutes + tv_minutes) / 60.0, 1)
 
-    # Promedio de películas por semana desde el registro
+    # Promedio de películas por semana
     user = await db.get(Usuario, usuario_id)
     if user and user.fecha_registro:
         reg_date = user.fecha_registro
@@ -1196,7 +1218,8 @@ async def get_user_stats(
             reg_date = reg_date.replace(tzinfo=timezone.utc)
         now_utc = datetime.now(timezone.utc)
         days_diff = max(1.0, (now_utc - reg_date).total_seconds() / 86400.0)
-        weeks = max(1.0, days_diff / 7.0)
+        effective_days = min(days, days_diff) if days else days_diff
+        weeks = max(1.0, effective_days / 7.0)
         avg_movies_per_week = round(movies_count / weeks, 1)
     else:
         avg_movies_per_week = float(movies_count)
@@ -1208,8 +1231,10 @@ async def get_user_stats(
         .join(Episodio, Episodio.temporada_id == Temporada.id)
         .join(EpisodioVisto, EpisodioVisto.episodio_id == Episodio.id)
         .where(EpisodioVisto.usuario_id == usuario_id)
-        .distinct()
     )
+    if since_date:
+        q_seasons = q_seasons.where(EpisodioVisto.fecha_visto >= since_date)
+    q_seasons = q_seasons.distinct()
     res_seasons = await db.execute(q_seasons)
     user_touched_seasons = res_seasons.scalars().all()
 
@@ -1221,7 +1246,7 @@ async def get_user_stats(
         if aired_eps and all(ep.id in user_ep_ids for ep in aired_eps):
             seasons_completed_count += 1
 
-    # 3. Distribución de géneros vistos (1 por cada título único consumido, no por episodio)
+    # 3. Distribución de géneros vistos (1 por cada título único consumido en la ventana)
     watched_titles_dict = {m.id: m for m in watched_movies}
     for _, t in watched_ep_rows:
         watched_titles_dict[t.id] = t
@@ -1233,7 +1258,7 @@ async def get_user_stats(
         for g in t.generos:
             genres_dist[g.nombre] = genres_dist.get(g.nombre, 0) + 1
 
-    # 4. Top 5 por Popularidad (de los títulos vistos)
+    # 4. Top 5 por Popularidad y Calificación de la Comunidad (de los títulos vistos en la ventana)
     all_watched_title_ids = set(watched_titles_dict.keys())
     top_pop = []
     top_community = []
@@ -1285,15 +1310,16 @@ async def get_user_stats(
             for t in res_comm.scalars().all()
         ]
 
-    # 5. Top 5 por My Rating (reseñas con puntaje del propio usuario)
+    # 5. Top 5 por My Rating (reseñas con puntaje del propio usuario dentro de la ventana si aplica)
     q_user_rate = (
         select(Titulo, Resena.puntaje)
         .join(Resena, Resena.titulo_id == Titulo.id)
         .options(selectinload(Titulo.temporadas))
         .where(Resena.usuario_id == usuario_id, Resena.puntaje.isnot(None))
-        .order_by(desc(Resena.puntaje))
-        .limit(5)
     )
+    if since_date:
+        q_user_rate = q_user_rate.where(Resena.fecha >= since_date)
+    q_user_rate = q_user_rate.order_by(desc(Resena.puntaje)).limit(5)
     res_ur = await db.execute(q_user_rate)
     top_user_rate = [
         TopTitleStat(
@@ -1321,7 +1347,8 @@ async def get_user_stats(
         top_by_popularity=top_pop,
         top_by_community_rating=top_community,
         top_by_user_rating=top_user_rate,
-        genres_distribution=genres_dist
+        genres_distribution=genres_dist,
+        window=window
     )
 
 
@@ -1673,10 +1700,26 @@ async def get_recommendation_candidates(
     db: AsyncSession,
     prompt: str,
     usuario_id: Optional[int] = None,
-    tipo_filtro: Optional[str] = "all"
+    tipo_filtro: Optional[str] = "all",
+    clarification_context: Optional[dict] = None
 ) -> tuple[list[dict], Optional[dict]]:
     """Selecciona un pool inteligente y acotado (35-45 títulos) de candidatos relevantes de PostgreSQL."""
-    lower_prompt = prompt.lower()
+    # Si hay contexto de aclaración, enriquecer términos de búsqueda para resolver respuestas relativas
+    search_prompt = prompt
+    if clarification_context:
+        prev_p = clarification_context.get("previous_prompt", "")
+        suggs = clarification_context.get("suggestions", [])
+        lower_p = prompt.lower()
+        if any(w in lower_p for w in ("primera", "primero", "1", "first")) and len(suggs) >= 1:
+            search_prompt = f"{prompt} {suggs[0]}"
+        elif any(w in lower_p for w in ("segunda", "segundo", "2", "second")) and len(suggs) >= 2:
+            search_prompt = f"{prompt} {suggs[1]}"
+        elif any(w in lower_p for w in ("tercera", "tercero", "3", "third")) and len(suggs) >= 3:
+            search_prompt = f"{prompt} {suggs[2]}"
+        else:
+            search_prompt = f"{prompt} {prev_p} {' '.join(suggs)}"
+
+    lower_prompt = search_prompt.lower()
     user_ctx = await get_user_recommendation_context(db, usuario_id) if usuario_id else None
 
     # Detección de intenciones sobre títulos ya vistos
