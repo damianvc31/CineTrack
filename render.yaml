@@ -7,10 +7,13 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
+      # --- Runtime y Entorno ---
       - key: PYTHON_VERSION
-        value: 3.12.8
+        value: "3.12.8"
       - key: ENVIRONMENT
-        value: production
+        value: "production"
+
+      # --- Secretos y Conexiones (Cargar valores en el dashboard de Render) ---
       - key: DATABASE_URL
         sync: false
       - key: AUTH_SECRET_KEY
@@ -25,3 +28,79 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+
+      # --- Configuración Operativa de TMDB ---
+      - key: TMDB_BASE_URL
+        value: "https://api.themoviedb.org/3"
+      - key: TMDB_LANGUAGE
+        value: "en-US"
+      - key: TMDB_INGEST_MOVIES_TARGET
+        value: "1000"
+      - key: TMDB_INGEST_SERIES_TARGET
+        value: "1000"
+      - key: TMDB_MIN_VOTE_COUNT
+        value: "100"
+      - key: TMDB_CAST_LIMIT
+        value: "15"
+      - key: TMDB_CREW_WRITERS_LIMIT
+        value: "3"
+      - key: TMDB_DAILY_SYNC_DAYS_WINDOW
+        value: "15"
+      - key: TMDB_CHANGES_HOURS_WINDOW
+        value: "48"
+      - key: TMDB_DAILY_SYNC_POP_THRESHOLD
+        value: "10.0"
+      - key: TMDB_INGEST_PRIORITY
+        value: "popular_first"
+      - key: TMDB_REVIEWS_PER_TITLE_LIMIT
+        value: "20"
+      - key: TMDB_ALLOW_UNRELEASED
+        value: "false"
+
+      # --- Expansión de Catálogo TMDB (/discover por género) ---
+      - key: TMDB_EXPAND_MIN_VOTE_COUNT
+        value: "300"
+      - key: TMDB_EXPAND_MIN_VOTE_AVERAGE
+        value: "7.0"
+      - key: TMDB_EXPAND_TITLES_PER_GENRE
+        value: "50"
+
+      # --- Asistente IA y Recomendador Híbrido ---
+      - key: AI_RECOMMENDER_PRIMARY
+        value: "gemini"
+      - key: GEMINI_MODEL
+        value: "gemini-3.6-flash"
+      - key: GEMINI_FALLBACK_MODELS
+        value: "gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.8-flash"
+      - key: GROQ_MODEL
+        value: "openai/gpt-oss-120b"
+      - key: GROQ_FALLBACK_MODELS
+        value: "openai/gpt-oss-20b,groq/compound-mini,qwen/qwen3.8-27b"
+      - key: RECOMMENDATION_CANDIDATES_LIMIT
+        value: "20"
+
+      # --- Parámetros de Secciones y Pools de Home ---
+      - key: HOME_SECTION_SAMPLE_SIZE
+        value: "10"
+      - key: HOME_NEW_RELEASES_DAYS
+        value: "30"
+      - key: HOME_TRENDING_DAYS
+        value: "90"
+      - key: HOME_TRENDING_MIN_POPULARITY_PERCENTILE
+        value: "0.80"
+      - key: HOME_CLASSICS_MIN_YEARS
+        value: "20"
+      - key: HOME_CLASSICS_MIN_RATING
+        value: "7.5"
+      - key: HOME_CLASSICS_MIN_VOTES
+        value: "500"
+      - key: HOME_CLASSICS_POOL_SIZE
+        value: "50"
+      - key: HOME_TOP_RATED_MIN_VOTES
+        value: "100"
+      - key: HOME_TOP_RATED_POOL_SIZE
+        value: "100"
+      - key: HOME_GENRE_POOL_SIZE
+        value: "100"
+      - key: HOME_GENRE_MIN_TITLES_FOR_CAROUSEL
+        value: "10"
