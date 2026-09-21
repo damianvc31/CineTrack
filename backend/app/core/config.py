@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 from typing import Any
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -54,9 +55,14 @@ class Settings(BaseSettings):
                     abs_db_path = (root_dir / rel_path).resolve().as_posix()
                     return f"sqlite+aiosqlite:///{abs_db_path}"
 
-            # Normalizar sslmode=require para asyncpg (asyncpg espera ssl=require o parámetro ssl)
+            # Normalizar sslmode=require para asyncpg
             if "sslmode=require" in v:
                 v = v.replace("sslmode=require", "ssl=require")
+
+            # Remover parámetros no soportados por asyncpg (ej. channel_binding de Neon)
+            v = re.sub(r"[?&]channel_binding=[^&]+", "", v)
+            if "?" not in v and "&" in v:
+                v = v.replace("&", "?", 1)
         return v
 
     # Auth

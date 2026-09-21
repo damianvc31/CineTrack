@@ -4,6 +4,7 @@ from datetime import date, datetime
 import logging
 import os
 from pathlib import Path
+import re
 import sqlite3
 import sys
 import time
@@ -60,7 +61,11 @@ def normalize_postgres_url(url: str) -> str:
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     if "sslmode=require" in url:
         url = url.replace("sslmode=require", "ssl=require")
+    url = re.sub(r"[?&]channel_binding=[^&]+", "", url)
+    if "?" not in url and "&" in url:
+        url = url.replace("&", "?", 1)
     return url
+
 
 
 def transform_value(col_type: Any, val: Any) -> Any:
@@ -101,7 +106,15 @@ def transform_value(col_type: Any, val: Any) -> Any:
         except (ValueError, TypeError):
             return None
 
+    # Truncar cadenas que excedan el tamaño de la columna para evitar StringDataRightTruncationError
+    from sqlalchemy import String, Text
+    if isinstance(col_type, String) and not isinstance(col_type, Text):
+        max_len = getattr(col_type, "length", None)
+        if max_len and isinstance(val, str) and len(val) > max_len:
+            return val[:max_len]
+
     return val
+
 
 
 def get_sqlite_table_counts(sqlite_path: Path) -> dict[str, int]:
@@ -187,18 +200,25 @@ async def export_data(
         await conn.execute(text("DELETE FROM alembic_version;"))
         await conn.execute(text("INSERT INTO alembic_version (version_num) VALUES ('0004_composite_tmdb_id_tipo');"))
 
+        # Asegurar que titulos_elenco.personaje tenga capacidad de 500 chars si la tabla ya existía
+        try:
+            await conn.execute(text("ALTER TABLE titulos_elenco ALTER COLUMN personaje TYPE VARCHAR(500);"))
+        except Exception:
+            pass
+
         # 3. Truncar si se solicitó
         if truncate_target:
             logger.warning("Vaciando tablas destino (--truncate activado)...")
             reversed_tables = list(reversed(TABLE_EXPORT_ORDER))
-            truncate_query = "TRUNCATE TABLE " + ", ".join(reversed_tables) + " RESTART IDENTITY CASCADE;"
-            try:
-                await conn.execute(text(truncate_query))
-                logger.info("Tablas truncadas exitosamente.")
-            except Exception as e:
-                logger.warning(f"Truncate cascade falló ({e}), limpiando con DELETE...")
-                for t in reversed_tables:
-                    await conn.execute(text(f"DELETE FROM {t};"))
+            for t in reversed_tables:
+                try:
+                    await conn.execute(text(f"TRUNCATE TABLE {t} RESTART IDENTITY CASCADE;"))
+                except Exception:
+                    try:
+                        await conn.execute(text(f"DELETE FROM {t};"))
+                    except Exception:
+                        pass
+            logger.info("Tablas destino vaciadas y listas para inserción limpia.")
 
     # 4. Migración tabla por tabla en streaming
     sqlite_conn = sqlite3.connect(source_sqlite)

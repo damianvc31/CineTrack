@@ -13,7 +13,7 @@ titulos_elenco = Table(
     Base.metadata,
     Column("titulo_id", Integer, ForeignKey("titulos.id", ondelete="CASCADE"), primary_key=True),
     Column("actor_id", Integer, ForeignKey("actores.id", ondelete="CASCADE"), primary_key=True),
-    Column("personaje", String(150), nullable=True),
+    Column("personaje", String(500), nullable=True),
     Column("orden", Integer, default=0, nullable=False),
 )
 
