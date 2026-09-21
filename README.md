@@ -267,6 +267,72 @@ VITE_API_URL=http://localhost:8000/api/v1
 
 ---
 
-## 4. Estructura del Proyecto
+---
+
+## 5. Despliegue en Producción (Cloud PaaS: Render + Vercel + Neon + GitHub Actions)
+
+CineTrack está preparado para desplegarse en una infraestructura serverless/PaaS desacoplada, de alta disponibilidad y sin costo:
+
+```mermaid
+flowchart TD
+    User["👤 Usuario Final (Navegador / Móvil PWA)"] -->|HTTPS| Vercel["⚡ Vercel (Frontend React SPA)"]
+    Vercel -->|REST API / HTTPS| Render["🚀 Render.com (Backend FastAPI)"]
+    Cron["⏱️ GitHub Actions (Cron 03:00 UTC)"] -->|POST /api/v1/admin/sync/daily| Render
+    Render -->|asyncpg / SSL / pooler| Neon["🐘 Neon.tech (PostgreSQL Serverless)"]
+    Render -->|HTTP Requests| TMDB["🎬 TMDB API"]
+    Render -->|SDK / REST| AI["🤖 Google Gemini / Groq API"]
+```
+
+### Paso 1: Base de Datos en Neon.tech (PostgreSQL Serverless)
+1. Crear una cuenta gratuita en [Neon.tech](https://neon.tech) y crear un proyecto nuevo (ej. `cinetrack-db`).
+2. Copiar la cadena de conexión `DATABASE_URL` (formato `postgresql://usuario:password@ep-xyz.us-east-2.aws.neon.tech/cinetrack?sslmode=require`).
+3. **Migrar el catálogo local enriquecido** hacia Neon sin consumir cuota de TMDB ejecutando el script masivo:
+   ```powershell
+   cd backend
+   python -m app.jobs.export_to_postgres --target-url "postgresql://usuario:password@ep-xyz.us-east-2.aws.neon.tech/cinetrack?sslmode=require"
+   ```
+   *El script creará automáticamente las 12 tablas, normalizará tipos, sincronizará la revisión de Alembic, transferirá los datos en bloques y actualizará las secuencias PostgreSQL.*
+
+### Paso 2: Backend en Render.com (Web Service)
+1. Crear una cuenta en [Render.com](https://render.com) y conectar el repositorio de GitHub.
+2. Crear un **New Web Service**:
+   - **Root Directory:** `backend`
+   - **Runtime:** `Python` (detectará automáticamente `backend/.python-version` con Python 3.12)
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - **Health Check Path:** `/health`
+3. En la pestaña **Environment Variables** de Render, definir:
+   - `ENVIRONMENT`: `production`
+   - `DATABASE_URL`: tu URL de Neon (con `?sslmode=require`)
+   - `AUTH_SECRET_KEY`: clave secreta de 32+ caracteres para firmar JWT
+   - `ADMIN_API_KEY`: clave secreta para operaciones administrativas
+   - `BACKEND_CORS_ORIGINS`: URL de Vercel (ej. `https://cinetrack.vercel.app,http://localhost:5173`)
+   - `TMDB_API_KEY`: tu Read Access Token de TMDB
+   - `GEMINI_API_KEY`: tu API Key de Google AI Studio
+   - `GROQ_API_KEY`: tu API Key de Groq Cloud
+4. Desplegar el servicio y copiar la URL pública asignada (ej. `https://cinetrack-api.onrender.com`).
+   *Verificar salud en `https://cinetrack-api.onrender.com/health` $\rightarrow$ `{"status": "ok", "version": "1.0.0"}`.*
+
+### Paso 3: Frontend en Vercel (SPA React 19)
+1. Crear una cuenta en [Vercel](https://vercel.com) e importar el repositorio.
+2. En la configuración del proyecto:
+   - **Root Directory:** `frontend`
+   - **Framework Preset:** `Vite`
+3. En **Environment Variables** de Vercel:
+   - `VITE_API_URL`: URL del backend en Render (ej. `https://cinetrack-api.onrender.com/api/v1`)
+4. Desplegar. El archivo `frontend/vercel.json` gestiona automáticamente los rewrites para que la navegación cliente no devuelva 404 al recargar páginas.
+
+### Paso 4: Automatización de Sincronización Diaria (GitHub Actions)
+1. En el repositorio de GitHub, ir a **Settings $\rightarrow$ Secrets and variables $\rightarrow$ Actions**.
+2. Agregar los siguientes **Repository Secrets**:
+   - `PROD_API_URL`: URL raíz de tu backend en Render (ej. `https://cinetrack-api.onrender.com`)
+   - `ADMIN_API_KEY`: el mismo valor de `ADMIN_API_KEY` configurado en Render.
+3. El workflow `.github/workflows/daily_sync.yml` se disparará automáticamente todos los días a las **03:00 UTC (00:00 hora de Argentina)** para actualizar el catálogo vía `/changes` de TMDB y recalcular percentiles y ratings.
+4. También puede dispararse manualmente en cualquier momento desde la pestaña **Actions $\rightarrow$ CineTrack Daily TMDB Sync $\rightarrow$ Run workflow**.
+
+---
+
+## 6. Estructura del Proyecto
 
 Consultar [ARCHITECTURE.md](ARCHITECTURE.md) para el detalle del diseño técnico, [TASK_PLAN.md](TASK_PLAN.md) para el estado del desarrollo, y [ROADMAP.md](ROADMAP.md) para los hitos planificados.
+

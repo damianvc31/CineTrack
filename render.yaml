@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: cinetrack-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTH_SECRET_KEY
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: BACKEND_CORS_ORIGINS
+        sync: false
+      - key: TMDB_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

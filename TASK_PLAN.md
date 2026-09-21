@@ -134,12 +134,12 @@
     - [x] Suite de 71 tests en backend pasando al 100% y builds limpios en frontend.
 
   - [ ] **Fase 7: Despliegue a Producción y Entrega Final (v1.0.0)**
-    - [ ] Paso 7.1: Documentación de la arquitectura de despliegue en `ARCHITECTURE.md` y `README.md`.
-    - [ ] Paso 7.2: Script de migración y volcado de base de datos (`export_to_postgres.py`) para trasladar el catálogo local `cinetrack.db` a PostgreSQL en la nube.
-    - [ ] Paso 7.3: Aprovisionamiento de base de datos PostgreSQL Serverless en Neon.tech y verificación de conexión SSL (`DATABASE_URL`).
+    - [x] Paso 7.1: Documentación de la arquitectura de despliegue en `ARCHITECTURE.md` y `README.md`.
+    - [x] Paso 7.2: Script de migración y volcado de base de datos (`export_to_postgres.py`) para trasladar el catálogo local `cinetrack.db` a PostgreSQL en la nube (verificado con `--dry-run`).
+    - [ ] Paso 7.3: Aprovisionamiento de base de datos PostgreSQL Serverless en Neon.tech y volcado de datos.
     - [ ] Paso 7.4: Despliegue del backend FastAPI en Render.com (Web Service) y configuración de variables de entorno de producción.
     - [ ] Paso 7.5: Despliegue de la SPA React 19 en Vercel con variable `VITE_API_URL` apuntando al backend en Render.
-    - [ ] Paso 7.6: Configuración del workflow de sincronización diaria en GitHub Actions (`.github/workflows/daily_sync.yml`) invocando `POST /api/v1/admin/sync/daily`.
+    - [x] Paso 7.6: Configuración del workflow de sincronización diaria en GitHub Actions (`.github/workflows/daily_sync.yml`) invocando `POST /api/v1/admin/sync/daily`.
     - [ ] Paso 7.7: Validación funcional de extremo a extremo en entorno de producción (login, catálogo, reseñas, recomendador y cron).
     - [ ] Paso 7.8: Tag `v1.0.0` y preparación de documentación final para entrega del curso.
 

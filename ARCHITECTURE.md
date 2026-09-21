@@ -215,27 +215,33 @@ Para la puesta en producción y entrega final del proyecto, se adopta una **Arqu
 ### 6.1. Componentes del Despliegue
 
 1. **Base de Datos Gestionada (Neon.tech PostgreSQL):**
-   - Instancia serverless de PostgreSQL 16 con SSL nativo.
-   - Conexión asíncrona mediante `postgresql+asyncpg://` soportada nativamente por `config.py` y `db/session.py`.
-   - Inicialización mediante migraciones Alembic (`alembic upgrade head`) y volcado de catálogo desde el entorno de desarrollo.
+   - Instancia serverless de PostgreSQL 16 con SSL nativo y soporte de pooling PgBouncer.
+   - Conexión asíncrona mediante `postgresql+asyncpg://` con normalización automática de `sslmode=require` a `ssl=require`.
+   - Driver asyncpg configurado con `statement_cache_size=0`, `pool_pre_ping=True` y `pool_recycle=300` para tolerar la suspensión serverless y compatibilidad total con connection poolers.
+   - Script de migración masiva por lotes `export_to_postgres.py` para transferir los 3.800+ títulos y 525k+ episodios directamente desde el entorno de desarrollo sin consumir cuotas de API externa.
 
 2. **Backend API (Render.com Web Service):**
    - Vinculado al repositorio GitHub (`damianvc31/CineTrack`).
-   - **Build Command:** `pip install -r backend/requirements.txt`.
-   - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend`.
-   - **Variables de Entorno Clave:** `DATABASE_URL`, `TMDB_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, `AUTH_SECRET_KEY`, `ADMIN_API_KEY`, `AI_RECOMMENDER_PRIMARY`.
+   - Infraestructura como Código (Blueprint) mediante `render.yaml` y fijado de runtime vía `backend/.python-version` (Python 3.12).
+   - **Root Directory:** `backend`.
+   - **Build Command:** `pip install -r requirements.txt`.
+   - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+   - **Health Check:** `/health` (reporta versión `1.0.0`).
+   - **CORS Flexible:** Validador en `config.py` que soporta listas JSON o cadenas separadas por coma (`BACKEND_CORS_ORIGINS`).
 
 3. **Frontend SPA (Vercel):**
    - Vinculado al repositorio GitHub en el subdirectorio `frontend`.
+   - Reglas de rewrite en `frontend/vercel.json` para garantizar enrutamiento SPA client-side sin 404 al recargar.
    - **Build Command:** `npm run build` (Framework preset: Vite).
    - **Output Directory:** `dist`.
    - **Variable de Entorno:** `VITE_API_URL=https://cinetrack-api.onrender.com/api/v1`.
 
 4. **Sincronización Diaria Periódica (GitHub Actions Workflow):**
-   - Workflow desacoplado en `.github/workflows/daily_sync.yml`.
+   - Workflow desacoplado en `.github/workflows/daily_sync.yml` programado a las 03:00 UTC (00:00 hora de Argentina) y con soporte manual `workflow_dispatch`.
    - Ejecuta un `curl` diario enviando la cabecera `X-Admin-Key` al endpoint administrativo `/api/v1/admin/sync/daily`, el cual delega la ingesta a `fastapi.BackgroundTasks` y responde inmediatamente con `HTTP 202 Accepted`.
 
 ### 6.2. Fundamento Técnico de la Elección
 - **Simplicidad Operativa (KISS):** Elimina la necesidad de aprovisionar y mantener sistemas operativos Linux, túneles SSH, configuración de Nginx y certificados Let's Encrypt manuales.
 - **Contenerización Transparente:** Tanto Render como Vercel ejecutan la aplicación en contenedores Linux aislados y seguros por defecto, sin obligar al desarrollador a mantener `Dockerfile` ni consumir recursos locales de Docker Desktop.
 - **Integración Continua (CI/CD):** Todo cambio o fix commiteado y pusheado se compila, verifica y publica automáticamente en producción en menos de dos minutos.
+

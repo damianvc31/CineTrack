@@ -1,0 +1,51 @@
+name: CineTrack Daily TMDB Sync
+
+on:
+  schedule:
+    # 03:00 UTC = 00:00 Argentina (UTC-3)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      allow_unreleased:
+        description: 'Permitir títulos no estrenados (default: false)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  daily-sync:
+    name: Trigger Daily Sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Sync Request to Production Backend
+        env:
+          PROD_API_URL: ${{ secrets.PROD_API_URL }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          ALLOW_UNRELEASED: ${{ inputs.allow_unreleased || 'false' }}
+        run: |
+          if [ -z "$PROD_API_URL" ] || [ -z "$ADMIN_API_KEY" ]; then
+            echo "Error: PROD_API_URL o ADMIN_API_KEY secret no está configurado en GitHub Secrets."
+            exit 1
+          fi
+
+          # Eliminar barra final si existe
+          API_URL="${PROD_API_URL%/}"
+
+          echo "Disparando sincronización diaria en $API_URL/api/v1/admin/sync/daily..."
+
+          HTTP_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$API_URL/api/v1/admin/sync/daily" \
+            -H "X-Admin-Key: $ADMIN_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"allow_unreleased\": $ALLOW_UNRELEASED}")
+
+          echo "Código HTTP recibido: $HTTP_CODE"
+          echo "Respuesta del servidor:"
+          cat response.txt || true
+          echo ""
+
+          if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 202 ]; then
+            echo "Sincronización disparada exitosamente."
+          else
+            echo "Error: El servidor respondió con código HTTP $HTTP_CODE"
+            exit 1
+          fi

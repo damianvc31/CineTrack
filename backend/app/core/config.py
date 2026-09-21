@@ -1,16 +1,37 @@
 from pathlib import Path
-from pydantic import field_validator
+from typing import Any
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "CineTrack API"
-    VERSION: str = "0.1.0"
+    VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
     
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Any) -> list[str]:
+        if isinstance(v, str):
+            v_str = v.strip()
+            if not v_str:
+                return []
+            if v_str.startswith("[") and v_str.endswith("]"):
+                import json
+                try:
+                    parsed = json.loads(v_str)
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
+                except Exception:
+                    pass
+            return [item.strip() for item in v_str.split(",") if item.strip()]
+        elif isinstance(v, (list, tuple)):
+            return [str(item).strip() for item in v if str(item).strip()]
+        return v
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://usuario:password@localhost:5432/cinetrack"
@@ -19,8 +40,10 @@ class Settings(BaseSettings):
     @classmethod
     def validate_database_url(cls, v: str) -> str:
         if isinstance(v, str):
-            if v.startswith("postgresql://"):
-                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            if v.startswith("postgres://"):
+                v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif v.startswith("postgresql://"):
+                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
             elif v.startswith("sqlite"):
                 if not v.startswith("sqlite+aiosqlite://"):
                     v = v.replace("sqlite://", "sqlite+aiosqlite://", 1)
@@ -30,6 +53,10 @@ class Settings(BaseSettings):
                     root_dir = Path(__file__).resolve().parents[3]
                     abs_db_path = (root_dir / rel_path).resolve().as_posix()
                     return f"sqlite+aiosqlite:///{abs_db_path}"
+
+            # Normalizar sslmode=require para asyncpg (asyncpg espera ssl=require o parámetro ssl)
+            if "sslmode=require" in v:
+                v = v.replace("sslmode=require", "ssl=require")
         return v
 
     # Auth
@@ -82,6 +109,16 @@ class Settings(BaseSettings):
     HOME_TOP_RATED_POOL_SIZE: int = 100
     HOME_GENRE_POOL_SIZE: int = 100
     HOME_GENRE_MIN_TITLES_FOR_CAROUSEL: int = 10
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        if self.ENVIRONMENT == "production":
+            import logging
+            cfg_logger = logging.getLogger("config")
+            if self.AUTH_SECRET_KEY == "temporary-dev-secret-key-change-in-production":
+                cfg_logger.warning("ALERTA DE SEGURIDAD: AUTH_SECRET_KEY usa la clave insegura por defecto en entorno de producción.")
+            if self.ADMIN_API_KEY == "cinetrack-dev-admin-secret-key":
+                cfg_logger.warning("ALERTA DE SEGURIDAD: ADMIN_API_KEY usa la clave insegura por defecto en entorno de producción.")
+        return self
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env", ".env.local"),
