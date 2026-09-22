@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date, datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy import delete, func, or_, select
@@ -11,6 +13,7 @@ from app.models.titulo import Titulo
 from app.schemas.state import (
     EpisodeWatchResponse,
     FavoriteToggleResponse,
+    SeasonWatchResponse,
     StateChangeResponse,
     TitleUserStateResponse,
 )
@@ -502,8 +505,6 @@ async def toggle_season_watched(
     - Si falta al menos un episodio por ver: marca todos los episodios emitidos de la temporada como vistos.
     Recalcula automáticamente el estado de la serie (siguiendo, vista, etc.).
     """
-    from app.schemas.state import SeasonWatchResponse
-
     temp_res = await db.execute(
         select(Temporada).where(Temporada.id == temporada_id)
     )
