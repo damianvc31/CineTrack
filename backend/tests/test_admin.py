@@ -136,6 +136,15 @@ async def test_admin_sync_jobs_with_parameters(async_client: AsyncClient):
     assert resp_json.status_code == 202
     assert resp_json.json()["job"] == "import_json"
 
+    # Actor photos sync
+    resp_photos = await async_client.post(
+        "/api/v1/admin/sync/actor-photos",
+        json={"limit": 100},
+        headers=headers
+    )
+    assert resp_photos.status_code == 202
+    assert resp_photos.json()["job"] == "sync_actor_photos"
+
 
 @pytest.mark.asyncio
 async def test_admin_background_workers_execution(monkeypatch):

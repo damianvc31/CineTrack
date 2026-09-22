@@ -86,6 +86,15 @@ class ExpandCatalogRequest(BaseModel):
     )
 
 
+class ActorPhotosSyncRequest(BaseModel):
+    limit: Optional[int] = Field(
+        default=500, ge=1, le=10000, description="Límite máximo de actores sin foto a procesar (default: 500)"
+    )
+    actor_id: Optional[int] = Field(
+        default=None, description="Procesar un actor específico por ID local"
+    )
+
+
 # -------------------------------------------------------------------------
 # FUNCIONES WRAPPER PARA BACKGROUND TASKS
 # -------------------------------------------------------------------------
@@ -222,6 +231,18 @@ async def _run_job_expand(
             )
     except Exception as e:
         logger.error(f"[Job Background] Error en expansión de catálogo: {e}")
+    finally:
+        await client.close()
+
+
+async def _run_job_actor_photos(limit: Optional[int], actor_id: Optional[int]):
+    from app.jobs.populate_actor_photos import populate_actor_photos
+    client = TMDBClient()
+    try:
+        async with AsyncSessionLocal() as db:
+            await populate_actor_photos(limit=limit, actor_id=actor_id, db=db, client=client)
+    except Exception as e:
+        logger.error(f"[Job Background] Error en sincronización de fotos de actores: {e}")
     finally:
         await client.close()
 
@@ -392,6 +413,25 @@ async def trigger_expand_catalog(
     return JobResponse(
         job="expand_catalog",
         message=f"Expansión de catálogo iniciada en segundo plano para {genre_desc} (tipo: {payload.media_type})."
+    )
+
+
+@router.post("/sync/actor-photos", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def trigger_actor_photos_sync(
+    payload: Optional[ActorPhotosSyncRequest] = None,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    admin: Any = Depends(get_current_admin)
+) -> JobResponse:
+    """
+    Dispara la sincronización en segundo plano de fotos de actores desde TMDB,
+    priorizando los actores de títulos más populares.
+    """
+    limit = payload.limit if payload else 500
+    actor_id = payload.actor_id if payload else None
+    background_tasks.add_task(_run_job_actor_photos, limit=limit, actor_id=actor_id)
+    return JobResponse(
+        job="sync_actor_photos",
+        message=f"Sincronización de fotos de actores iniciada en background (límite: {limit or 'sin límite'})."
     )
 
 
