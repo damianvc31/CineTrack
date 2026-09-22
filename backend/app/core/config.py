@@ -89,6 +89,9 @@ class Settings(BaseSettings):
     TMDB_EXPAND_MIN_VOTE_AVERAGE: float = 7.0
     TMDB_EXPAND_TITLES_PER_GENRE: int = 50
 
+    # Ingesta de Fotos de Actores
+    TMDB_ACTOR_PHOTOS_LIMIT: int = 500
+
     # Admin Key para endpoints administrativos y automatizaciones
     ADMIN_API_KEY: str = "cinetrack-dev-admin-secret-key"
 

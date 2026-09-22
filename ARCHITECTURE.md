@@ -242,7 +242,7 @@ Para la puesta en producción y entrega final del proyecto, se adopta una **Arqu
 
 5. **Mantenimiento Mensual de Fotos de Elenco (GitHub Actions Workflow):**
    - Workflow en `.github/workflows/monthly_actor_photos.yml` programado el día 1 de cada mes a las 04:00 UTC con soporte de ejecución manual.
-   - Invoca `POST /api/v1/admin/sync/actor-photos?limit=250` autenticado con `X-Admin-Key` para mantener actualizados los retratos del reparto principal.
+   - Invoca `POST /api/v1/admin/sync/actor-photos` autenticado con `X-Admin-Key` procesando un lote de 500 actores (gobernado por la variable de entorno `TMDB_ACTOR_PHOTOS_LIMIT = 500`) para mantener actualizados los retratos del reparto principal.
 
 ### 6.2. Fundamento Técnico de la Elección
 - **Simplicidad Operativa (KISS):** Elimina la necesidad de aprovisionar y mantener sistemas operativos Linux, túneles SSH, configuración de Nginx y certificados Let's Encrypt manuales.

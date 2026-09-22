@@ -88,7 +88,7 @@ class ExpandCatalogRequest(BaseModel):
 
 class ActorPhotosSyncRequest(BaseModel):
     limit: Optional[int] = Field(
-        default=500, ge=0, description="Límite de actores sin foto a procesar. Enviar 0 o null para procesar todos sin límite (default: 500)"
+        default=None, ge=0, description="Límite de actores sin foto a procesar. Enviar 0 para sin límite, o null para usar TMDB_ACTOR_PHOTOS_LIMIT de config (default: 500)"
     )
     actor_id: Optional[int] = Field(
         default=None, description="Procesar un actor específico por ID local"
@@ -426,13 +426,21 @@ async def trigger_actor_photos_sync(
     Dispara la sincronización en segundo plano de fotos de actores desde TMDB,
     priorizando los actores de títulos más populares.
     """
-    raw_limit = payload.limit if payload is not None else 500
-    limit = None if (raw_limit == 0 or raw_limit is None) else raw_limit
+    raw_limit = payload.limit if payload is not None else None
+    if raw_limit == 0:
+        limit = 0
+        desc = "sin límite"
+    elif raw_limit is not None:
+        limit = raw_limit
+        desc = f"{limit}"
+    else:
+        limit = None  # populate_actor_photos usará settings.TMDB_ACTOR_PHOTOS_LIMIT
+        desc = f"config default ({settings.TMDB_ACTOR_PHOTOS_LIMIT})"
     actor_id = payload.actor_id if payload else None
     background_tasks.add_task(_run_job_actor_photos, limit=limit, actor_id=actor_id)
     return JobResponse(
         job="sync_actor_photos",
-        message=f"Sincronización de fotos de actores iniciada en background (límite: {limit or 'sin límite'})."
+        message=f"Sincronización de fotos de actores iniciada en background (límite: {desc})."
     )
 
 

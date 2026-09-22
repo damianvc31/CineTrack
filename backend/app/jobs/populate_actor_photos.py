@@ -6,6 +6,7 @@ from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.session import AsyncSessionLocal
 from app.models.actor import Actor, titulos_elenco
 from app.models.titulo import Titulo
@@ -19,7 +20,7 @@ logger = logging.getLogger("populate_actor_photos")
 
 
 async def populate_actor_photos(
-    limit: Optional[int] = 100,
+    limit: Optional[int] = None,
     actor_id: Optional[int] = None,
     batch_size: int = 20,
     db: Optional[AsyncSession] = None,
@@ -38,6 +39,7 @@ async def populate_actor_photos(
     async def _execute_with_session(session: AsyncSession):
         nonlocal total_updated, total_checked
 
+        effective_limit = settings.TMDB_ACTOR_PHOTOS_LIMIT if limit is None else limit
         query = select(Actor).where(Actor.tmdb_id.isnot(None))
         if actor_id:
             query = query.where(Actor.id == actor_id)
@@ -50,13 +52,14 @@ async def populate_actor_photos(
                 .group_by(Actor.id)
                 .order_by(func.coalesce(func.max(Titulo.popularidad), 0).desc(), Actor.id.asc())
             )
-            if limit is not None:
-                query = query.limit(limit)
+            if effective_limit and effective_limit > 0:
+                query = query.limit(effective_limit)
 
         res = await session.execute(query)
         actors = res.scalars().all()
 
-        logger.info(f"Encontrados {len(actors)} actores sin foto_url (límite: {limit or 'sin límite'}) para consultar en TMDB...")
+        limit_desc = f"{effective_limit}" if effective_limit and effective_limit > 0 else "sin límite"
+        logger.info(f"Encontrados {len(actors)} actores sin foto_url (límite: {limit_desc}) para consultar en TMDB...")
 
         for idx, actor in enumerate(actors, 1):
             total_checked += 1
@@ -95,13 +98,12 @@ async def populate_actor_photos(
 
 def main():
     parser = argparse.ArgumentParser(description="Poblar fotos de actores desde TMDB")
-    parser.add_argument("--limit", type=int, default=100, help="Límite de actores a procesar (default: 100, 0 o omitido para sin límite)")
+    parser.add_argument("--limit", type=int, default=None, help="Límite de actores a procesar (default: según TMDB_ACTOR_PHOTOS_LIMIT en config, 0 para sin límite)")
     parser.add_argument("--actor-id", type=int, default=None, help="Procesar un actor específico por ID local")
     parser.add_argument("--batch-size", type=int, default=20, help="Tamaño de lote para commits (default: 20)")
     args = parser.parse_args()
 
-    lim = args.limit if args.limit and args.limit > 0 else None
-    asyncio.run(populate_actor_photos(limit=lim, actor_id=args.actor_id, batch_size=args.batch_size))
+    asyncio.run(populate_actor_photos(limit=args.limit, actor_id=args.actor_id, batch_size=args.batch_size))
 
 
 if __name__ == "__main__":

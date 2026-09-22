@@ -9,7 +9,7 @@ on:
       limit:
         description: 'Límite de actores sin foto a procesar'
         required: false
-        default: '1000'
+        default: '500'
         type: string
 
 jobs:
@@ -21,7 +21,7 @@ jobs:
         env:
           PROD_API_URL: ${{ secrets.PROD_API_URL }}
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
-          LIMIT: ${{ inputs.limit || '1000' }}
+          LIMIT: ${{ inputs.limit || '500' }}
         run: |
           if [ -z "$PROD_API_URL" ] || [ -z "$ADMIN_API_KEY" ]; then
             echo "Error: PROD_API_URL o ADMIN_API_KEY secret no está configurado en GitHub Secrets."
