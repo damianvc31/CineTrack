@@ -240,6 +240,10 @@ Para la puesta en producción y entrega final del proyecto, se adopta una **Arqu
    - Workflow desacoplado en `.github/workflows/daily_sync.yml` programado a las 03:00 UTC (00:00 hora de Argentina) y con soporte manual `workflow_dispatch`.
    - Ejecuta un `curl` diario enviando la cabecera `X-Admin-Key` al endpoint administrativo `/api/v1/admin/sync/daily`, el cual delega la ingesta a `fastapi.BackgroundTasks` y responde inmediatamente con `HTTP 202 Accepted`.
 
+5. **Mantenimiento Mensual de Fotos de Elenco (GitHub Actions Workflow):**
+   - Workflow en `.github/workflows/monthly_actor_photos.yml` programado el día 1 de cada mes a las 04:00 UTC con soporte de ejecución manual.
+   - Invoca `POST /api/v1/admin/sync/actor-photos?limit=250` autenticado con `X-Admin-Key` para mantener actualizados los retratos del reparto principal.
+
 ### 6.2. Fundamento Técnico de la Elección
 - **Simplicidad Operativa (KISS):** Elimina la necesidad de aprovisionar y mantener sistemas operativos Linux, túneles SSH, configuración de Nginx y certificados Let's Encrypt manuales.
 - **Contenerización Transparente:** Tanto Render como Vercel ejecutan la aplicación en contenedores Linux aislados y seguros por defecto, sin obligar al desarrollador a mantener `Dockerfile` ni consumir recursos locales de Docker Desktop.

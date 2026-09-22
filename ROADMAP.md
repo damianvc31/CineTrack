@@ -48,11 +48,13 @@
   - Filtro de rango temporal en estadísticas de perfil, tarjetas de seguimiento con póster vertical 2:3, avatares de actores con iniciales completas, validación determinista de entradas ininteligibles, cancelación instantánea de peticiones en vuelo y flujo de repregunta interactivo (v0.9.4).
   - Endpoint `POST /api/v1/recommendations` con hidratación completa de `TitleCard`.
   - Pantalla dedicada `/recommendations` (`RecommendationsPage.tsx`), filtros temáticos y suite de 71 tests en backend.
-- [ ] **Fase 7: Despliegue a Producción y Entrega Final (v1.0.0)**
-  - Arquitectura PaaS cloud de costo cero (Render Web Service + Vercel Edge + Neon PostgreSQL).
-  - Script de migración y volcado del catálogo de desarrollo (`cinetrack.db`) a la base de datos PostgreSQL remota.
+- [x] **Fase 7: Despliegue a Producción y Entrega Final (v1.0.0)**
+  - Arquitectura PaaS cloud de costo cero (Render Web Service + Vercel Edge + Neon PostgreSQL 16 Serverless).
+  - Script de migración masiva y volcado del catálogo enriquecido (`export_to_postgres.py`) con 634k+ registros verificados.
+  - Ingesta masiva y sincronización de 25.116 fotos oficiales de actores (`populate_actor_photos.py`).
   - Sincronización diaria automatizada mediante GitHub Actions (`.github/workflows/daily_sync.yml`).
-  - Verificación funcional integral y documentación de entrega académica.
+  - Mantenimiento mensual programado de fotos de elenco (`.github/workflows/monthly_actor_photos.yml`).
+  - Verificación funcional integral, normalizaciones de conexión y documentación de entrega final.
 
 ---
 

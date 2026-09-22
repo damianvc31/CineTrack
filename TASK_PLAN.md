@@ -1,6 +1,6 @@
 # TASK_PLAN.md — Plan de Trabajo Activo: CineTrack
 
-## Hito Actual: Fase 3 — Autenticación y Motor de Estados de Título (Completada)
+## Hito Actual: Fase 7 — Despliegue a Producción y Entrega Final (v1.0.0) — En Curso
 
 - [x] **Fase 1:** Scaffolding inicial y smoke tests en verde (v0.1.0).
 - [x] **Fase 2:** Persistencia y modelos relacionales completos en SQLAlchemy 2.0 (v0.2.0).
@@ -137,11 +137,12 @@
     - [x] Paso 7.1: Documentación de la arquitectura de despliegue en `ARCHITECTURE.md` y `README.md`.
     - [x] Paso 7.2: Script de migración y volcado de base de datos (`export_to_postgres.py`) para trasladar el catálogo local `cinetrack.db` a PostgreSQL en la nube (verificado con `--dry-run`).
     - [x] Paso 7.3: Aprovisionamiento de base de datos PostgreSQL Serverless en Neon.tech y volcado masivo exitoso (634.107 registros verificados).
-    - [ ] Paso 7.4: Despliegue del backend FastAPI en Render.com (Web Service) y configuración de variables de entorno de producción.
-    - [ ] Paso 7.5: Despliegue de la SPA React 19 en Vercel con variable `VITE_API_URL` apuntando al backend en Render.
-    - [x] Paso 7.6: Configuración del workflow de sincronización diaria en GitHub Actions (`.github/workflows/daily_sync.yml`) invocando `POST /api/v1/admin/sync/daily`.
+    - [x] Paso 7.3b: Ingesta masiva y sincronización de 25.116 fotos oficiales de actores (`populate_actor_photos.py`) y ampliación `String(500)` de roles de elenco.
+    - [ ] Paso 7.4: Despliegue del backend FastAPI en Render.com (Web Service vía Blueprint `render.yaml`) y configuración de variables de entorno de producción.
+    - [ ] Paso 7.5: Despliegue de la SPA React 19 en Vercel con variable `VITE_API_URL` apuntando al backend en Render y reglas `vercel.json`.
+    - [x] Paso 7.6: Creación de workflows de automatización en GitHub Actions: sincronización diaria (`daily_sync.yml`) y mantenimiento mensual de fotos de elenco (`monthly_actor_photos.yml`).
     - [ ] Paso 7.7: Validación funcional de extremo a extremo en entorno de producción (login, catálogo, reseñas, recomendador y cron).
-    - [ ] Paso 7.8: Tag `v1.0.0` y preparación de documentación final para entrega del curso.
+    - [ ] Paso 7.8: Tag formal `v1.0.0` y cierre de entrega del proyecto.
 
 ---
 

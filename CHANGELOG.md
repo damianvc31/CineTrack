@@ -2,6 +2,32 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.0.0] - 2026-09-21
+### Agregado & Despliegue a Producción (Hito Final)
+- **Infraestructura Cloud Desacoplada de Costo Cero:**
+  - **Base de Datos Gestionada (Neon.tech PostgreSQL 16 Serverless):**
+    - Despliegue en AWS Ohio con pooling nativo PgBouncer y cifrado SSL obligatorio.
+    - Script de migración masiva por lotes (`backend/app/jobs/export_to_postgres.py`) para transferir el catálogo completo de desarrollo (3.851 títulos, 525.972 episodios, 29.777 actores, 8.935 reseñas) en menos de 4 minutos, con re-sincronización de secuencias e integridad referencial.
+    - Configuración asíncrona de base de datos (`session.py`) adaptada para connection poolers y tolerancia a suspensión serverless (`statement_cache_size=0`, `pool_pre_ping=True`, `pool_recycle=300`).
+  - **Backend API (Render.com Web Service):**
+    - Despliegue automatizado con Blueprint declarativo (`render.yaml`) y runtime fijado en Python 3.12.8 (`backend/.python-version`).
+    - Health check `/health` reportando estado operacional y versión de producción `1.0.0`.
+    - Normalizador de cadenas de conexión en `config.py` para conversión transparente de esquemas (`postgres://` a `postgresql+asyncpg://`, `sslmode=require` a `ssl=require`) y sanitización regex de parámetros no soportados (`channel_binding=require`).
+    - Validador flexible de orígenes CORS (`assemble_cors_origins`) para soportar listas JSON o dominios separados por coma.
+  - **Frontend SPA (Vercel):**
+    - Despliegue desacoplado en el edge con React 19, TypeScript y Vite.
+    - Reglas de reescritura client-side en `frontend/vercel.json` para garantizar enrutamiento SPA sin errores 404 al recargar el navegador.
+  - **Automatización Desacoplada (GitHub Actions):**
+    - Workflow diario `.github/workflows/daily_sync.yml` programado a las 03:00 UTC (00:00 hora de Argentina) para actualización de cartelera y cambios de catálogo vía `POST /api/v1/admin/sync/daily`.
+    - Workflow mensual `.github/workflows/monthly_actor_photos.yml` programado el primer día de cada mes a las 04:00 UTC para ingesta periódica de fotos de actores vía `POST /api/v1/admin/sync/actor-photos`.
+- **Mejoras y Resiliencia en Ingesta de Datos:**
+  - **Ingesta Masiva y Priorizada de Fotos de Actores (`populate_actor_photos.py`):**
+    - Priorización automática de actores con roles destacados en los títulos de mayor popularidad del catálogo.
+    - Soporte para ejecución sin límite (`limit=0` o `null`) y exposición como endpoint administrativo HTTP `POST /api/v1/admin/sync/actor-photos`.
+    - Sincronización masiva de 25.116 fotos oficiales de actores en el catálogo de producción.
+  - **Ampliación de Longitud de Personajes de Elenco:**
+    - Expansión de columna `personaje` en `titulos_elenco` a `String(500)` para alojar roles múltiples y acreditaciones complejas sin truncamiento.
+
 ## [v0.9.4] - 2026-09-18
 ### Corregido & Mejorado
 - **Perfil de Usuario: Ventana Temporal en Estadísticas y Rediseño de Siguiendo:**
