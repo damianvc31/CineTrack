@@ -156,11 +156,21 @@ async def test_list_titles_with_filters_and_search(async_client: AsyncClient, sa
     assert data_act_str["total"] == 1
     assert data_act_str["items"][0]["nombre"] == "Top Gun"
 
-    # 7. Filtro por sección (section=top_rated)
+    # 7. Filtro por sección (section=top_rated) y ordenamiento dentro del pool
     res_sec_tr = await async_client.get("/api/v1/titles?section=top_rated")
     assert res_sec_tr.status_code == 200
     data_sec_tr = res_sec_tr.json()
-    assert data_sec_tr["total"] >= 1
+    assert data_sec_tr["total"] >= 2
+    # Por defecto, el pool de top_rated se ordena por rating descendente (Breaking Bad 8.9 > Top Gun 8.3)
+    assert data_sec_tr["items"][0]["nombre"] == "Breaking Bad"
+    assert data_sec_tr["items"][1]["nombre"] == "Top Gun"
+
+    # Ordenamiento por popularidad ascendente dentro del pool de top_rated (Top Gun 150.0 < Breaking Bad 250.0)
+    res_sec_tr_pop_asc = await async_client.get("/api/v1/titles?section=top_rated&sort_by=popularity&order=asc")
+    assert res_sec_tr_pop_asc.status_code == 200
+    data_sec_tr_pop_asc = res_sec_tr_pop_asc.json()
+    assert data_sec_tr_pop_asc["items"][0]["nombre"] == "Top Gun"
+    assert data_sec_tr_pop_asc["items"][1]["nombre"] == "Breaking Bad"
 
     # 8. Filtro por sección (section=new_releases) con ordenamiento (sort_by=popularity)
     res_sec_nr = await async_client.get("/api/v1/titles?section=new_releases&sort_by=popularity")

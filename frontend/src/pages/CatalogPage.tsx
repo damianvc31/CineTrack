@@ -28,7 +28,8 @@ export const CatalogPage: React.FC = () => {
   const tipo = (searchParams.get('tipo') as 'movie' | 'tv') || undefined
   const section = (searchParams.get('section') as any) || undefined
   const actor = searchParams.get('actor') || undefined
-  const sortBy = (searchParams.get('sort_by') as any) || 'popularity'
+  const rawSort = searchParams.get('sort_by')
+  const sortBy = (rawSort as any) || (section === 'top_rated' ? 'rating' : section === 'new_releases' ? 'release_date' : 'popularity')
   const order = (searchParams.get('order') as any) || 'desc'
   const page = parseInt(searchParams.get('page') || '1', 10)
 
