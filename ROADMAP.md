@@ -48,13 +48,22 @@
   - Filtro de rango temporal en estadísticas de perfil, tarjetas de seguimiento con póster vertical 2:3, avatares de actores con iniciales completas, validación determinista de entradas ininteligibles, cancelación instantánea de peticiones en vuelo y flujo de repregunta interactivo (v0.9.4).
   - Endpoint `POST /api/v1/recommendations` con hidratación completa de `TitleCard`.
   - Pantalla dedicada `/recommendations` (`RecommendationsPage.tsx`), filtros temáticos y suite de 71 tests en backend.
-- [x] **Fase 7: Despliegue a Producción y Entrega Final (v1.0.0)**
+- [x] **Fase 7: Despliegue a Producción y Entrega Final (v1.0.0 - v1.0.2)**
   - Arquitectura PaaS cloud de costo cero (Render Web Service + Vercel Edge + Neon PostgreSQL 16 Serverless).
   - Script de migración masiva y volcado del catálogo enriquecido (`export_to_postgres.py`) con 634k+ registros verificados.
   - Ingesta masiva y sincronización de 25.116 fotos oficiales de actores (`populate_actor_photos.py`).
   - Sincronización diaria automatizada mediante GitHub Actions (`.github/workflows/daily_sync.yml`).
   - Mantenimiento mensual programado de fotos de elenco (`.github/workflows/monthly_actor_photos.yml`).
   - Verificación funcional integral, normalizaciones de conexión y documentación de entrega final.
+
+### Fase 8: Optimización de Rendimiento y Recomendador de Próxima Generación
+- [ ] **Optimización de Latencia y Rendimiento en Home (`GET /api/v1/home`):**
+  - Diagnóstico de cuellos de botella en la composición de carruseles múltiples (Trending, New Releases, Classics, Top Rated y By Genre).
+  - Estrategias de paralelización asíncrona de consultas (`asyncio.gather`), optimización de índices en PostgreSQL / Neon, y posible caché en memoria / TTL para colecciones de Home.
+- [ ] **Evolución y Robustecimiento Integral del Recomendador:**
+  - **Calibración del Validador Determinista:** Ajustar o rediseñar el validador previo para eliminar falsos positivos (garantizando que nunca rechace prompts legítimos ni sugerencias predefinidas en ningún idioma).
+  - **Búsqueda Semántica Vectorial con Embeddings:** Evaluar e incorporar búsqueda por similitud vectorial (vía embeddings y `pgvector` / modelo semántico) para enriquecer el emparejamiento con el catálogo.
+  - **Control de Precisión y Feedback al Usuario:** Garantizar que consultas ricas devuelvan recomendaciones de alta fidelidad, y ante consultas insuficientes o confusas, el sistema informe con claridad, pida aclaraciones orientadas o sugiera la mejor aproximación disponible.
 
 ---
 
