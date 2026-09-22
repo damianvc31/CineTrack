@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     
     # CORS
-    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    BACKEND_CORS_ORIGINS: list[str] | str = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
