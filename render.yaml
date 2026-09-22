@@ -100,9 +100,9 @@ services:
       - key: HOME_CLASSICS_MIN_VOTES
         value: "500"
       - key: HOME_CLASSICS_POOL_SIZE
-        value: "50"
-      - key: HOME_TOP_RATED_MIN_VOTES
         value: "100"
+      - key: HOME_TOP_RATED_MIN_VOTES
+        value: "500"
       - key: HOME_TOP_RATED_POOL_SIZE
         value: "100"
       - key: HOME_GENRE_POOL_SIZE

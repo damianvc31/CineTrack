@@ -27,6 +27,10 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
     - Sincronización masiva de 25.116 fotos oficiales de actores en el catálogo de producción.
   - **Ampliación de Longitud de Personajes de Elenco:**
     - Expansión de columna `personaje` en `titulos_elenco` a `String(500)` para alojar roles múltiples y acreditaciones complejas sin truncamiento.
+- **Ajustes de Catálogo y Reglas de Negocio:**
+  - Ampliación del pool de clásicos en Home (`HOME_CLASSICS_POOL_SIZE = 100`) y elevación del umbral mínimo de votos en Top Rated a 500 (`HOME_TOP_RATED_MIN_VOTES = 500`).
+  - Acotamiento estricto de la sección *Top Rated* en el catálogo (`/catalog?section=top_rated`) a los 100 títulos mejor calificados históricos (`HOME_TOP_RATED_POOL_SIZE = 100`), ordenados por puntuación unificada descendente.
+  - Saneamiento de `docs/CATALOG_SPECS.md` retirando la sección residual "Others" para mantener alineación total con la experiencia en producción.
 
 ## [v0.9.4] - 2026-09-18
 ### Corregido & Mejorado

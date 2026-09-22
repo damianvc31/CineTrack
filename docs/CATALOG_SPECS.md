@@ -12,10 +12,9 @@ La pantalla principal (`GET /api/v1/home`) presenta colecciones curadas para des
 |---|---|---|---|---|---|---|
 | **New Releases** | Últimos 30 días (`fecha_estreno >= hoy - 30d`) | Sin mínimo | N/A (directo) | Top 10 | `fecha_estreno DESC, popularidad DESC` | Sí (`/titles?section=new_releases`) |
 | **Trending** | Últimos 90 días (`fecha_estreno` o último episodio) | Percentil de popularidad $\ge 80\%$ (`popularidad_percentil >= 0.80`) | N/A (directo) | Top 10 | `popularidad DESC` | Sí (`/titles?section=trending`) |
-| **Classics** | Antigüedad > 20 años (`fecha_estreno <= año_actual - 20`) | `rating >= 7.5` y $\ge 500$ votos | Top 50 más populares | Muestra aleatoria de 10 | `popularidad DESC` (en pool) | Sí (`/titles?section=classics`) |
-| **Top Rated** | Todo el catálogo histórico | Votos $\ge 100$ | Top 100 con mayor rating | Muestra aleatoria de 10 | `rating_unificado DESC, votos DESC` | Sí (`/titles?section=top_rated`) |
+| **Classics** | Antigüedad > 20 años (`fecha_estreno <= año_actual - 20`) | `rating >= 7.5` y $\ge 500$ votos | Top 100 más populares | Muestra aleatoria de 10 | `popularidad DESC` (en pool) | Sí (`/titles?section=classics`) |
+| **Top Rated** | Todo el catálogo histórico | Votos $\ge 500$ (`HOME_TOP_RATED_MIN_VOTES`) | Top 100 con mayor rating | Muestra aleatoria de 10 | `rating_unificado DESC, votos DESC` | Sí (`/titles?section=top_rated`, acotado a los Top 100) |
 | **By Genre** | Por cada género con $\ge 10$ títulos | Sin restricción | Top 100 del género | Muestra aleatoria de 10 por género | `popularidad DESC` | Sí (`/titles?genero=Nombre` o `genero_id=X`) |
-| **Others** | Consolidado de géneros con $< 10$ títulos | Sin restricción | Top 100 géneros minoritarios | Muestra aleatoria de 10 | `popularidad DESC` | Sí (`/titles?section=others`) |
 
 ### 1.1. Reglas Específicas por Sección
 
@@ -28,13 +27,13 @@ La pantalla principal (`GET /api/v1/home`) presenta colecciones curadas para des
 3. **Classics:**
    - **Exclusivo de películas:** Si el usuario selecciona el toggle `tipo=tv`, la sección devuelve una lista vacía `[]`.
    - Requiere superar un umbral exigente de consagración: rating unificado $\ge 7.5$ (`HOME_CLASSICS_MIN_RATING`) y al menos 500 votos registrados (`HOME_CLASSICS_MIN_VOTES`).
-   - De las 50 películas clásicas más populares, se selecciona una muestra aleatoria de 10 cada vez para dar dinamismo a la Home.
+   - Del pool de las 100 películas clásicas más populares (`HOME_CLASSICS_POOL_SIZE = 100`), se selecciona una muestra aleatoria de 10 cada vez para dar dinamismo a la Home.
 4. **Top Rated:**
    - Reemplaza el concepto de "Recomendados generales" previo al motor de IA.
-   - Requiere un mínimo de 100 votos (`HOME_TOP_RATED_MIN_VOTES`) para evitar sesgos de obras con calificaciones perfectas pero un solo voto.
-5. **By Genre y Carrusel "Others":**
-   - Si un género tiene $\ge 10$ títulos en la base (`HOME_GENRE_MIN_TITLES_FOR_CAROUSEL`), se renderiza en su propio carrusel horizontal.
-   - Los géneros de nicho que no alcanzan los 10 títulos no se descartan: se agrupan ordenados por popularidad en el carrusel de **Others**.
+   - Requiere un mínimo de 500 votos (`HOME_TOP_RATED_MIN_VOTES = 500`) para evitar sesgos de obras con calificaciones perfectas pero pocos votos.
+   - En el catálogo (`/catalog?section=top_rated`), la sección está acotada estrictamente a los 100 títulos mejor puntuados del catálogo (`HOME_TOP_RATED_POOL_SIZE = 100`), ordenados por calificación unificada descendente.
+5. **By Genre:**
+   - Si un género tiene $\ge 10$ títulos en la base (`HOME_GENRE_MIN_TITLES_FOR_CAROUSEL`), se renderiza en su propio carrusel horizontal con una muestra de hasta 10 títulos del pool de los 100 más populares de dicho género.
 
 ### 1.2. Regla Transversal: Preservación de Títulos en Home
 - Los títulos ya vistos (`vista`) o en seguimiento (`siguiendo`) **se preservan en todos los carruseles de Home** con sus respectivos indicadores visuales y badges, evitando vaciar o desvirtuar las colecciones curadas (*Trending, New Releases, Classics, etc.*).

@@ -275,6 +275,10 @@ async def get_titles(
         else:
             effective_sort = "popularity"
 
+    # Si la sección activa es top_rated y no se eligió un orden específico distinto, ordenar por rating
+    if active_section == "top_rated" and sort_by in (None, "popularity"):
+        effective_sort = "rating"
+
     today = date.today()
     if active_section == "new_releases":
         nr_cutoff = today - timedelta(days=settings.HOME_NEW_RELEASES_DAYS)
@@ -357,12 +361,24 @@ async def get_titles(
     # Paginación
     count_query = select(func.count()).select_from(query.subquery())
     total_res = await db.execute(count_query)
-    total = total_res.scalar() or 0
+    raw_total = total_res.scalar() or 0
+
+    if active_section == "top_rated":
+        max_top = settings.HOME_TOP_RATED_POOL_SIZE
+        total = min(raw_total, max_top)
+    else:
+        total = raw_total
 
     offset = (page - 1) * page_size
-    query = query.offset(offset).limit(page_size)
-    res = await db.execute(query)
-    titulos = res.scalars().all()
+    if active_section == "top_rated" and offset >= total:
+        titulos = []
+    else:
+        current_limit = page_size
+        if active_section == "top_rated" and offset + page_size > total:
+            current_limit = max(0, total - offset)
+        query = query.offset(offset).limit(current_limit)
+        res = await db.execute(query)
+        titulos = res.scalars().all()
 
     # Cargar estados de usuario y calificaciones si está autenticado
     user_states_map = {}
