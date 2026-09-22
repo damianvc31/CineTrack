@@ -339,7 +339,7 @@ async def get_titles(
             .limit(settings.HOME_TOP_RATED_POOL_SIZE)
             .scalar_subquery()
         )
-        query = select(Titulo).where(Titulo.id.in_(top_100_subq))
+        query = query.where(Titulo.id.in_(top_100_subq))
 
     # 2. Ordenamiento puro (criterio + dirección)
     is_asc = order.lower() == "asc"

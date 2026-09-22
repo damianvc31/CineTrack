@@ -2,12 +2,13 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
-## [v1.0.1] - 2026-09-22
+## [v1.0.2] - 2026-09-22
 ### Corregido
 - **Ordenamiento Multicriterio en Sección Top Rated:**
   - Definición arquitectónica del pool de `section=top_rated` como subconsulta estricta de los 100 títulos mejor calificados (`rating_unificado DESC, vote_count_tmdb DESC LIMIT 100`).
   - Habilitación del ordenamiento secundario (`sort_by=popularity`, `release_date`, `title`) directamente sobre dicho pool de 100 títulos consagrados, resolviendo el bug donde el backend anulaba la selección forzándola a rating.
   - Sincronización del selector de orden en `CatalogPage.tsx` para mostrar "Calificación" por defecto al entrar a la sección y permitir la alternancia fluida a "Popularidad".
+  - Preservación de opciones de carga ansiosa (`selectinload` para géneros y temporadas) al aplicar el filtro de subconsulta sobre `Titulo.id`, solucionando el error 500 (`MissingGreenlet`) al serializar tarjetas de títulos.
   - Cobertura de tests unitarios específicos en `backend/tests/test_catalog.py`.
 
 ## [v1.0.0] - 2026-09-21
