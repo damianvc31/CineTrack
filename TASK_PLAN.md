@@ -1,6 +1,6 @@
 # TASK_PLAN.md — Plan de Trabajo Activo: CineTrack
 
-## Hito Actual: Fase 7 — Despliegue a Producción y Entrega Final (v1.0.0) — En Curso
+## Hito Actual: Fase 8 — Robustecimiento y Calidad del Recomendador con IA (Pre-Entrega)
 
 - [x] **Fase 1:** Scaffolding inicial y smoke tests en verde (v0.1.0).
 - [x] **Fase 2:** Persistencia y modelos relacionales completos en SQLAlchemy 2.0 (v0.2.0).
@@ -133,25 +133,44 @@
     - [x] Limpieza completa y aborto de peticiones al iniciar o cerrar sesión desde cualquier punto de la aplicación.
     - [x] Suite de 71 tests en backend pasando al 100% y builds limpios en frontend.
 
-  - [ ] **Fase 7: Despliegue a Producción y Entrega Final (v1.0.0)**
+  - [x] **Fase 7: Despliegue a Producción y Entrega Final (v1.0.0 - v1.0.2)**
     - [x] Paso 7.1: Documentación de la arquitectura de despliegue en `ARCHITECTURE.md` y `README.md`.
     - [x] Paso 7.2: Script de migración y volcado de base de datos (`export_to_postgres.py`) para trasladar el catálogo local `cinetrack.db` a PostgreSQL en la nube (verificado con `--dry-run`).
     - [x] Paso 7.3: Aprovisionamiento de base de datos PostgreSQL Serverless en Neon.tech y volcado masivo exitoso (634.107 registros verificados).
     - [x] Paso 7.3b: Ingesta masiva y sincronización de 25.116 fotos oficiales de actores (`populate_actor_photos.py`) y ampliación `String(500)` de roles de elenco.
-    - [ ] Paso 7.4: Despliegue del backend FastAPI en Render.com (Web Service vía Blueprint `render.yaml`) y configuración de variables de entorno de producción.
-    - [ ] Paso 7.5: Despliegue de la SPA React 19 en Vercel con variable `VITE_API_URL` apuntando al backend en Render y reglas `vercel.json`.
+    - [x] Paso 7.4: Despliegue del backend FastAPI en Render.com (Web Service vía Blueprint `render.yaml`) y configuración de variables de entorno de producción.
+    - [x] Paso 7.5: Despliegue de la SPA React 19 en Vercel con variable `VITE_API_URL` apuntando al backend en Render y reglas `vercel.json`.
     - [x] Paso 7.6: Creación de workflows de automatización en GitHub Actions: sincronización diaria (`daily_sync.yml`) y mantenimiento mensual de fotos de elenco (`monthly_actor_photos.yml`).
-    - [ ] Paso 7.7: Validación funcional de extremo a extremo en entorno de producción (login, catálogo, reseñas, recomendador y cron).
-    - [ ] Paso 7.8: Tag formal `v1.0.0` y cierre de entrega del proyecto.
+    - [x] Paso 7.7: Validación funcional de extremo a extremo en entorno de producción (login, catálogo, reseñas, recomendador y cron).
+    - [x] Paso 7.8: Tags formales `v1.0.0`, `v1.0.1` y `v1.0.2` generados y pusheados a GitHub.
 
 ---
 
-## Próximos Hitos (Versión Superior / Post-Entrega):
-- [ ] **Recomendador Avanzado con Búsqueda Semántica Vectorial:**
-  - [ ] Generación de embeddings con `fastembed` (CPU) o Google Text-Embedding API.
-  - [ ] Búsqueda por similitud de coseno con `pgvector` en PostgreSQL.
-- [ ] **Sistema de Notificaciones In-App:**
-  - [ ] Avisos de cambio de status de series en listas del usuario (renovación, cancelación, finalización, hiatus).
-  - [ ] Alertas y transición automática a "Siguiendo" cuando una serie en "Vista" estrena nueva temporada/episodios.
+## Hito Actual: Fase 8 — Robustecimiento y Calidad del Recomendador con IA (Pre-Entrega)
+- [ ] **Paso 8.1: Diagnóstico y calibración del Validador Previo (`is_unintelligible_prompt`):**
+  - Identificar la causa de falsos positivos en prompts sugeridos/predefinidos en español e inglés (ej. "Películas de atracos...", "Obras fascinantes sobre bucles temporales...").
+  - Rediseñar el validador para que solo filtre basura evidente (teclado machacado, gibberish, caracteres de control) sin rechazar oraciones estructuradas con lenguaje cinematográfico natural.
+- [ ] **Paso 8.2: Calidad de Recomendación y Tratamiento de Prompts Ambigüos/Vagos:**
+  - Ante consultas de alta calidad, asegurar recomendaciones ricas, coherentes y justificadas en afinidad semántica.
+  - Ante consultas pobres, ambiguas o que no arrojen coincidencias claras, responder de forma transparente y útil (pidiendo aclaración o sugiriendo la mejor alternativa posible del catálogo).
+- [ ] **Paso 8.3: Evaluación e Integración de Búsqueda Semántica Vectorial con Embeddings (RAG):**
+  - Analizar viabilidad y arquitectura de embeddings (modelo local ligero en CPU o Google Text-Embedding API + similitud de coseno en BD/memoria).
+  - Integrar el paso de recuperación semántica previa al grounding del LLM para elevar sustancialmente la precisión de los títulos candidatos.
+- [ ] **Paso 8.4: Suite de Pruebas Automatizadas y Validación E2E:**
+  - Tests unitarios y de integración para prompts predefinidos, multilingües y casos límite.
+  - Verificación en local y en producción (Render/Vercel).
+
+---
+
+## Próximos Hitos:
+### Fase 9: Optimización de Rendimiento y Latencia en Home
+- [ ] Diagnóstico de cuellos de botella en la composición de carruseles múltiples (`GET /api/v1/home`).
+- [ ] Paralelización asíncrona de consultas (`asyncio.gather`), optimización de índices en PostgreSQL / Neon, y posible caché en memoria / TTL para colecciones de Home.
+
+### Backlog / Versión Superior (Post-Entrega):
+- [ ] Sistema de notificaciones in-app para estrenos y cambios de status en series.
+- [ ] Badge visual "Viendo Actualmente" (🔥).
+- [ ] Soporte multirregión para plataformas de streaming (JustWatch / TMDB Watch Providers).
+- [ ] Selector de idioma para títulos y sinopsis.
 
 

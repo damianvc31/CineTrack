@@ -56,14 +56,19 @@
   - Mantenimiento mensual programado de fotos de elenco (`.github/workflows/monthly_actor_photos.yml`).
   - Verificación funcional integral, normalizaciones de conexión y documentación de entrega final.
 
-### Fase 8: Optimización de Rendimiento y Recomendador de Próxima Generación
-- [ ] **Optimización de Latencia y Rendimiento en Home (`GET /api/v1/home`):**
+### Fase 8: Robustecimiento y Calidad del Recomendador con IA (Hito Académico / Pre-Entrega)
+- [ ] **Corrección Integral del Validador Previo de Entrada:**
+  - Calibrar o rediseñar `is_unintelligible_prompt` para erradicar falsos positivos (garantizando que nunca rechace prompts legítimos, sugerencias predefinidas en español o inglés ni consultas temáticas extensas).
+- [ ] **Manejo de Calidad de Recomendación y Feedback:**
+  - Ante un prompt claro y bien definido, garantizar recomendaciones de alta precisión y afinidad cinematográfica.
+  - Ante un prompt vago, confuso o insuficiente, informar con claridad al usuario que no se puede brindar una recomendación exacta, solicitando aclaraciones orientadas o sugiriendo la mejor alternativa disponible.
+- [ ] **Búsqueda Semántica Vectorial con Embeddings (RAG):**
+  - Evaluar e integrar modelo de embeddings y búsqueda por similitud vectorial (enriqueciendo el emparejamiento semántico del catálogo sin comprometer tiempos de respuesta).
+
+### Fase 9: Optimización de Rendimiento y Latencia en Home
+- [ ] **Optimización de Latencia en Home (`GET /api/v1/home`):**
   - Diagnóstico de cuellos de botella en la composición de carruseles múltiples (Trending, New Releases, Classics, Top Rated y By Genre).
   - Estrategias de paralelización asíncrona de consultas (`asyncio.gather`), optimización de índices en PostgreSQL / Neon, y posible caché en memoria / TTL para colecciones de Home.
-- [ ] **Evolución y Robustecimiento Integral del Recomendador:**
-  - **Calibración del Validador Determinista:** Ajustar o rediseñar el validador previo para eliminar falsos positivos (garantizando que nunca rechace prompts legítimos ni sugerencias predefinidas en ningún idioma).
-  - **Búsqueda Semántica Vectorial con Embeddings:** Evaluar e incorporar búsqueda por similitud vectorial (vía embeddings y `pgvector` / modelo semántico) para enriquecer el emparejamiento con el catálogo.
-  - **Control de Precisión y Feedback al Usuario:** Garantizar que consultas ricas devuelvan recomendaciones de alta fidelidad, y ante consultas insuficientes o confusas, el sistema informe con claridad, pida aclaraciones orientadas o sugiera la mejor aproximación disponible.
 
 ---
 
