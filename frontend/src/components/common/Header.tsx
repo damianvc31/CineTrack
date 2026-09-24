@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Search, Compass, Bot, User as UserIcon, LogOut, Menu, X, Heart, MessageSquare, Settings, Bell, Bookmark, Eye, PlaySquare } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
@@ -12,6 +13,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
+  const queryClient = useQueryClient()
   const { user, logout } = useAuth()
   const { t } = useLanguage()
   const navigate = useNavigate()
@@ -38,7 +40,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
         <div className="relative flex items-center justify-between h-16 gap-4">
           {/* Logo CineTrack + Atribución TMDB */}
           <div className="flex items-center gap-3 shrink-0 z-10">
-            <Link to="/" className="flex items-center gap-2.5 group">
+            <Link
+              to="/"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['homeSections'] })
+              }}
+              className="flex items-center gap-2.5 group"
+            >
               <img src={cinetrackLogo} alt="CineTrack" className="w-8 h-8 rounded-lg group-hover:scale-105 transition-transform" />
               <span className="font-bold text-xl tracking-tight text-white">
                 Cine<span className="text-amber-500">Track</span>
@@ -273,7 +281,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
           <nav className="flex flex-col space-y-1 pt-2">
             <Link
               to="/"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['homeSections'] })
+                setMobileMenuOpen(false)
+              }}
               className="px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-[#171717]"
             >
               {t('home')}

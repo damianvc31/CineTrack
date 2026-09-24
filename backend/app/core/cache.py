@@ -55,6 +55,15 @@ class MemoryCache:
             self._cache.pop(k, None)
         return len(keys_to_delete)
 
+    def delete_prefix(self, prefix: str) -> int:
+        """Alias para clear con prefijo."""
+        return self.clear(prefix)
+
+    def delete_pattern(self, pattern: str) -> int:
+        """Elimina claves coincidentes con un patrón simple de prefijo (ej: 'prefix*')."""
+        prefix = pattern.rstrip("*")
+        return self.clear(prefix)
+
     def size(self) -> int:
         """Retorna la cantidad de elementos en caché (incluyendo no purgados)."""
         return len(self._cache)

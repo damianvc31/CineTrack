@@ -73,6 +73,21 @@ async def get_optional_current_user(
         return None
 
 
+def get_optional_user_id(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security)
+) -> Optional[int]:
+    """Extrae el user_id verificado criptográficamente del token JWT sin consultar la base de datos."""
+    if not credentials:
+        return None
+    payload = decode_access_token(credentials.credentials)
+    if not payload or not payload.get("sub"):
+        return None
+    try:
+        return int(payload["sub"])
+    except (ValueError, TypeError):
+        return None
+
+
 async def get_current_admin(
     x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),

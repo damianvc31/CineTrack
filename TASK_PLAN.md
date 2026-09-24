@@ -198,6 +198,7 @@
   - [x] Migrar `ProfilePage.tsx` con soporte de caché para estadísticas multi-ventana y sincronización reactiva de biblioteca.
 - [x] **Paso 9.5: Verificación Integral, Tests y Documentación Viva**
   - [x] Ejecutar suite de pruebas de backend (`pytest`: 81/81 en verde) y frontend (`vitest` + `npm run build`: 100% en verde).
+  - [x] Refinamiento de performance F5 y rotación de navegación: authLoading guard en frontend, `get_optional_user_id` sin hit de BD, y caché en RAM de estados personales para Home con auto-invalidación en mutaciones (latencia de Home autenticada reducida de 2800ms a 2.6ms).
   - [x] Comprobar ausencia de regresiones visuales y funcionales.
   - [x] Actualizar `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` y `ROADMAP.md`.
   - [x] Commit y tag `v1.2.0`.

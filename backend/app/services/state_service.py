@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import cache
 from app.models.episodio import Episodio
 from app.models.episodio_visto import EpisodioVisto
 from app.models.estado import EstadoUsuarioTitulo
@@ -21,6 +22,10 @@ from app.schemas.state import (
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _invalidate_user_home_cache(usuario_id: int) -> None:
+    cache.delete_pattern(f"user_home_states:{usuario_id}*")
 
 
 async def get_or_create_title_state(
@@ -67,6 +72,7 @@ async def toggle_favorite(
     estado_obj.fecha_favorito = _now() if estado_obj.favorito else None
 
     await db.commit()
+    _invalidate_user_home_cache(usuario_id)
     return FavoriteToggleResponse(
         titulo_id=titulo_id,
         favorito=estado_obj.favorito,
@@ -105,6 +111,7 @@ async def toggle_watchlist(
         mensaje = "Título agregado a Watchlist."
 
     await db.commit()
+    _invalidate_user_home_cache(usuario_id)
     return StateChangeResponse(
         titulo_id=titulo_id,
         nuevo_estado=estado_obj.estado,
@@ -194,6 +201,7 @@ async def toggle_watched(
             mensaje = "Serie completa marcada como vista."
 
     await db.commit()
+    _invalidate_user_home_cache(usuario_id)
     return StateChangeResponse(
         titulo_id=titulo_id,
         nuevo_estado=estado_obj.estado,
@@ -228,6 +236,7 @@ async def abandon_series(
     estado_obj.fecha_estado = None
 
     await db.commit()
+    _invalidate_user_home_cache(usuario_id)
     return StateChangeResponse(
         titulo_id=titulo_id,
         nuevo_estado=None,
@@ -287,6 +296,7 @@ async def follow_series(
     estado_obj.fecha_estado = now_ts
 
     await db.commit()
+    _invalidate_user_home_cache(usuario_id)
     return StateChangeResponse(
         titulo_id=titulo_id,
         nuevo_estado="siguiendo",
@@ -395,6 +405,7 @@ async def toggle_episode_watched(
             estado_obj.fecha_estado = None
 
     await db.commit()
+    _invalidate_user_home_cache(usuario_id)
 
     porcentaje = round((episodios_vistos / total_episodios * 100), 1) if total_episodios > 0 else 0.0
 
@@ -606,6 +617,7 @@ async def toggle_season_watched(
             estado_obj.fecha_estado = None
 
     await db.commit()
+    _invalidate_user_home_cache(usuario_id)
 
     porcentaje = round((episodios_vistos / total_episodios * 100), 1) if total_episodios > 0 else 0.0
 

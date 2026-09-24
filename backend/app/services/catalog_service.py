@@ -741,48 +741,69 @@ async def get_home_sections(
     user_ratings_map = {}
     tv_abandoned_ids = set()
 
-    if all_selected:
-        unique_ids = list({card.id for card in all_selected})
-        st_res = await db.execute(
-            select(EstadoUsuarioTitulo).where(
-                EstadoUsuarioTitulo.usuario_id == usuario_id,
-                EstadoUsuarioTitulo.titulo_id.in_(unique_ids)
-            )
-        )
-        user_states_map = {st.titulo_id: st for st in st_res.scalars().all()}
+    user_cache_key = f"user_home_states:{usuario_id}"
+    cached_user_states = cache.get(user_cache_key) if settings.CACHE_HOME_TTL_SECONDS > 0 else None
 
-        r_res = await db.execute(
-            select(Resena.titulo_id, Resena.puntaje).where(
-                Resena.usuario_id == usuario_id,
-                Resena.titulo_id.in_(unique_ids),
-                Resena.puntaje.isnot(None)
-            )
-        )
-        for r_tid, r_score in r_res.all():
-            user_ratings_map[r_tid] = r_score
-
-        tv_ids = [card.id for card in all_selected if card.tipo == "tv"]
-        if tv_ids:
-            w_res = await db.execute(
-                select(Temporada.titulo_id)
-                .join(Episodio, Episodio.temporada_id == Temporada.id)
-                .join(EpisodioVisto, EpisodioVisto.episodio_id == Episodio.id)
-                .where(
-                    EpisodioVisto.usuario_id == usuario_id,
-                    Temporada.titulo_id.in_(tv_ids)
+    if cached_user_states is not None:
+        user_states_map, user_ratings_map, tv_abandoned_ids = cached_user_states
+    else:
+        if all_selected:
+            unique_ids = list({card.id for card in all_selected})
+            st_res = await db.execute(
+                select(EstadoUsuarioTitulo).where(
+                    EstadoUsuarioTitulo.usuario_id == usuario_id,
+                    EstadoUsuarioTitulo.titulo_id.in_(unique_ids)
                 )
-                .distinct()
             )
-            watched_tv_ids = set(w_res.scalars().all())
-            for tid in watched_tv_ids:
-                st = user_states_map.get(tid)
-                if not st or st.estado not in ("siguiendo", "vista"):
-                    tv_abandoned_ids.add(tid)
+            user_states_map = {st.titulo_id: (st.favorito, st.estado) for st in st_res.scalars().all()}
+
+            r_res = await db.execute(
+                select(Resena.titulo_id, Resena.puntaje).where(
+                    Resena.usuario_id == usuario_id,
+                    Resena.titulo_id.in_(unique_ids),
+                    Resena.puntaje.isnot(None)
+                )
+            )
+            for r_tid, r_score in r_res.all():
+                user_ratings_map[r_tid] = r_score
+
+            tv_ids = [card.id for card in all_selected if card.tipo == "tv"]
+            if tv_ids:
+                w_res = await db.execute(
+                    select(Temporada.titulo_id)
+                    .join(Episodio, Episodio.temporada_id == Temporada.id)
+                    .join(EpisodioVisto, EpisodioVisto.episodio_id == Episodio.id)
+                    .where(
+                        EpisodioVisto.usuario_id == usuario_id,
+                        Temporada.titulo_id.in_(tv_ids)
+                    )
+                    .distinct()
+                )
+                watched_tv_ids = set(w_res.scalars().all())
+                for tid in watched_tv_ids:
+                    st_info = user_states_map.get(tid)
+                    st_estado = st_info[1] if st_info else None
+                    if not st_estado or st_estado not in ("siguiendo", "vista"):
+                        tv_abandoned_ids.add(tid)
+
+            if settings.CACHE_HOME_TTL_SECONDS > 0:
+                cache.set(
+                    user_cache_key,
+                    (user_states_map, user_ratings_map, tv_abandoned_ids),
+                    ttl_seconds=min(settings.CACHE_HOME_TTL_SECONDS, 60)
+                )
 
     def _hydrate_card(card: TitleCardResponse) -> TitleCardResponse:
-        st = user_states_map.get(card.id)
-        u_favorito = st.favorito if st else False
-        u_estado = st.estado if st else None
+        st_info = user_states_map.get(card.id)
+        if isinstance(st_info, tuple):
+            u_favorito, u_estado = st_info
+        elif st_info:
+            u_favorito = st_info.favorito
+            u_estado = st_info.estado
+        else:
+            u_favorito = False
+            u_estado = None
+
         if card.tipo == "tv" and (u_estado is None or u_estado == "abandonada") and (card.id in tv_abandoned_ids):
             u_estado = "abandonada"
         u_rating = user_ratings_map.get(card.id)
@@ -1008,6 +1029,8 @@ async def create_user_review(
     sync_svc = TMDBSyncService(db)
     await sync_svc.recalculate_unified_ratings(titulo_id=titulo_id)
 
+    cache.delete_pattern(f"user_home_states:{usuario_id}*")
+
     # Recargar con usuario
     q = select(Resena).options(selectinload(Resena.usuario)).where(Resena.id == review.id)
     r_full = (await db.execute(q)).scalar_one()
@@ -1045,6 +1068,8 @@ async def delete_user_review(
     from app.services.tmdb_sync_service import TMDBSyncService
     sync_svc = TMDBSyncService(db)
     await sync_svc.recalculate_unified_ratings(titulo_id=titulo_id)
+
+    cache.delete_pattern(f"user_home_states:{usuario_id}*")
 
     return True
 

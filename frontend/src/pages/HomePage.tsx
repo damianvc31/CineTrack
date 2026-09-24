@@ -143,7 +143,7 @@ const HOME_SIDEBAR_PRESETS: SidebarPreset[] = [
 
 export const HomePage: React.FC = () => {
   const { openAuth } = useOutletContext<OutletContextType>()
-  const { user, logout } = useAuth()
+  const { user, logout, loading: authLoading } = useAuth()
   const { t, translateGenreName, language } = useLanguage()
   const navigate = useNavigate()
 
@@ -154,12 +154,12 @@ export const HomePage: React.FC = () => {
   const {
     data,
     isLoading: loading,
-    isFetching: filtering,
     error: queryError,
     refetch: reloadHome,
   } = useQuery<HomeSections>({
     queryKey: ['homeSections', activeTipo, user?.id],
     queryFn: () => catalogService.getHome(activeTipo !== 'all' ? { tipo: activeTipo } : undefined),
+    enabled: !authLoading,
   })
 
   const error = queryError ? (queryError instanceof Error ? queryError.message : 'Could not connect to CineTrack catalog.') : null
@@ -418,14 +418,6 @@ export const HomePage: React.FC = () => {
               </button>
             </div>
           </div>
-
-          {/* Filtering indicator */}
-          {filtering && (
-            <div className="flex items-center justify-center py-6 gap-2 text-xs text-amber-400">
-              <div className="w-4 h-4 border-2 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-              <span>Updating catalog...</span>
-            </div>
-          )}
 
           {/* Carousel 1: 📈 Trending */}
           <CarouselRow

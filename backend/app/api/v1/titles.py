@@ -2,7 +2,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_optional_current_user
+from app.api.deps import get_current_user, get_optional_current_user, get_optional_user_id
 from app.db.session import get_db
 from app.models.usuario import Usuario
 from app.schemas.catalog import (
@@ -26,11 +26,10 @@ router = APIRouter(tags=["Catálogo y Títulos"])
 @router.get("/home", response_model=HomeSectionsResponse)
 async def get_home(
     tipo: Optional[str] = Query(default=None, description="Filtro opcional: 'movie' o 'tv'"),
-    current_user: Optional[Usuario] = Depends(get_optional_current_user),
+    user_id: Optional[int] = Depends(get_optional_user_id),
     db: AsyncSession = Depends(get_db)
 ) -> HomeSectionsResponse:
     """Retorna las secciones curadas de la Home (Trending, New Releases, Classics y por Género)."""
-    user_id = current_user.id if current_user else None
     return await catalog_service.get_home_sections(db, tipo=tipo, usuario_id=user_id)
 
 
@@ -53,11 +52,10 @@ async def list_titles(
     order: str = Query(default="desc", pattern="^(asc|desc)$", description="Dirección del orden: 'desc' o 'asc'"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    current_user: Optional[Usuario] = Depends(get_optional_current_user),
+    user_id: Optional[int] = Depends(get_optional_user_id),
     db: AsyncSession = Depends(get_db)
 ) -> TitleListResponse:
     """Búsqueda y listado paginado de títulos con filtros multidimensionales y secciones."""
-    user_id = current_user.id if current_user else None
     return await catalog_service.get_titles(
         db,
         tipo=tipo,
