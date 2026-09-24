@@ -51,6 +51,8 @@ class CandidateTitle(BaseModel):
     nombre: str
     tipo: str
     anio: Optional[int] = None
+    pais: Optional[str] = None
+    idioma_original: Optional[str] = None
     generos: list[str] = Field(default_factory=list)
     director: Optional[str] = None
     vote_average: float = 0.0

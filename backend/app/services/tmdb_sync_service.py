@@ -819,6 +819,12 @@ class TMDBSyncService:
         await self.recalculate_percentiles()
         await self.recalculate_unified_ratings()
 
+        # 6. Sincronizar embeddings pendientes para nuevos títulos
+        try:
+            await self.sync_pending_embeddings()
+        except Exception as e:
+            logger.warning(f"No se pudieron sincronizar embeddings tras sync diaria: {e}")
+
         logger.info(
             f"Sincronización diaria terminada: {updated_series_count} series actualizadas, "
             f"{new_movies_count} nuevos estrenos de películas, {new_series_count} nuevas series."
@@ -828,6 +834,16 @@ class TMDBSyncService:
             "new_movies": new_movies_count,
             "new_series": new_series_count,
         }
+
+    async def sync_pending_embeddings(self, batch_size: int = 50) -> Dict[str, int]:
+        """Calcula embeddings pendientes para los títulos que aún no tienen vector generado."""
+        bind = self.db.bind or (self.db.get_bind() if hasattr(self.db, "get_bind") else None)
+        if bind and bind.dialect.name != "postgresql":
+            logger.info("Base de datos local es SQLite (sin soporte pgvector). Omitiendo sincronización de embeddings.")
+            return {"total_pending": 0, "total_updated": 0, "total_failed": 0}
+
+        from app.jobs.sync_embeddings import sync_catalog_embeddings
+        return await sync_catalog_embeddings(batch_size=batch_size, db=self.db)
 
     # -------------------------------------------------------------------------
     # SANEAMIENTO DE TÍTULOS NO ESTRENADOS

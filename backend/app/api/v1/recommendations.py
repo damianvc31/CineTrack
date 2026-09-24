@@ -6,7 +6,11 @@ from app.api.deps import get_db, get_optional_current_user
 from app.models.usuario import Usuario
 from app.schemas.recommendations import RecommendationRequest, RecommendationResponse
 from app.services import catalog_service
-from app.services.ai_recommender_service import ai_recommender_service
+from app.services.ai_recommender_service import (
+    ai_recommender_service,
+    build_unintelligible_response,
+    is_unintelligible_prompt,
+)
 
 router = APIRouter()
 
@@ -32,8 +36,12 @@ async def get_recommendations(
             model_used="Cancelado"
         )
 
-    # 1. Obtener candidatos relevantes del catálogo local y contexto del usuario
+    # 0. Validación y sanitización inmediata (Corta en seco sin tocar DB, embeddings ni LLMs si el texto es ininteligible)
     clarification_dict = request.clarification_context.model_dump() if request.clarification_context else None
+    if not clarification_dict and is_unintelligible_prompt(request.prompt):
+        return build_unintelligible_response(request.prompt, request.language or "es")
+
+    # 1. Obtener candidatos relevantes del catálogo local y contexto del usuario
     candidates, user_ctx = await catalog_service.get_recommendation_candidates(
         db,
         prompt=request.prompt,

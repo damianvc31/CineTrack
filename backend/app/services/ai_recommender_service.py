@@ -26,11 +26,19 @@ Tu objetivo es recomendar entre 2 y 5 títulos de películas o series al usuario
    - AFINIDAD ESTRICTA VS. RELLENO: Es preferible recomendar 2 o 3 títulos con estricta y genuina afinidad temática, autoral o de tono antes que rellenar con obras no relacionadas solo por alcanzar un cupo numérico. NUNCA incluyas obras que no guarden relación con el pedido temático del usuario (ej: si piden "películas de robos y atracos/heist", jamás recomiendes una comedia de viajes en el tiempo solo porque tenga alta nota). Si en el pool hay solo 2 o 3 obras que encajan genuinamente, recomienda solo esas y aclara en el mensaje de apertura que son las joyas ideales disponibles en el catálogo para ese criterio.
    - PREFERENCIA TEMÁTICA ESTRICTA: Si el usuario solicita una dinámica, subgénero o temática puntual (como "planes elaborados", "atracos/robos/heist", "asesinos en serie", "venganza", "viajes en el tiempo", etc.), debes seleccionar prioritariamente aquellas obras cuya premisa o sinopsis aborde DIRECTAMENTE esa temática. NO selecciones títulos simplemente porque pertenezcan a la categoría general de género si su trama no tiene relación con el pedido específico (ejemplo: si piden "thrillers de crimen y planes elaborados", recomienda obras como Heat, The Usual Suspects, Reservoir Dogs, Lock Stock, Nine Queens, etc., y NUNCA documentales de narcotraficantes o dramas ajenos a la temática).
    - SIEMPRE que haya al menos 1 o 2 títulos en el pool de candidatos que guarden afinidad con el pedido (por género, temática, director, actor o tono), DEBES RESPONDER con "status": "recommended". Nunca respondas que no hay títulos en el catálogo si dispones de candidatos afines.
-   - Si el usuario pide algo genérico o amplio ("recomiéndame algo bueno", "sorpréndeme", "qué puedo ver"): DEBES RESOLVER con confianza seleccionando 3 a 5 de los títulos con mayor puntaje y popularidad del pool.
+   - MANEJO DE AMBIGÜEDAD Y PROMPTS AMPLIOS: Si el usuario pide algo genérico, amplio o ambiguo (ej: "recomiéndame algo bueno", "sorpréndeme", "qué puedo ver", "una buena película"):
+     DEBES responder con "status": "recommended" seleccionando 2 o 3 obras aclamadas de estilos/géneros marcadamente contrastantes (ej: una obra maestra de suspenso y una joya reconfortante o comedia), explicando en el mensaje de apertura qué experiencias contrastantes ofrece el catálogo e incluyendo en "clarification_suggestions" de 3 a 4 caminos concretos para profundizar (ej: ["Thrillers y giros inesperados", "Comedia ligera para relajarse", "Ciencia ficción épica"]).
    - ÚNICAMENTE si el prompt es un texto ininteligible o caracteres aleatorios sin ningún sentido lingüístico o temático (ej: "asdasd", "12345", "qwerty") responde con:
      "status": "clarification_needed", "recommendations": [], y en "clarification_suggestions" incluye de 3 a 4 opciones de búsqueda concretas y atractivas para que el usuario explore (ej: ["Películas de ciencia ficción y viajes espaciales", "Thrillers y misterio policial", "Clásicos aclamados (+8.5★)", "Películas de Christopher Nolan"]). NUNCA hagas preguntas retóricas en clarification_suggestions.
    - PROHIBICIÓN ESTRICTA DE SOBREINTERPRETACIÓN:
      Está TERMINANTEMENTE PROHIBIDO interpretar combinaciones aleatorias de caracteres, letras y números, palabras inexistentes o secuencias sin sentido (ej: "asdf123", "x89f2a", "zxcvbnm", etc.) como si fueran "códigos secretos", "enigmas misteriosos", "criptografía", "hackers" o "películas de misterio/suspenso". Ante cualquier texto sin significado lingüístico ni temático real, DEBES responder OBLIGATORIAMENTE con "status": "clarification_needed", NUNCA asociarlo creativamente con el género de misterio.
+5. DIRECTIVA GEOGRÁFICA (ORIGEN/PRODUCCIÓN VS. AMBIENTACIÓN / IDIOMA):
+   - ORIGEN / PRODUCCIÓN (ej: "cine argentino", "películas de Argentina", "series coreanas", "cine francés"):
+     Recomienda ÚNICAMENTE títulos cuyo "País" coincida con el país solicitado. NUNCA confundas una producción extranjera cuya sinopsis simplemente mencione un país con una película nacional producida en ese país.
+   - AMBIENTACIÓN / TRAMA / LOCALIZACIÓN (ej: "ambientada en Argentina", "historias que transcurran en Buenos Aires", "películas en Tokio", "viajan a París"):
+     DEBES recomendar TANTO producciones nacionales del país/ciudad (que naturalmente transcurren allí) COMO producciones internacionales cuya trama se desarrolle en ese lugar si están disponibles en los candidatos. En las razones ('reason'), destaca y fundamenta la ambientación con precisión (ej: para una obra local, resalta cómo retrata la atmósfera y calles de la ciudad o el país; para una producción extranjera, aclara el contraste: "Aunque es una producción de Hong Kong dirigida por Wong Kar-wai, la historia transcurre íntegramente en las calles y clubes de Buenos Aires...").
+   - IDIOMA ORIGINAL (ej: "en coreano", "en español", "en francés"):
+     Asegúrate de que el campo "Idioma" de los títulos recomendados coincida con la lengua solicitada.
 
 ### FORMATO DE RESPUESTA OBLIGATORIO (JSON ESTRICTO):
 Debes responder ÚNICAMENTE un objeto JSON válido con esta estructura:
@@ -103,15 +111,22 @@ Perfil del usuario:
         actors_list = c.get("actores", [])
         actors_text = f" | Elenco: {', '.join(actors_list[:3])}" if actors_list else ""
         watched_text = " [YA VISTO POR EL USUARIO]" if c.get("is_watched") else ""
+        pais_text = f" | País: {c['pais']}" if c.get("pais") else ""
+        idioma_text = f" | Idioma: {c['idioma_original']}" if c.get("idioma_original") else ""
         candidates_summary.append(
-            f"- ID {c['id']}: \"{c['nombre']}\" ({c['tipo']}, {c.get('anio') or 'N/A'}{watched_text}) - Géneros: {', '.join(c.get('generos', []))} | Puntaje: {c.get('vote_average', 0.0)}★ ({c.get('vote_count', 0)} votos){director_text}{actors_text} | Sinopsis: {c.get('sinopsis_corta', '')}{snippet_text}"
+            f"- ID {c['id']}: \"{c['nombre']}\" ({c['tipo']}, {c.get('anio') or 'N/A'}{watched_text}){pais_text}{idioma_text} - Géneros: {', '.join(c.get('generos', []))} | Puntaje: {c.get('vote_average', 0.0)}★ ({c.get('vote_count', 0)} votos){director_text}{actors_text} | Sinopsis: {c.get('sinopsis_corta', '')}{snippet_text}"
         )
 
     instructions_extra = ""
     if user_context and user_context.get("only_watched"):
         instructions_extra = "\nATENCIÓN: El usuario solicitó recomendaciones EXCLUSIVAMENTE extraídas de los títulos que ya ha visto en su historial en CineTrack. Enfoca las razones en por qué vale la pena volver a verlas (rewatch)."
     elif user_context and user_context.get("allow_rewatch"):
-        instructions_extra = "\nNOTA: El usuario permite o solicitó títulos para volver a ver (rewatch). Puedes incluir tanto obras ya vistas como no vistas."
+        instructions_extra = (
+            "\nDIRECTIVA DE BALANCE (VISTAS Y NO VISTAS): El usuario permite o solicitó incluir obras ya vistas en su historial sin excluir obras no vistas. "
+            "Debes combinar ambas posibilidades de forma armónica según su pedido: puedes recomendar tanto obras no vistas para descubrir como obras ya vistas ([YA VISTO POR EL USUARIO]) para revivir. "
+            "NO excluyas las obras no vistas solo porque haya una vista disponible. "
+            "Para las ya vistas, enfoca la justificación en por qué vale la pena volver a verlas; para las no vistas, en por qué debe descubrirlas."
+        )
 
     clarification_section = ""
     if clarification_context:
@@ -145,99 +160,196 @@ POOL DE CANDIDATOS DISPONIBLES EN CINETRACK ({len(candidates)} títulos):
 Genera la respuesta en formato JSON estricto siguiendo las reglas del sistema:"""
 
 
+KEYBOARD_ROWS = [
+    "qwertyuiop", "asdfghjkl", "zxcvbnm",
+    "poiuytrewq", "lkjhgfdsa", "mnbvcxz"
+]
+
+FILLER_WORDS = {
+    # Palabras de intención, pronombres, preposiciones y artículos en español
+    "quiero", "quisiera", "busco", "buscando", "dame", "recomiendame", "recomendame",
+    "recomienda", "recomiendan", "ver", "mirar", "algo", "algun", "alguna", "algunas", "algunos",
+    "un", "una", "unos", "unas", "el", "la", "los", "las", "lo",
+    "de", "del", "en", "con", "sin", "para", "por", "que", "y", "o", "u", "a", "al",
+    "tipo", "estilo", "onda", "favor", "porfa", "hola",
+    # Palabras equivalentes en inglés
+    "i", "want", "looking", "for", "give", "me", "recommend", "recommendation",
+    "recommendations", "watch", "see", "something", "any", "a", "an", "the", "some",
+    "about", "with", "without", "and", "or", "to", "of", "in", "like", "please", "hello", "hi"
+}
+
 CINEMA_KNOWN_KEYWORDS = {
     "pelicula", "peliculas", "película", "películas", "serie", "series", "temporada", "temporadas",
-    "film", "films", "movie", "movies", "show", "shows", "cinema", "cine", "ver", "quiero",
-    "recomiendame", "recomendame", "recomienda", "dame", "busco",
-    "top", "mejor", "mejores", "best", "good", "actor", "actriz", "director", "directores",
+    "film", "films", "movie", "movies", "show", "shows", "cinema", "cine",
+    "top", "mejor", "mejores", "bueno", "buena", "buenas", "buenos", "good", "great", "best",
+    "actor", "actriz", "director", "directores",
     "accion", "acción", "action", "comedia", "comedy", "drama", "terror", "horror", "suspenso",
     "thriller", "misterio", "mystery", "ciencia", "ficcion", "ficción", "sci-fi", "scifi",
     "animacion", "animación", "animation", "anime", "documental", "documentary", "fantasia",
     "fantasía", "fantasy", "aventura", "aventuras", "adventure", "crimen", "crime", "romance",
     "romantica", "romántica", "western", "clasico", "clásico", "classic", "antigua", "reciente",
     "estreno", "estrenos", "nolan", "tarantino", "scorsese", "dicaprio", "spiderman", "batman",
-    "sorprendeme", "sorpréndeme", "surprise", "popular", "populares", "visto", "vistas"
+    "sorprendeme", "sorpréndeme", "surprise", "popular", "populares", "visto", "vistas",
+    "heist", "robos", "atracos", "twists", "giros", "plot", "dvd", "vhs",
+    "divertida", "divertido", "graciosa", "gracioso", "emocionante", "oscura", "oscuro",
+    "espacio", "espacial", "viajes", "tiempo", "zombies", "zombie",
+    # Países, gentilicios e idiomas
+    "argentina", "argentinas", "argentino", "argentinos", "españa", "espana", "español", "española",
+    "españoles", "francia", "francés", "frances", "francesa", "franceses", "italia", "italiano",
+    "italiana", "italianos", "japon", "japón", "japonés", "japones", "japonesa", "corea", "coreano",
+    "coreana", "coreanos", "kdrama", "mexico", "méxico", "mexicano", "mexicana", "brasil", "brasileño",
+    "brasilero", "inglaterra", "britanico", "británico", "aleman", "alemán", "alemana", "rusia", "ruso",
+    "rusa", "turquia", "turquía", "turco", "turca", "india", "indio", "china", "chino", "chinos",
+    "castellano", "ingles", "inglés", "danes", "danés", "sueco", "sueca", "noruego", "noruega"
 }
 
-KEYBOARD_ROWS = [
-    "qwertyuiop", "asdfghjkl", "zxcvbnm",
-    "poiuytrewq", "lkjhgfdsa", "mnbvcxz"
-]
+
+def is_gibberish_word(w: str) -> bool:
+    """Evalúa si un término individual es teclado machacado o ruido sin sentido lingüístico."""
+    # Años o décadas legítimas
+    if re.match(r"^(19\d\d|20\d\d|[5-9]0s)$", w):
+        return False
+
+    # Palabras del vocabulario del dominio o funcionales
+    if w in CINEMA_KNOWN_KEYWORDS or w in FILLER_WORDS:
+        return False
+
+    # 1. Solo dígitos
+    if w.isdigit():
+        return True
+
+    # 2. Sin vocales (longitud >= 2)
+    if len(w) >= 2 and not re.search(r"[aeiouyáéíóú]", w):
+        return True
+
+    # 3. Filas continuas de teclado físico (4+ teclas contiguas)
+    for kr in KEYBOARD_ROWS:
+        for i in range(len(kr) - 3):
+            if kr[i : i + 4] in w:
+                return True
+
+    # 4. Patrones repetitivos periódicos (ej: asdasd, lalala, aaaa)
+    if re.search(r"(.{1,4})\1{2,}", w):
+        return True
+
+    # 5. Agrupación extrema de consonantes (4 o más seguidas)
+    if re.search(r"[bcdfghjklmnpqrstvwxz]{4,}", w):
+        return True
+
+    # 6. Muy baja variedad de caracteres en palabras medianas/largas (ej: asdsada)
+    if len(w) >= 5 and len(set(w)) <= 3:
+        return True
+
+    # 7. Ratio excesivo de consonantes en palabras medianas (>= 5 letras y >= 80% consonantes)
+    consonants_count = len(re.findall(r"[bcdfghjklmnpqrstvwxz]", w))
+    if len(w) >= 5 and (consonants_count / len(w)) >= 0.8:
+        return True
+
+    return False
 
 
 def is_unintelligible_prompt(prompt: str) -> bool:
-    """Detecta deterministamente si el prompt es teclado machacado, sopa de caracteres o texto ininteligible."""
+    """
+    Detecta determinísticamente si el prompt es teclado machacado, spam o texto sin sentido.
+    Maneja con precisión casos como 'quiero un asdsadasdhk' (short-circuit inmediato)
+    sin perjudicar consultas mixtas válidas como 'quiero una pelicula divertida asdsakjdha'.
+    Retorna True si no contiene una consulta cinematográfica coherente.
+    """
     clean = prompt.strip().lower()
+
+    # 1. Menos de 2 caracteres
     if len(clean) < 2:
         return True
-
-    # Año de lanzamiento válido aislado (ej: '1999', '2024')
-    if clean.isdigit():
-        return not (len(clean) == 4 and 1900 <= int(clean) <= 2030)
 
     words = re.findall(r"[a-záéíóúñ0-9]+", clean)
     if not words:
         return True
 
-    # 1. Tokens que mezclan letras y dígitos sin ser especificaciones técnicas comunes (ej: 'asdf123', 'h4', 'a1', 'x89f2a')
-    for w in words:
-        if re.search(r"[a-z]", w) and re.search(r"[0-9]", w):
-            if not re.match(r"^(4k|3d|2d|1080p|720p|imax|se7en)$", w):
-                return True
+    # 2. Separar palabras funcionales/relleno
+    non_filler_words = [w for w in words if w not in FILLER_WORDS]
 
-    # 2. Filas continuas de teclado o subcadenas evidentes
-    for kr in KEYBOARD_ROWS:
-        if clean in kr or kr in clean or any(w in kr and len(w) >= 3 for w in words if not w.isdigit()):
-            return True
+    # Si sólo escribió palabras de relleno o intención vacía (ej: "quiero un", "dame una para ver")
+    if not non_filler_words:
+        return True
 
-    # 3. Repetición cíclica (ej: 'asdasd', 'qweqwe', 'lalala')
-    for w in words:
-        if len(w) >= 4 and not w.isdigit():
-            for chunk_size in (2, 3):
-                chunk = w[:chunk_size]
-                if chunk * (len(w) // chunk_size) == w:
-                    return True
+    # 3. Analizar palabras no-filler: clasificar entre basura y términos con potencial semántico
+    gibberish_words = [w for w in non_filler_words if is_gibberish_word(w)]
+    meaningful_words = [w for w in non_filler_words if not is_gibberish_word(w)]
 
-    # 4. Consonantes consecutivas o sin vocales en tokens de letras
-    for w in words:
-        if not w.isdigit():
-            if re.search(r"[bcdfghjklmnpqrstvwxyz]{4,}", w):
-                return True
-            vowels = len(re.findall(r"[aeiouáéíóú]", w))
-            if len(w) >= 4 and vowels == 0:
-                return True
-            if len(w) >= 5 and (vowels / len(w)) < 0.2:
-                return True
+    # Si todas las palabras no-filler son basura (ej: "quiero un asdsadasdhk", "asdf123")
+    if not meaningful_words:
+        return True
 
-    # 5. Palabra única corta sin vocales o que no existe
-    if len(words) == 1 and not words[0].isdigit():
-        w = words[0]
-        if len(w) <= 3 and w not in {"el", "la", "un", "una", "de", "del", "en", "por", "con", "sin", "top", "ver", "cine", "film", "the", "war"}:
-            if not re.search(r"[aeiouáéíóú]", w):
-                return True
+    # 4. Si hay palabras con sentido, verificar si hay un ancla temática o cinematográfica explícita
+    has_cinema_anchor = any(
+        w in CINEMA_KNOWN_KEYWORDS or re.match(r"^(19\d\d|20\d\d|[5-9]0s)$", w)
+        for w in meaningful_words
+    )
 
-    # 6. Combinación de 2 tokens: dígito arbitrario + token corto desconocido (ej: 'asd 123', 'abc 123', 'xyz 999')
-    if len(words) == 2 and any(w.isdigit() for w in words) and any(not w.isdigit() for w in words):
-        non_dig = [w for w in words if not w.isdigit()][0]
-        dig = [w for w in words if w.isdigit()][0]
-        is_year = len(dig) == 4 and 1900 <= int(dig) <= 2030
-        if not is_year and len(non_dig) <= 3 and non_dig not in CINEMA_KNOWN_KEYWORDS:
-            return True
+    if has_cinema_anchor:
+        return False
 
-    return False
+    # 5. Si no tiene ancla pero tiene palabras válidas reales y superan a las palabras basura
+    if len(meaningful_words) > len(gibberish_words):
+        if any(not w.isdigit() and len(w) >= 3 for w in meaningful_words):
+            return False
+
+    return True
+
+
+def build_unintelligible_response(prompt: str, language: str = "es") -> "RecommendationResponse":
+    """Construye una respuesta guiada amigable para prompts ininteligibles sin llamar a APIs externas."""
+    from app.schemas.recommendations import RecommendationResponse
+    lang = language or _detect_language(prompt)
+    if lang == "es":
+        msg = "No he podido comprender tu mensaje. Por favor, dime qué género, actor, director o temática tienes ganas de ver hoy para poder darte una buena recomendación."
+        suggestions = [
+            "Películas de ciencia ficción y viajes espaciales",
+            "Thrillers y misterio policial",
+            "Clásicos aclamados (+8.5★)",
+            "Películas de Christopher Nolan"
+        ]
+    else:
+        msg = "I couldn't quite understand your query. Please tell me what genre, actor, director or theme you are in the mood for today."
+        suggestions = [
+            "Space sci-fi and time travel",
+            "Police mystery and thrillers",
+            "Top rated classics (+8.5★)",
+            "Christopher Nolan masterpieces"
+        ]
+    return RecommendationResponse(
+        status="clarification_needed",
+        message=msg,
+        recommendations=[],
+        clarification_suggestions=suggestions,
+        provider_used="heuristic",
+        model_used="Validador de Entrada (CineTrack Recommender Engine)"
+    )
 
 
 class AIRecommenderService:
     def __init__(self):
         self.groq_url = "https://api.groq.com/openai/v1/chat/completions"
 
-    async def _call_gemini(self, user_message: str, model_override: Optional[str] = None) -> Dict[str, Any]:
+    @property
+    def gemini_api_keys(self) -> List[str]:
+        raw = getattr(settings, "GEMINI_API_KEY", "")
+        return [k.strip() for k in raw.split(",") if k.strip()]
+
+    async def _call_gemini(
+        self,
+        user_message: str,
+        model_override: Optional[str] = None,
+        api_key_override: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Llamada directa asíncrona a Google Gemini API."""
-        if not settings.GEMINI_API_KEY:
+        keys = self.gemini_api_keys
+        if not keys:
             raise ValueError("GEMINI_API_KEY no configurada")
 
+        api_key = api_key_override or keys[0]
         gemini_model = model_override or getattr(settings, "GEMINI_MODEL", "gemini-3.6-flash")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={settings.GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
         payload = {
             "system_instruction": {
                 "parts": [{"text": SYSTEM_PROMPT}]
@@ -258,14 +370,26 @@ class AIRecommenderService:
             raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
             return json.loads(raw_text)
 
-    async def _call_groq(self, user_message: str, model_override: Optional[str] = None) -> Dict[str, Any]:
+    @property
+    def groq_api_keys(self) -> List[str]:
+        raw = getattr(settings, "GROQ_API_KEY", "")
+        return [k.strip() for k in raw.split(",") if k.strip()]
+
+    async def _call_groq(
+        self,
+        user_message: str,
+        model_override: Optional[str] = None,
+        api_key_override: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Llamada directa asíncrona a Groq API."""
-        if not settings.GROQ_API_KEY:
+        keys = self.groq_api_keys
+        if not keys:
             raise ValueError("GROQ_API_KEY no configurada")
 
+        api_key = api_key_override or keys[0]
         groq_model = model_override or getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
         headers = {
-            "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
         payload = {
@@ -293,44 +417,49 @@ class AIRecommenderService:
             if alt != primary_model and alt not in models_to_try:
                 models_to_try.append(alt)
 
+        keys = self.gemini_api_keys
         last_error = None
-        for model in models_to_try:
-            for attempt in range(max_retries):
-                try:
-                    res = await self._call_gemini(user_message, model_override=model)
-                    return res, model
-                except Exception as e:
-                    last_error = e
-                    logger.warning(f"Intento {attempt + 1}/{max_retries} en Gemini ({model}) falló: {e}")
-                    # Si la cuota está agotada (429), pasar de inmediato al siguiente modelo con cuota fresca
-                    if "429" in str(e) or "quota" in str(e).lower():
-                        break
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(1.0)
+        for key in keys:
+            for model in models_to_try:
+                for attempt in range(max_retries):
+                    try:
+                        res = await self._call_gemini(user_message, model_override=model, api_key_override=key)
+                        return res, model
+                    except Exception as e:
+                        last_error = e
+                        logger.warning(f"Intento {attempt + 1}/{max_retries} en Gemini ({model}) falló: {e}")
+                        # Si la cuota de esta key está agotada (429), pasar a la siguiente key o modelo
+                        if "429" in str(e) or "quota" in str(e).lower():
+                            break
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(1.0)
         raise last_error
 
+
     async def _call_groq_with_retry(self, user_message: str, max_retries: int = 2) -> tuple[Dict[str, Any], str]:
-        """Invoca Groq API con reintentos y cascada automática a modelos alternativos ante 429/timeouts."""
+        """Invoca Groq API con reintentos, balanceo multi-clave y cascada automática ante 429/timeouts."""
         primary_model = getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
         models_to_try = [primary_model]
         for alt in ["openai/gpt-oss-20b", "groq/compound-mini", "qwen/qwen3.8-27b"]:
             if alt != primary_model and alt not in models_to_try:
                 models_to_try.append(alt)
 
+        keys = self.groq_api_keys
         last_error = None
-        for model in models_to_try:
-            for attempt in range(max_retries):
-                try:
-                    res = await self._call_groq(user_message, model_override=model)
-                    return res, model
-                except Exception as e:
-                    last_error = e
-                    logger.warning(f"Intento {attempt + 1}/{max_retries} en Groq ({model}) falló: {e}")
-                    # Si es 429 (límite de tasa por minuto o día), pasar de inmediato al siguiente modelo con cuota fresca
-                    if "429" in str(e):
-                        break
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(1.0)
+        for key in keys:
+            for model in models_to_try:
+                for attempt in range(max_retries):
+                    try:
+                        res = await self._call_groq(user_message, model_override=model, api_key_override=key)
+                        return res, model
+                    except Exception as e:
+                        last_error = e
+                        logger.warning(f"Intento {attempt + 1}/{max_retries} en Groq ({model}, key {key[:8]}...) falló: {e}")
+                        # Si es 429 o rate limit, pasar de inmediato a la siguiente key o modelo
+                        if "429" in str(e) or "quota" in str(e).lower() or "rate_limit" in str(e).lower():
+                            break
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(1.0)
         raise last_error
 
     def _fallback_heuristic(

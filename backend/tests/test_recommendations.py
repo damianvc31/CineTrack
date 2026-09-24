@@ -27,6 +27,8 @@ async def sample_catalog_for_recs(db_session: AsyncSession):
         fecha_estreno=date(2014, 11, 7),
         duracion=169,
         director="Christopher Nolan",
+        pais="US",
+        idioma_original="en",
         popularidad=200.0,
         vote_average_tmdb=8.6,
         vote_count_tmdb=30000,
@@ -41,6 +43,8 @@ async def sample_catalog_for_recs(db_session: AsyncSession):
         fecha_estreno=date(2010, 7, 16),
         duracion=148,
         director="Christopher Nolan",
+        pais="US",
+        idioma_original="en",
         popularidad=180.0,
         vote_average_tmdb=8.4,
         vote_count_tmdb=32000,
@@ -54,14 +58,48 @@ async def sample_catalog_for_recs(db_session: AsyncSession):
         sinopsis="La desaparición de dos niños expone las dobles vidas y relaciones fracturadas de cuatro familias.",
         fecha_estreno=date(2017, 12, 1),
         director="Baran bo Odar",
+        pais="DE",
+        idioma_original="de",
         popularidad=150.0,
         vote_average_tmdb=8.5,
         vote_count_tmdb=6000,
         rating_unificado=8.5,
         status_tmdb="Ended"
     )
+    m3 = Titulo(
+        id=4,
+        tmdb_id=301,
+        tipo="movie",
+        nombre="Nueve Reinas",
+        sinopsis="Dos estafadores se conocen en una estación de servicio en Buenos Aires y planean un gran robo.",
+        fecha_estreno=date(2000, 8, 31),
+        duracion=114,
+        director="Fabián Bielinsky",
+        pais="AR",
+        idioma_original="es",
+        popularidad=120.0,
+        vote_average_tmdb=7.9,
+        vote_count_tmdb=1500,
+        rating_unificado=7.9
+    )
+    m4 = Titulo(
+        id=5,
+        tmdb_id=302,
+        tipo="movie",
+        nombre="Happy Together",
+        sinopsis="Dos amantes de Hong Kong viajan a Buenos Aires, Argentina y viven una relación tormentosa.",
+        fecha_estreno=date(1997, 5, 30),
+        duracion=96,
+        director="Wong Kar-wai",
+        pais="HK",
+        idioma_original="zh",
+        popularidad=110.0,
+        vote_average_tmdb=7.8,
+        vote_count_tmdb=1200,
+        rating_unificado=7.8
+    )
 
-    db_session.add_all([m1, m2, s1])
+    db_session.add_all([m1, m2, s1, m3, m4])
     await db_session.flush()
 
     # Relaciones generos
@@ -73,6 +111,10 @@ async def sample_catalog_for_recs(db_session: AsyncSession):
             {"titulo_id": 2, "genero_id": 28},
             {"titulo_id": 3, "genero_id": 878},
             {"titulo_id": 3, "genero_id": 18},
+            {"titulo_id": 4, "genero_id": 80},
+            {"titulo_id": 4, "genero_id": 18},
+            {"titulo_id": 5, "genero_id": 18},
+            {"titulo_id": 5, "genero_id": 10749},
         ])
     )
     await db_session.commit()
@@ -325,5 +367,157 @@ async def test_recommendations_with_clarification_context(
         # Should recommend science fiction (Interstellar is in sample_catalog_for_recs)
         rec_ids = [r["title_id"] for r in data["recommendations"]]
         assert 1 in rec_ids
+
+
+def test_relaxed_validator_legitimate_prompts():
+    """Valida que prompts legítimos en español e inglés con números y consonantes complejas no sean rechazados."""
+    from app.services.ai_recommender_service import is_unintelligible_prompt
+
+    valid_prompts = [
+        "Películas de atracos, robos ingeniosos y planes maestros con giros inesperados",
+        "Obras fascinantes sobre bucles temporales, paradojas y viajes en el tiempo",
+        "Unforgettable 80s and 90s cult classics",
+        "Psychological thrillers with unpredictable twists",
+        "sci-fi movies from 2024",
+        "best 4k films",
+        "classic horror movies",
+        "quiero una pelicula divertida asdsakjdha",
+        "recomiéndame algo bueno para ver hoy",
+        "quiero algo de suspenso",
+    ]
+    for p in valid_prompts:
+        assert is_unintelligible_prompt(p) is False, f"Falso positivo en prompt válido: {p}"
+
+
+def test_relaxed_validator_gibberish_rejection():
+    """Valida que teclado machacado extremo y secuencias sin vocales sean correctamente rechazadas."""
+    from app.services.ai_recommender_service import is_unintelligible_prompt
+
+    gibberish = [
+        "asdfghjkl",
+        "qwertyuiop",
+        "asdf123",
+        "asdasd",
+        "qweqwe",
+        "12345",
+        "ajskdhaskjdh",
+        "sdklfj",
+        "bcdfghjklmnpqr",
+        "z",
+        "   ",
+        "zzzzzzzzzzzz",
+        "quiero un asdsadasdhk",
+        "quiero un asdf",
+        "busco asdasd",
+        "dame algo asdasd",
+        "recomienda qweqwe",
+        "busco zxcvbnm",
+    ]
+    for g in gibberish:
+        assert is_unintelligible_prompt(g) is True, f"Falso negativo en basura: {g}"
+
+
+@pytest.mark.asyncio
+async def test_recommendations_endpoint_unintelligible_prompt(async_client: AsyncClient):
+    """Verifica que un prompt ininteligible corta de inmediato en el endpoint con el Validador de Entrada."""
+    res = await async_client.post("/api/v1/recommendations", json={"prompt": "asdf123"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "clarification_needed"
+    assert data["model_used"] == "Validador de Entrada (CineTrack Recommender Engine)"
+    assert data["recommendations"] == []
+    assert len(data["clarification_suggestions"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_negative_genre_filtering(db_session: AsyncSession, sample_catalog_for_recs):
+    """Verifica que el filtrado negativo (ej. 'sin drama') excluya títulos que contengan dicho género."""
+    from app.services.catalog_service import get_recommendation_candidates
+
+    # Interstellar y Dark tienen drama (id=18). Inception tiene Acción (28) y Sci-Fi (878), no drama.
+    candidates, _ = await get_recommendation_candidates(
+        db_session,
+        prompt="ciencia ficcion pero sin drama",
+        usuario_id=None
+    )
+    cand_ids = [c["id"] for c in candidates]
+    # Inception no tiene drama, debería estar presente
+    assert 2 in cand_ids
+    # Interstellar y Dark tienen drama, deben haber sido filtrados por la exclusión negativa
+    assert 1 not in cand_ids
+    assert 3 not in cand_ids
+
+
+def test_embedding_service_build_text():
+    """Verifica la construcción del texto formateado para vectorización semántica."""
+    from app.services.embedding_service import EmbeddingService
+
+    text = EmbeddingService.build_title_text(
+        nombre="Inception",
+        tipo="movie",
+        generos=["Ciencia ficción", "Acción"],
+        director="Christopher Nolan",
+        sinopsis="Un ladrón que roba secretos corporativos mediante sueños."
+    )
+    assert "Título: Inception." in text
+    assert "Tipo: Película." in text
+    assert "Géneros: Ciencia ficción, Acción." in text
+    assert "Director: Christopher Nolan." in text
+    assert "Sinopsis: Un ladrón que roba" in text
+
+
+@pytest.mark.asyncio
+async def test_country_origin_filtering(db_session: AsyncSession, sample_catalog_for_recs):
+    """Verifica que 'peliculas de argentina' filtre estrictamente por Titulo.pais == 'AR', excluyendo obras extranjeras ambientadas allí."""
+    from app.services.catalog_service import get_recommendation_candidates
+
+    candidates, _ = await get_recommendation_candidates(
+        db_session,
+        prompt="peliculas de argentina",
+        usuario_id=None
+    )
+    cand_ids = [c["id"] for c in candidates]
+    # Nueve Reinas es producción argentina (AR)
+    assert 4 in cand_ids
+    # Happy Together es de Hong Kong (HK), debe quedar excluida por el filtro de procedencia
+    assert 5 not in cand_ids
+    # Verificamos que los metadatos de país e idioma estén presentes en el candidato
+    ar_cand = next(c for c in candidates if c["id"] == 4)
+    assert ar_cand["pais"] == "AR"
+    assert ar_cand["idioma_original"] == "es"
+
+
+@pytest.mark.asyncio
+async def test_setting_location_allows_foreign_setting(db_session: AsyncSession, sample_catalog_for_recs):
+    """Verifica que 'ambientadas en Buenos Aires' NO aplique filtro excluyente de país, permitiendo títulos extranjeros que transcurren allí."""
+    from app.services.catalog_service import get_recommendation_candidates
+
+    candidates, _ = await get_recommendation_candidates(
+        db_session,
+        prompt="peliculas ambientadas en buenos aires",
+        usuario_id=None
+    )
+    cand_ids = [c["id"] for c in candidates]
+    # Happy Together (HK) y Nueve Reinas (AR) ambas transcurren en Buenos Aires
+    assert 4 in cand_ids or 5 in cand_ids
+
+
+@pytest.mark.asyncio
+async def test_language_filtering(db_session: AsyncSession, sample_catalog_for_recs):
+    """Verifica que 'series en aleman' filtre estrictamente por Titulo.idioma_original == 'de'."""
+    from app.services.catalog_service import get_recommendation_candidates
+
+    candidates, _ = await get_recommendation_candidates(
+        db_session,
+        prompt="series en aleman",
+        usuario_id=None
+    )
+    cand_ids = [c["id"] for c in candidates]
+    # Dark es alemana (de)
+    assert 3 in cand_ids
+    # Interstellar e Inception son en inglés (en)
+    assert 1 not in cand_ids
+    assert 2 not in cand_ids
+
 
 

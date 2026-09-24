@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 1480" width="1160" height="1480" style="background-color: #020617; font-family: system-ui, -apple-system, sans-serif;">
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- TÍTULO PRINCIPAL -->
+  <text x="580" y="32" font-size="20" font-weight="bold" fill="#38bdf8" text-anchor="middle">CINETRACK — ARQUITECTURA DEL RECOMENDADOR HÍBRIDO (FASE 8)</text>
+
+  <!-- Conectores / Flechas de Fondo -->
+  <g stroke="#475569" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Paso 1 a Paso 2 -->
+    <path d="M 580 140 L 580 180"/>
+    
+    <!-- Paso 2 a bifurcación DB (Paso 3) -->
+    <path d="M 580 295 L 580 340"/>
+    <path d="M 580 340 L 350 340 L 350 380"/>
+    <path d="M 580 340 L 810 340 L 810 380"/>
+    
+    <!-- DB a Pool -->
+    <path d="M 350 540 L 350 575 L 580 575 L 580 610"/>
+    <path d="M 810 540 L 810 575 L 580 575"/>
+
+    <!-- Pool a Paso 4 (LLM Cascada) -->
+    <path d="M 580 690 L 580 730"/>
+
+    <!-- Cascada Nivel 1 -> Nivel 2 -> Nivel 3 -->
+    <path d="M 580 950 L 580 980"/>
+    <path d="M 580 1190 L 580 1220"/>
+    <path d="M 580 1330 L 580 1360"/>
+  </g>
+
+  <!-- ================= PASO 1 ================= -->
+  <g transform="translate(180, 50)" filter="url(#shadow)">
+    <rect width="800" height="90" rx="14" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <rect x="0" y="0" width="800" height="30" rx="14" fill="#dc2626"/>
+    <rect x="0" y="18" width="800" height="12" fill="#dc2626"/>
+    <text x="400" y="21" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">PASO 1: VALIDACIÓN &amp; SANITIZACIÓN INMEDIATA (is_unintelligible_prompt)</text>
+    <text x="400" y="55" font-size="14" font-weight="600" fill="#f8fafc" text-anchor="middle">Filtro temprano determinista de texto ilegítimo, spam o teclado machacado</text>
+    <text x="400" y="76" font-size="12" fill="#fca5a5" text-anchor="middle">⚠️ Si es ininteligible: Retorna aclaración amigable y sugerencias de inmediato SIN llamar a BD ni LLMs</text>
+  </g>
+
+  <!-- ================= PASO 2 ================= -->
+  <g transform="translate(180, 180)" filter="url(#shadow)">
+    <rect width="800" height="115" rx="14" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <rect x="0" y="0" width="800" height="30" rx="14" fill="#2563eb"/>
+    <rect x="0" y="18" width="800" height="12" fill="#2563eb"/>
+    <text x="400" y="21" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">PASO 2: EXTRACCIÓN DE INTENCIÓN SEMÁNTICA &amp; RESTRICCIONES DURAS</text>
+    <text x="400" y="55" font-size="14" font-weight="600" fill="#f8fafc" text-anchor="middle">"Películas de atracos de los 80 sin animación que no haya visto"</text>
+    <text x="400" y="78" font-size="12" fill="#93c5fd" text-anchor="middle">Intención Semántica: "atracos, robos, planes maestros" • Década: 1980-1989 • Tipo: movie</text>
+    <text x="400" y="98" font-size="12" fill="#cbd5e1" text-anchor="middle">Restricciones Duras: Excluir 'Animación' (GENRE_NEGATION_MAP) • Excluir biblioteca de vistas</text>
+  </g>
+
+  <!-- ================= PASO 3: BÚSQUEDA HÍBRIDA ================= -->
+  <!-- PostgreSQL Branch Card -->
+  <g transform="translate(130, 380)" filter="url(#shadow)">
+    <rect width="440" height="160" rx="14" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
+    <text x="220" y="30" font-size="15" font-weight="bold" fill="#a7f3d0" text-anchor="middle">PostgreSQL / Neon (Producción &amp; Dev)</text>
+    <text x="20" y="60" font-size="13" fill="#ecfdf5">1. Vectoriza intención con gemini-embedding-001 (768 dim)</text>
+    <text x="20" y="85" font-size="13" fill="#ecfdf5">2. Búsqueda vectorial pgvector: Titulo.embedding &lt;=&gt; user_vec</text>
+    <text x="20" y="110" font-size="13" fill="#ecfdf5">3. Acelerado por índice HNSW sobre 3.864 vectores</text>
+    <text x="20" y="135" font-size="13" fill="#6ee7b7">4. Combina con cláusulas WHERE duras y búsqueda léxica</text>
+  </g>
+
+  <!-- SQLite Branch Card -->
+  <g transform="translate(590, 380)" filter="url(#shadow)">
+    <rect width="440" height="160" rx="14" fill="#451a03" stroke="#f59e0b" stroke-width="2"/>
+    <text x="220" y="30" font-size="15" font-weight="bold" fill="#fde68a" text-anchor="middle">SQLite Local (.env.local / Offline)</text>
+    <text x="20" y="60" font-size="13" fill="#fef3c7">1. Detecta SQLite: OMITE vectorización automáticamente</text>
+    <text x="20" y="85" font-size="13" fill="#fef3c7">2. Cero llamadas a APIs externas / Cero consumo de cuota</text>
+    <text x="20" y="110" font-size="13" fill="#fef3c7">3. Búsqueda léxica y temática pura (géneros, elenco, sinopsis)</text>
+    <text x="20" y="135" font-size="13" fill="#fde68a">4. Ponderación por popularidad TMDB y filtros de usuario</text>
+  </g>
+
+  <!-- Candidatos Pool -->
+  <g transform="translate(280, 610)" filter="url(#shadow)">
+    <rect width="600" height="80" rx="14" fill="#1e293b" stroke="#818cf8" stroke-width="2"/>
+    <text x="300" y="32" font-size="15" font-weight="bold" fill="#c7d2fe" text-anchor="middle">PASO 3: POOL HÍBRIDO DE CANDIDATOS (~35 TÍTULOS)</text>
+    <text x="300" y="58" font-size="13" fill="#94a3b8" text-anchor="middle">Candidatos depurados por filtros duros y ordenados por similitud + popularidad</text>
+  </g>
+
+  <!-- ================= PASO 4: CASCADA LLM MULTI-NIVEL ================= -->
+  <!-- Nivel 1: Modelos Insignia Principales -->
+  <g transform="translate(80, 730)" filter="url(#shadow)">
+    <rect width="1000" height="220" rx="16" fill="#0f172a" stroke="#6366f1" stroke-width="2"/>
+    <rect x="0" y="0" width="1000" height="32" rx="16" fill="#4f46e5"/>
+    <rect x="0" y="18" width="1000" height="14" fill="#4f46e5"/>
+    <text x="500" y="22" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">PASO 4 — NIVEL 1: MODELOS INSIGNIA PRINCIPALES (Gemini Principal ➔ Groq Principal)</text>
+
+    <!-- Gemini Principal -->
+    <g transform="translate(25, 48)">
+      <rect width="455" height="150" rx="12" fill="#0c4a6e" stroke="#0284c7" stroke-width="1.5"/>
+      <text x="227" y="26" font-size="14" font-weight="bold" fill="#38bdf8" text-anchor="middle">1. Google Gemini — Modelo Primario</text>
+      <text x="18" y="55" font-size="13" fill="#e0f2fe">⚡ Modelo: gemini-3.6-flash</text>
+      <text x="18" y="80" font-size="13" fill="#e0f2fe">🔑 Key 1 (Activa) ➔ Si da 429: Key 2 (Rotación inmediata)</text>
+      <text x="18" y="105" font-size="12" fill="#bae6fd">Genera recommendations + justificaciones cinematográficas</text>
+      <text x="18" y="130" font-size="12" fill="#fca5a5">❌ Si agota keys en 3.6-flash: Conmuta al modelo insignia de Groq</text>
+    </g>
+
+    <!-- Groq Principal -->
+    <g transform="translate(520, 48)">
+      <rect width="455" height="150" rx="12" fill="#7c2d12" stroke="#ea580c" stroke-width="1.5"/>
+      <text x="227" y="26" font-size="14" font-weight="bold" fill="#fdba74" text-anchor="middle">2. Groq Cloud — Modelo Primario</text>
+      <text x="18" y="55" font-size="13" fill="#ffedd5">⚡ Modelo: openai/gpt-oss-120b</text>
+      <text x="18" y="80" font-size="13" fill="#ffedd5">🔑 Key 1 (Activa) ➔ Si da 429: Key 2 (Rotación inmediata)</text>
+      <text x="18" y="105" font-size="12" fill="#fed7aa">Procesamiento ultra-rápido en LPUs de Groq Cloud</text>
+      <text x="18" y="130" font-size="12" fill="#fca5a5">❌ Si agota keys en 120b: Pasa a Nivel 2 (Fallbacks ligeros)</text>
+    </g>
+  </g>
+
+  <!-- Nivel 2: Modelos de Respaldo Ligeros -->
+  <g transform="translate(80, 980)" filter="url(#shadow)">
+    <rect width="1000" height="210" rx="16" fill="#0f172a" stroke="#8b5cf6" stroke-width="1.5"/>
+    <rect x="0" y="0" width="1000" height="32" rx="16" fill="#7c3aed"/>
+    <rect x="0" y="18" width="1000" height="14" fill="#7c3aed"/>
+    <text x="500" y="22" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">PASO 4 — NIVEL 2: MODELOS DE RESPALDO LIGEROS (Gemini Fallbacks ➔ Groq Fallbacks)</text>
+
+    <!-- Gemini Fallbacks -->
+    <g transform="translate(25, 48)">
+      <rect width="455" height="140" rx="12" fill="#0e3d54" stroke="#0ea5e9" stroke-width="1"/>
+      <text x="227" y="26" font-size="14" font-weight="bold" fill="#7dd3fc" text-anchor="middle">Fallbacks Gemini (con Multi-Key)</text>
+      <text x="18" y="55" font-size="13" fill="#e0f2fe">1. gemini-flash-lite-latest (ultra liviano)</text>
+      <text x="18" y="80" font-size="13" fill="#e0f2fe">2. gemini-3.5-flash-lite (generación rápida)</text>
+      <text x="18" y="105" font-size="13" fill="#e0f2fe">3. gemini-3.8-flash (alta disponibilidad)</text>
+      <text x="18" y="127" font-size="12" fill="#bae6fd">Cada modelo evalúa ambas API Keys antes de saltar</text>
+    </g>
+
+    <!-- Groq Fallbacks -->
+    <g transform="translate(520, 48)">
+      <rect width="455" height="140" rx="12" fill="#5c200b" stroke="#f97316" stroke-width="1"/>
+      <text x="227" y="26" font-size="14" font-weight="bold" fill="#fed7aa" text-anchor="middle">Fallbacks Groq (con Multi-Key)</text>
+      <text x="18" y="55" font-size="13" fill="#ffedd5">1. openai/gpt-oss-20b (modelo compacto)</text>
+      <text x="18" y="80" font-size="13" fill="#ffedd5">2. groq/compound-mini (alta tasa por minuto)</text>
+      <text x="18" y="105" font-size="13" fill="#ffedd5">3. qwen/qwen3.8-27b (razonamiento alternativo)</text>
+      <text x="18" y="127" font-size="12" fill="#fed7aa">Cada modelo evalúa ambas API Keys antes de saltar</text>
+    </g>
+  </g>
+
+  <!-- Nivel 3: Fallback Heurístico Offline -->
+  <g transform="translate(180, 1220)" filter="url(#shadow)">
+    <rect width="800" height="110" rx="14" fill="#334155" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="400" y="32" font-size="15" font-weight="bold" fill="#f1f5f9" text-anchor="middle">PASO 4 — NIVEL 3: FALLBACK HEURÍSTICO OFFLINE (GARANTÍA 100% DE RESPUESTA)</text>
+    <text x="400" y="60" font-size="13" fill="#cbd5e1" text-anchor="middle">Algoritmo matemático determinístico sin llamadas a APIs externas (Cero dependencias)</text>
+    <text x="400" y="85" font-size="13" fill="#e2e8f0" text-anchor="middle">Scoring por afinidad de género + popularidad ponderada + rating unificado + coincidencia léxica</text>
+  </g>
+
+  <!-- ================= PASO 5: RESPUESTA FINAL ================= -->
+  <g transform="translate(180, 1360)" filter="url(#shadow)">
+    <rect width="800" height="85" rx="16" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="400" y="32" font-size="16" font-weight="bold" fill="#bbf7d0" text-anchor="middle">PASO 5: RESPUESTA JSON FINAL Y PRESENTACIÓN EN LA UI</text>
+    <text x="400" y="58" font-size="14" fill="#dcfce7" text-anchor="middle">TitleCards hidratadas + Justificaciones contextuales + Trazabilidad transparente ("model_used")</text>
+  </g>
+</svg>

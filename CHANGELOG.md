@@ -2,6 +2,39 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.1.0] - 2026-09-23
+### Agregado & Mejorado (Fase 8: Recomendador Inteligente RAG Híbrido, Batería de Pruebas y Procedencia)
+- **Motor de Recomendación RAG Híbrido (Vectorial + SQL):**
+  - **Persistencia Vectorial Nativa (`pgvector`):**
+    - Habilitación de la extensión `pgvector` en PostgreSQL Neon y adición de la columna `embedding VECTOR(768)` en la tabla `titulos` (Migración Alembic `0005_pgvector_embedding.py`).
+    - Creación de índice HNSW (`vector_cosine_ops`) para búsqueda semántica por similitud coseno en submilisegundos.
+    - Compatibilidad dual automática: uso nativo del operador `<=>` en PostgreSQL y fallback transparente a búsqueda léxica/temática cuando se opera contra SQLite (permitiendo ejecución instantánea de tests y trabajo offline).
+  - **Generación de Embeddings Multilingües con Google AI Studio:**
+    - Creación de `EmbeddingService` (`app/services/embedding_service.py`) integrando `gemini-embedding-001` (768 dimensiones) con fallback a `gemini-embedding-2`.
+    - Soporte de vectorización masiva por bloques (`batchEmbedContents`) con control de rate-limit y reintentos exponenciales.
+    - Script CLI `backend/scripts/sync_embeddings.py` y módulo `app.jobs.sync_embeddings` para cálculo y sincronización histórica del catálogo.
+    - Integración automática de `sync_pending_embeddings()` en la tarea diaria `run_daily_sync()` de TMDB para vectorizar nuevos títulos sobre la marcha.
+  - **Jerarquización de Entidades y Fuzzy Matching Difuso (`pg_trgm`):**
+    - Activación de la extensión nativa `pg_trgm` en PostgreSQL Neon (`similarity(nombre, :query) >= 0.45`).
+    - Tolerancia automática a errores ortográficos y tipográficos en nombres de actores y directores (ej: *"brad pit"*, *"ian mckelen"*, *"scorsece"*).
+    - Jerarquía de candidatos prioritaria: 1º Entidades directas (actores/directores) -> 2º Coincidencias de sinopsis -> 3º Similitud vectorial `pgvector` -> 4º Fallback de aclamadas, evitando la dilución de embeddings sobre nombres propios.
+  - **Filtrado Negativo Estricto:**
+    - Detección determinista de patrones de descarte en lenguaje natural (ej. *"no anime"*, *"sin terror"*, *"nada de comedia"*).
+    - Inyección de cláusula SQL `WHERE titulos.id NOT IN (subquery géneros)` para garantizar la exclusión absoluta de obras no deseadas antes del ordenamiento semántico.
+  - **Procedencia Geográfica Dual-Track (Origen vs. Ambientación) e Idioma Original:**
+    - **Producción / Origen:** Mapeo de gentilicios y países (ISO 3166-1) con filtro estricto SQL `Titulo.pais` (ej: *"películas de Argentina"*, *"cine francés"* garantiza 100% obras del país y excluye intrusos extranjeros).
+    - **Ambientación / Setting:** Detección de patrones de locación (*"ambientada en"*, *"que transcurra en"*, *"historias en Buenos Aires"*); inyecta prioritariamente producciones nacionales del lugar e incorpora obras internacionales situadas allí, transparentando su procedencia en el prompt.
+    - **Idioma Original:** Mapeo de expresiones lingüísticas (ISO 639-1) aplicando filtro estricto SQL `Titulo.idioma_original` (ej: *"series en coreano"*).
+    - **Metadatos en LLM:** Inyección de `País` e `Idioma original` en `CandidateTitle` y en las tarjetas del prompt, junto a directivas en `SYSTEM_PROMPT` para fundamentar con precisión el contraste geográfico.
+  - **Soporte Avanzado de Biblioteca y Modos de Rewatch:**
+    - Desdoblamiento entre *Inclusión Mixta* (*"podés incluir algo que ya vi"*) y *Rewatch Exclusivo* (*"solo películas que ya vi"*), resolviendo el balance óptimo entre obras vistas para revivir y no vistas para descubrir.
+  - **Validador de Entrada Local y Manejo de Ambigüedad (Opción C):**
+    - Validador determinista `is_unintelligible_prompt` que corta en seco (1.8s, 0 ms de LLM) basura extrema y combinaciones aleatorias de caracteres sin sentido lingüístico, mientras tolera términos alfanuméricos válidos (*"80s"*, *"sci-fi"*).
+    - Resolución de ambigüedad extrema ofreciendo 2-3 obras contrastantes y 3-4 sugerencias temáticas interactivas para continuar el diálogo.
+  - **Batería de Pruebas y Cobertura:**
+    - Ejecución automatizada de batería de 20 casos de prueba de borde con 100% de éxito en modo autenticado e invitado.
+    - Suite de backend ampliada a 79 tests unitarios e integración pasando en verde (`pytest`). Tests de frontend pasando al 100% (`vitest`).
+
 ## [v1.0.2] - 2026-09-22
 ### Corregido
 - **Ordenamiento Multicriterio en Sección Top Rated:**

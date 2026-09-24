@@ -146,19 +146,30 @@
 
 ---
 
-## Hito Actual: Fase 8 — Robustecimiento y Calidad del Recomendador con IA (Pre-Entrega)
-- [ ] **Paso 8.1: Diagnóstico y calibración del Validador Previo (`is_unintelligible_prompt`):**
-  - Identificar la causa de falsos positivos en prompts sugeridos/predefinidos en español e inglés (ej. "Películas de atracos...", "Obras fascinantes sobre bucles temporales...").
-  - Rediseñar el validador para que solo filtre basura evidente (teclado machacado, gibberish, caracteres de control) sin rechazar oraciones estructuradas con lenguaje cinematográfico natural.
-- [ ] **Paso 8.2: Calidad de Recomendación y Tratamiento de Prompts Ambigüos/Vagos:**
-  - Ante consultas de alta calidad, asegurar recomendaciones ricas, coherentes y justificadas en afinidad semántica.
-  - Ante consultas pobres, ambiguas o que no arrojen coincidencias claras, responder de forma transparente y útil (pidiendo aclaración o sugiriendo la mejor alternativa posible del catálogo).
-- [ ] **Paso 8.3: Evaluación e Integración de Búsqueda Semántica Vectorial con Embeddings (RAG):**
-  - Analizar viabilidad y arquitectura de embeddings (modelo local ligero en CPU o Google Text-Embedding API + similitud de coseno en BD/memoria).
-  - Integrar el paso de recuperación semántica previa al grounding del LLM para elevar sustancialmente la precisión de los títulos candidatos.
-- [ ] **Paso 8.4: Suite de Pruebas Automatizadas y Validación E2E:**
-  - Tests unitarios y de integración para prompts predefinidos, multilingües y casos límite.
-  - Verificación en local y en producción (Render/Vercel).
+## Hito Actual: Fase 8 — Robustecimiento y Calidad del Recomendador con IA (RAG Híbrido)
+- [x] **Paso 8.1: Calibración del Validador Previo (`is_unintelligible_prompt`):**
+  - Rediseñar el validador para que solo filtre basura extrema (teclado machacado sin vocales, strings cortísimos) sin rechazar oraciones naturales ni mezclas de números/letras (ej. "80s").
+- [x] **Paso 8.2: Preparación de la Base de Datos (Neon Dev):**
+  - [x] Crear rama hija en Neon (development branch) para mantener la data y aislar las pruebas.
+  - [x] Modificar el modelo `Titulo` para agregar la columna vectorial `embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)`.
+  - [x] Crear y ejecutar migración Alembic `0005_pgvector_embedding.py` (`CREATE EXTENSION vector;` + índice HNSW `vector_cosine_ops`).
+- [x] **Paso 8.3: Integración de Embeddings (Google AI Studio Embeddings):**
+  - [x] Crear `EmbeddingService` (`gemini-embedding-001` con dimensión 768 y batching `batchEmbedContents`).
+  - [x] Crear job `sync_embeddings.py` y script CLI `backend/scripts/sync_embeddings.py` para calcular embeddings del catálogo.
+  - [x] Integrar `sync_pending_embeddings()` en `tmdb_sync_service.py` para sincronización automática de títulos nuevos.
+- [x] **Paso 8.4: Sistema de Recomendación Híbrido (Vector + SQL):**
+  - [x] **Filtrado Negativo Estricto:** Detección de exclusiones ("no anime", "sin comedia", etc.) y aplicación de `WHERE id NOT IN (subquery géneros)`.
+  - [x] **Búsqueda Vectorial:** Similitud coseno con `pgvector` (`Titulo.embedding.cosine_distance(user_vec).asc()`) con fallback automático y elegante a búsqueda léxica.
+- [x] **Paso 8.5: Manejo de Ambigüedad:**
+  - [x] Calibración de `SYSTEM_PROMPT` con la política de Opción C (respuesta amable ante pedidos vagos, repreguntas temáticas contrastantes y muestra de 2 títulos variados).
+- [x] **Paso 8.6: Pruebas, Calibración Avanzada y Cierre (v1.1.0):**
+  - [x] Jerarquización de entidades y fuzzy matching difuso con `pg_trgm` (tolerancia a errores ortográficos como 'brad pit' o 'scorsece').
+  - [x] Soporte avanzado para rewatch: desdoblamiento de inclusión mixta (*"podés incluir lo que ya vi"*) vs. rewatch exclusivo (*"solo lo que ya vi"*).
+  - [x] Reconocimiento dual-track de Procedencia Geográfica: país de producción estricto (`Titulo.pais`) vs. historias ambientadas/locación (setting/lore en sinopsis y vector search, con inclusión de títulos nacionales).
+  - [x] Filtro estricto de idioma original (`Titulo.idioma_original`).
+  - [x] Batería automatizada de 20 casos de prueba de borde con 100% de éxito en modo autenticado e invitado.
+  - [x] Suite completa de backend ampliada a 79 tests pasando en verde (`pytest`) y tests de frontend en verde (`vitest`).
+  - [x] Tag `v1.1.0`.
 
 ---
 

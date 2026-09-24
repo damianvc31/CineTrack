@@ -37,11 +37,32 @@ Variables clave requeridas:
   - `TMDB_EXPAND_TITLES_PER_GENRE`: Títulos objetivo a ingerir por género (default: `50`).
 - `HOME_*`: Parámetros de ajuste de ventanas temporales, pools y umbrales de Home (`HOME_NEW_RELEASES_DAYS=30`, `HOME_TRENDING_DAYS=90`, `HOME_TRENDING_MIN_POPULARITY_PERCENTILE=0.80`, etc.)
 
+### Gestión de Ambientes en Desarrollo (`.env` vs `.env.local`)
+El proyecto admite alternar fluidamente entre dos bases de datos para desarrollo local:
+- **`.env` (Neon PostgreSQL / Dev Branch):** Configuración base con soporte para `pgvector` y búsqueda vectorial semántica. Es el entorno activo por defecto.
+- **`.env.local` (SQLite Local):** Configuración liviana y veloz (`sqlite+aiosqlite:///cinetrack.db`), ideal para iteración rápida de interfaz o pruebas que no requieren el recomendador vectorial.
+
 ---
 
 ## 3. Instalación y Ejecución
 
-### Backend
+### Ejecución Directa desde la Raíz (`CineTrack/`)
+Puedes arrancar ambos servicios sin cambiar de directorio:
+
+```powershell
+# Backend con Neon PostgreSQL (.env por defecto)
+uvicorn app.main:app --reload --app-dir backend
+
+# Backend con SQLite Local (.env.local)
+uvicorn app.main:app --reload --app-dir backend --env-file .env.local
+
+# Frontend (Vite)
+npm --prefix frontend run dev
+```
+
+### Ejecución Tradicional por Carpetas
+
+#### Backend
 ```powershell
 cd backend
 python -m venv .venv
@@ -54,8 +75,11 @@ alembic upgrade head
 # Correr tests
 pytest
 
-# Iniciar servidor de desarrollo
+# Iniciar servidor con Neon PostgreSQL (.env)
 uvicorn app.main:app --reload --port 8000
+
+# Iniciar servidor alternativo con SQLite (.env.local en raíz)
+uvicorn app.main:app --reload --port 8000 --env-file ../.env.local
 ```
 
 #### Comandos de Migraciones (Alembic)
@@ -261,7 +285,7 @@ VITE_API_URL=http://localhost:8000/api/v1
 - `/reviews`: **Reseñas y Opiniones** con pestañas "My Reviews" (gestión centralizada de reseñas propias) y "Pending Reviews" (títulos vistos sin reseñar con redactor rápido in-place).
 - `/library`: **Mi Biblioteca** con pestañas de Favoritos, Watchlist, Siguiendo y Vistas (actualización silenciosa en background sin layout shifts).
 - `/profile`: **Perfil de Usuario** con desglose de estadísticas de tiempo invertido (horas/semanas en cine vs TV), Top 5 personalizable y gráfico interactivo Donut SVG de distribución de géneros.
-- `/recommendations`: **Asistente IA de Recomendaciones** con consultas conversacionales en lenguaje natural, disparadores de inspiración variados (subgéneros, décadas, directores, actores, emociones), badges claros de tipo (Película / Serie), visualización del proveedor y modelo utilizado, y botón de reintento ante degradación temporal.
+- `/recommendations`: **Asistente IA de Recomendaciones (RAG Híbrido)** con búsqueda semántica vectorial de 768 dimensiones con `pgvector` e índice HNSW, filtrado relacional con exclusiones negativas estrictas (*"sin animación"*), jerarquización de actores y directores con fuzzy matching difuso vía `pg_trgm` (*"brad pit"*), reconocimiento dual-track de procedencia (país de producción estricto vs. ambientación/locación e idioma original), y cascada multi-modelo resiliente entre Google Gemini y Groq API con degradación elegante a motor heurístico determinista local.
 - `/settings`: **Configuración de Usuario** con cambio seguro de contraseña y selector de idioma reactivo para la interfaz (Español / English).
 - **PWA Instalable:** Acceso directo como aplicación nativa en dispositivos móviles y de escritorio gracias al soporte de `manifest.json` y Web App Manifest.
 

@@ -56,14 +56,24 @@
   - Mantenimiento mensual programado de fotos de elenco (`.github/workflows/monthly_actor_photos.yml`).
   - Verificación funcional integral, normalizaciones de conexión y documentación de entrega final.
 
-### Fase 8: Robustecimiento y Calidad del Recomendador con IA (Hito Académico / Pre-Entrega)
-- [ ] **Corrección Integral del Validador Previo de Entrada:**
-  - Calibrar o rediseñar `is_unintelligible_prompt` para erradicar falsos positivos (garantizando que nunca rechace prompts legítimos, sugerencias predefinidas en español o inglés ni consultas temáticas extensas).
-- [ ] **Manejo de Calidad de Recomendación y Feedback:**
-  - Ante un prompt claro y bien definido, garantizar recomendaciones de alta precisión y afinidad cinematográfica.
-  - Ante un prompt vago, confuso o insuficiente, informar con claridad al usuario que no se puede brindar una recomendación exacta, solicitando aclaraciones orientadas o sugiriendo la mejor alternativa disponible.
-- [ ] **Búsqueda Semántica Vectorial con Embeddings (RAG):**
-  - Evaluar e integrar modelo de embeddings y búsqueda por similitud vectorial (enriqueciendo el emparejamiento semántico del catálogo sin comprometer tiempos de respuesta).
+### Fase 8: Robustecimiento y Calidad del Recomendador con IA (RAG Híbrido, Fuzzy Matching y Procedencia)
+- [x] **Corrección Integral del Validador Previo de Entrada:**
+  - Validador `is_unintelligible_prompt` rediseñado para erradicar falsos positivos (admite expresiones naturales como "80s", "sci-fi", "psychological", números y oraciones extensas en español e inglés, bloqueando exclusivamente teclado machacado real).
+- [x] **Manejo de Calidad de Recomendación y Ambigüedad (Opción C):**
+  - Ante prompts claros, recuperación semántica de alta fidelidad vía embeddings y justificaciones sólidas.
+  - Ante prompts ambiguos o vagos ("recomiéndame algo bueno"), respuesta amigable con 2 títulos contrastantes y sugerencias temáticas en chips para guiar al usuario.
+- [x] **Búsqueda Semántica Vectorial con Embeddings (RAG Híbrido):**
+  - Integración de `pgvector` en PostgreSQL Neon con columna `embedding VECTOR(768)` e índice HNSW (`vector_cosine_ops`).
+  - Generación de vectores con Google AI Studio (`gemini-embedding-001`), filtrado negativo estricto ("no anime", "sin comedia") y fallback automático a búsqueda léxica.
+- [x] **Jerarquización de Entidades y Fuzzy Matching (`pg_trgm`):**
+  - Tolerancia difusa a errores ortográficos en nombres propios de actores y directores (ej: "brad pit", "ian mckelen", "scorsece").
+- [x] **Procedencia Geográfica Dual-Track e Idioma Original:**
+  - Diferenciación sintáctica entre país de producción estricto (`Titulo.pais`) vs. ambientación/locación (setting/lore con inclusión de títulos nacionales y extranjeros fundamentados).
+  - Filtro estricto por idioma original (`Titulo.idioma_original`).
+- [x] **Inclusión Mixta de Biblioteca y Rewatch Avanzado:**
+  - Balance entre inclusión de obras vistas para revivir y no vistas para descubrir.
+- [x] **Batería de Pruebas y Cobertura (v1.1.0):**
+  - Suite de 20 casos de prueba de borde con 100% de éxito, 79 tests de backend (`pytest`) y 2 tests de frontend (`vitest`) en verde.
 
 ### Fase 9: Optimización de Rendimiento y Latencia en Home
 - [ ] **Optimización de Latencia en Home (`GET /api/v1/home`):**
@@ -92,6 +102,6 @@
   - Tabla de traducciones multilingüe conectada a TMDB, con regla de fallback al inglés/idioma original para contenidos o idiomas faltantes.
 - [x] **Expansión selectiva del catálogo mediante jobs dirigidos (Criterio 1):** *(Completado en v0.9.1)*
   - Job CLI `python -m app.jobs.sync_tmdb --expand` con filtro por género (individual o masivo), tipo de medio (`both`, `movie`, `tv`) y umbrales configurables de votos (`min_vote_count`) y calificación (`min_vote_average`) sin duplicar títulos existentes ni rehacer la ingesta inicial completa.
-- [ ] **Recomendador avanzado (Post-Entrega):**
-  - Evolución del recomendador hacia búsqueda semántica vectorial mediante embeddings (`fastembed` en CPU o Google Text-Embedding API) y `pgvector` en PostgreSQL. Se prescinde formalmente de *function calling* por inviabilidad técnica en producción (latencia acumulada de 5-8s y rápido agotamiento de cuotas TPM en capas gratuitas), adoptando un patrón RAG híbrido de un solo turno.
+- [x] **Recomendador avanzado (RAG Híbrido):** *(Completado en Fase 8)*
+  - Búsqueda semántica vectorial con embeddings de 768 dimensiones vía Google AI Studio y `pgvector` en PostgreSQL Neon con índice HNSW, filtrado negativo estricto y fallback léxico.
 - [ ] Posible refinamiento UX en desmarques de episodios: diálogo opcional para advertir al usuario o resetear progreso posterior al desmarcar un episodio intermedio.

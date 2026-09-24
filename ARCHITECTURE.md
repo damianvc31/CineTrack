@@ -62,10 +62,11 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 4. **Cálculo de Percentiles y Métricas Estadísticas:**
    - Uso de la función analítica SQL `PERCENT_RANK() OVER (ORDER BY popularidad ASC)` con fallback algorítmico en memoria para bases de datos que carezcan de soporte nativo para funciones de ventana.
    - Recálculo atómico disparado tras la incorporación o actualización de lotes en el catálogo.
-5. **Recomendador de IA Embebido:**
+5. **Recomendador de IA Embebido (RAG Híbrido Vectorial + SQL — Fase 8):**
    - Desacoplado de los hubs del entorno de desarrollo.
-   - **Versión Mínima (Implementada - v0.9.3):** Recomendador con grounding estricto sobre el catálogo local de PostgreSQL, filtrado bilingüe temático en SQL y cascada jerárquica multi-modelo de 2 niveles entre proveedores de nube (Gemini / Groq) con fallback offline a motor heurístico local. Prompt estructurado directo que combina la consulta con el perfil del usuario (favoritos, vistos, reseñas) sin requerir llamadas agénticas intermedias.
-   - **Versión Superior (Planificada Post-Entrega):** Evolución hacia búsqueda semántica vectorial con embeddings (`fastembed` en CPU o Google Text-Embedding API) persistidos en PostgreSQL con la extensión `pgvector`. **Se descarta formalmente el uso de *function calling* y agentes multi-turno** por inviabilidad técnica en entornos de producción (latencia acumulada de 5-8s y rápido agotamiento de cuotas por minuto/TPM en capas gratuitas). La versión superior consolida una arquitectura RAG híbrida de un solo turno (*single-turn hybrid RAG*): búsqueda vectorial y filtros relacionales directos en backend + generación y justificación cinematográfica en una sola llamada de LLM.
+   - **Búsqueda Semántica Vectorial (`pgvector`):** Vectores de 768 dimensiones generados con Google AI Studio (`gemini-embedding-001`) persistidos en la columna `embedding` de PostgreSQL e indexados con HNSW (`vector_cosine_ops`).
+   - **Filtrado Negativo Estricto:** Detección de exclusiones ("no anime", "sin comedia") y restricciones duras aplicadas en cláusulas SQL `WHERE` antes de computar distancias.
+   - **Cascada Jerárquica y Grounding:** Pool acotado de los 20 mejores candidatos conceptuales inyectados al LLM (Gemini / Groq) con justificación personalizada y fallback determinista.
 
 6. **Motor Integral de Reseñas y Calificación Decimal:**
    - **Regla Estricta 1 Reseña por Usuario por Título:** Garantizada mediante validación y upsert a nivel de servicio y restricciones de unicidad.
@@ -94,20 +95,21 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
     - Job asíncrono `app.jobs.populate_actor_photos` para consultar en lote fotos de actores en TMDB con control de rate limit.
     - Componente visual de Top Cast en `TitleDetailPage` con avatares circulares de actores, fotos oficiales, nombres y personajes.
 
-11. **Motor del Recomendador Inteligente por IA (Fase 6 — MVP):**
-    - **Estrategia Híbrida y Resiliencia con Cascada Jerárquica Multinivel (v0.9.3):**
+11. **Motor del Recomendador Inteligente por IA (RAG Híbrido — Fase 8):**
+    - **Recuperación Semántica Vectorial (`pgvector`):** Integración de embeddings con `gemini-embedding-001` (768 dimensiones) almacenados en PostgreSQL Neon y acelerados con índice HNSW (`vector_cosine_ops`).
+    - **Filtrado Negativo Estricto:** Exclusión en tiempo de consulta SQL (`WHERE id NOT IN ...`) ante solicitudes explícitas de descarte (ej. *"no anime"*, *"sin terror"*).
+    - **Estrategia Híbrida y Resiliencia con Cascada Jerárquica Multinivel:**
       - **Nivel 1 (Modelos Insignia / Flagship):** Se prueba primero el modelo insignia del proveedor primario (ej. Gemini `gemini-3.6-flash`). Si falla o agota cuota (HTTP 429), se intenta con el modelo insignia del proveedor secundario (ej. Groq `openai/gpt-oss-120b`), priorizando siempre la máxima capacidad de razonamiento.
       - **Nivel 2 (Modelos Alternativos / Respaldo Ligeros):** Si ambos modelos insignia fallan, se intenta en cascada ordenada con los modelos ligeros de respaldo del primario (`gemini-flash-lite-latest`, `gemini-3.5-flash-lite`, `gemini-3.8-flash`), seguidos por los de respaldo del secundario (`openai/gpt-oss-20b`, `groq/compound-mini`, `qwen/qwen3.8-27b`), aprovechando cuotas y límites independientes.
       - **Nivel 3 (Modo Offline Determinista):** Motor heurístico local si todos los servicios en la nube fallan, garantizando disponibilidad 100%.
       - **Fallo Rápido (Fail-Fast):** Detección inmediata de HTTP 429 sin pausas de reintento redundantes para conmutar de inmediato al siguiente modelo.
     - **Optimización de Cuota y Payload (Grounding Estricto):** El pool de candidatos se limita a 20 títulos (`RECOMMENDATION_CANDIDATES_LIMIT`), reduciendo el consumo en un 73% (de ~5.500 a ~1.500 tokens por consulta) para cuadruplicar el rendimiento de consultas por minuto (TPM) y cuota diaria (TPD). El modelo de lenguaje tiene prohibido inventar títulos externos y debe seleccionar exclusivamente entre los IDs del pool, respondiendo en JSON estructurado validado.
-    - **Afinidad Semántica Bilingüe:** Mapeo de conceptos en español (`THEME_EXPANSION_MAP`) y consulta SQL con filtro cruzado para posicionar títulos altamente relevantes en la cabecera del pool.
-    - **Política de Resolución y Manejo de Incertidumbre:**
-      - Ante prompts genéricos (*"recomiéndame algo bueno"*, *"sorpréndeme"*), el recomendador resuelve con confianza basándose en títulos aclamados y populares del catálogo.
-      - Ante prompts específicos o de nicho, prioriza concordancia temática por sobre popularidad masiva.
-      - Solo ante prompts incomprensibles responde con `status: clarification_needed`, ofreciendo sugerencias interactivas (*chips*) para orientar la búsqueda.
+    - **Política de Resolución y Manejo de Incertidumbre (Opción C):**
+      - Ante prompts genéricos o ambiguos (*"recomiéndame algo bueno"*, *"sorpréndeme"*), el recomendador ofrece 2 o 3 obras contrastantes y genera sugerencias temáticas interactivas (*chips*) para profundizar la búsqueda.
+      - Ante prompts específicos, prioriza concordancia conceptual y semántica vía embeddings.
+      - Validador previo permisivo que admite expresiones coloquiales en inglés/español con números y combinaciones alfanuméricas ("80s", "sci-fi"), bloqueando exclusivamente teclado machacado sin sentido.
     - **Hidratación y Contrato OpenAPI:** Endpoint `POST /api/v1/recommendations`, que devuelve cada título recomendado completamente hidratado como `TitleCardResponse` junto a la justificación personalizada de la IA (`reason`) y el proveedor y modelo exacto utilizado (`provider_used`, `model_used`).
-    - **Especificación Completa y Diagrama de Arquitectura:** El flujo detallado, la cascada de resiliencia y el diagrama Mermaid están documentados en [docs/ARQUITECTURA_RECOMENDADOR.md](docs/ARQUITECTURA_RECOMENDADOR.md) y [docs/UML/recomendador/arquitectura_recomendador_minimo.mmd](docs/UML/recomendador/arquitectura_recomendador_minimo.mmd).
+    - **Especificación Completa y Diagrama de Arquitectura:** El flujo detallado, la cascada de resiliencia y el diagrama Mermaid están documentados en [docs/ARQUITECTURA_RECOMENDADOR.md](docs/ARQUITECTURA_RECOMENDADOR.md) y [docs/UML/recomendador/arquitectura_recomendador_hibrido.mmd](docs/UML/recomendador/arquitectura_recomendador_hibrido.mmd).
 
 ---
 
@@ -248,4 +250,56 @@ Para la puesta en producción y entrega final del proyecto, se adopta una **Arqu
 - **Simplicidad Operativa (KISS):** Elimina la necesidad de aprovisionar y mantener sistemas operativos Linux, túneles SSH, configuración de Nginx y certificados Let's Encrypt manuales.
 - **Contenerización Transparente:** Tanto Render como Vercel ejecutan la aplicación en contenedores Linux aislados y seguros por defecto, sin obligar al desarrollador a mantener `Dockerfile` ni consumir recursos locales de Docker Desktop.
 - **Integración Continua (CI/CD):** Todo cambio o fix commiteado y pusheado se compila, verifica y publica automáticamente en producción en menos de dos minutos.
+
+---
+
+## 7. Arquitectura del Recomendador Inteligente (RAG Híbrido & Cascadas)
+
+```
+                                  PROMPT DEL USUARIO
+                                          │
+                                          ▼
+                      ┌────────────────────────────────────────┐
+                      │ 0. Validador Determinista Local        │
+                      │ • Filtra teclado machacado (0 ms LLM)  │
+                      │ • Admite términos de dominio / alfanum │
+                      └──────────────────┬─────────────────────┘
+                                         │ Válido
+                                         ▼
+                      ┌────────────────────────────────────────┐
+                      │ 1. Recuperación Relacional & Semántica │
+                      │ • Entidades: Actores/Directores        │
+                      │ • pg_trgm: Fuzzy matching (brad pit)   │
+                      │ • pgvector: Similitud Coseno (768d)    │
+                      │ • Filtro Negativo: NOT IN subquery     │
+                      │ • Procedencia: Origen vs. Ambientación │
+                      │ • Idioma Original: ISO 639-1 estricto  │
+                      └──────────────────┬─────────────────────┘
+                                         │ 20 Candidatos
+                                         ▼
+                      ┌────────────────────────────────────────┐
+                      │ 2. Cascada Jerárquica de Modelos (LLM) │
+                      │ • Primario: Gemini Flash               │
+                      │ • Fallback 1: Groq (gpt-oss-120b)      │
+                      │ • Fallback 2: Gemini / Groq ligeros    │
+                      │ • Fallback 3: Motor Heurístico Offline │
+                      └──────────────────┬─────────────────────┘
+                                         │ JSON Estricto
+                                         ▼
+                      ┌────────────────────────────────────────┐
+                      │ 3. Hidratación & Respuesta API         │
+                      │ • Tarjetas interactivas TitleCard      │
+                      │ • Justificaciones contextuales        │
+                      │ • Sugerencias interactivas (Opción C)  │
+                      └────────────────────────────────────────┘
+```
+
+### 7.1. Características Técnicas Centrales
+1. **Persistencia Vectorial (`pgvector`):** Columna `embedding VECTOR(768)` en `titulos` con índice HNSW (`vector_cosine_ops`), vectorizada mediante `gemini-embedding-001`.
+2. **Jerarquización de Entidades y Trigramas (`pg_trgm`):** Prioridad 1 a coincidencias directas de actores y directores con tolerancia difusa (`similarity >= 0.45`), evitando que los embeddings densos diluyan búsquedas por nombres propios.
+3. **Procedencia Geográfica Dual-Track:**
+   - **Producción / Origen:** Filtro estricto SQL por código ISO 3166-1 (`Titulo.pais`) ante gentilicios o expresiones de origen (*"cine argentino"*), garantizando 0 intrusos extranjeros.
+   - **Ambientación / Setting:** Detección de giros de locación (*"ambientada en"*, *"que transcurra en Buenos Aires"*); rescata prioritariamente producciones nacionales (que retratan su propia geografía) e integra obras internacionales filmadas o ambientadas allí, transparentando su país de origen.
+4. **Filtro de Idioma Original:** Mapeo a ISO 639-1 y filtrado estricto sobre `Titulo.idioma_original`.
+5. **Cascada de Resiliencia Multi-Nivel:** Conmutación automática ante errores 429/500 entre Google AI Studio y Groq API con motor heurístico local determinista como red de seguridad final.
 

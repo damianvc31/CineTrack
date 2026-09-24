@@ -6,6 +6,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 from app.models.actor import titulos_elenco
 from app.models.genero import titulos_generos
+try:
+    from pgvector.sqlalchemy import Vector
+except ImportError:  # pragma: no cover
+    from sqlalchemy import JSON as Vector
 
 if TYPE_CHECKING:
     from app.models.actor import Actor, TituloElenco
@@ -68,6 +72,7 @@ class Titulo(Base):
     rating_unificado: Mapped[float] = mapped_column(Float, default=0.0, index=True, nullable=False)
     status_tmdb: Mapped[str | None] = mapped_column(String(50), nullable=True)  # Ended, Returning Series, Canceled
     proximo_episodio_fecha: Mapped[date | None] = mapped_column(Date, nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
 
     # Relaciones Muchos a Muchos
     generos: Mapped[list["Genero"]] = relationship(

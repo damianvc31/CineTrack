@@ -2,7 +2,7 @@ import random
 import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
-from sqlalchemy import and_, delete, desc, extract, func, or_, select, union
+from sqlalchemy import and_, delete, desc, extract, func, or_, select, text, union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -1652,6 +1652,365 @@ THEME_EXPANSION_MAP = {
     "zombies": ["zombies", "undead", "infected", "virus"],
 }
 
+# Patrones para detectar intención de ambientación / trama / locación (Setting)
+SETTING_PATTERNS = [
+    r"\bambientad[ao]s?\s+en\b",
+    r"\btranscurr[aeio]n?\s+(?:en|por)\b",
+    r"\bque\s+ocurr[ae]n?\s+en\b",
+    r"\bsituad[ao]s?\s+en\b",
+    r"\bfilmad[ao]s?\s+en\b",
+    r"\brodad[ao]s?\s+en\b",
+    r"\bviajan?\s+a\b",
+    r"\bhistoria\s+(?:en|sobre)\b",
+    r"\btrama\s+en\b",
+    r"\bdesarrollad[ao]s?\s+en\b",
+    r"\bque\s+pasan?\s+en\b",
+    r"\bset\s+in\b",
+    r"\btakes?\s+place\s+in\b",
+    r"\bfilmed\s+in\b",
+]
+
+# Mapeo de términos geográficos a códigos ISO 3166-1 (país de producción)
+COUNTRY_KEYWORDS_MAP = {
+    # Argentina
+    "argentina": "AR",
+    "argentinas": "AR",
+    "argentino": "AR",
+    "argentinos": "AR",
+    "cine argentino": "AR",
+    "peliculas argentinas": "AR",
+    "películas argentinas": "AR",
+    # España
+    "españa": "ES",
+    "espana": "ES",
+    "española": "ES",
+    "españolas": "ES",
+    "español": "ES",
+    "españoles": "ES",
+    "cine español": "ES",
+    # Corea del Sur
+    "corea": "KR",
+    "corea del sur": "KR",
+    "coreana": "KR",
+    "coreanas": "KR",
+    "coreano": "KR",
+    "coreanos": "KR",
+    "k-drama": "KR",
+    "kdrama": "KR",
+    "korean": "KR",
+    "cine coreano": "KR",
+    # Japón
+    "japón": "JP",
+    "japon": "JP",
+    "japonesa": "JP",
+    "japonesas": "JP",
+    "japonés": "JP",
+    "japones": "JP",
+    "japoneses": "JP",
+    "japanese": "JP",
+    "japan": "JP",
+    "cine japonés": "JP",
+    "cine japones": "JP",
+    # Francia
+    "francia": "FR",
+    "francesa": "FR",
+    "francesas": "FR",
+    "francés": "FR",
+    "frances": "FR",
+    "franceses": "FR",
+    "french": "FR",
+    "france": "FR",
+    "cine francés": "FR",
+    "cine frances": "FR",
+    # Italia
+    "italia": "IT",
+    "italiana": "IT",
+    "italianas": "IT",
+    "italiano": "IT",
+    "italianos": "IT",
+    "italian": "IT",
+    "italy": "IT",
+    "cine italiano": "IT",
+    # México
+    "méxico": "MX",
+    "mexico": "MX",
+    "mexicana": "MX",
+    "mexicanas": "MX",
+    "mexicano": "MX",
+    "mexicanos": "MX",
+    "mexican": "MX",
+    "cine mexicano": "MX",
+    # Reino Unido / Inglaterra
+    "reino unido": "GB",
+    "inglaterra": "GB",
+    "británica": "GB",
+    "britanica": "GB",
+    "británicas": "GB",
+    "britanicas": "GB",
+    "británico": "GB",
+    "britanico": "GB",
+    "británicos": "GB",
+    "britanicos": "GB",
+    "british": "GB",
+    "uk": "GB",
+    "cine británico": "GB",
+    "cine britanico": "GB",
+    # Alemania
+    "alemania": "DE",
+    "alemana": "DE",
+    "alemanas": "DE",
+    "alemán": "DE",
+    "aleman": "DE",
+    "alemanes": "DE",
+    "german": "DE",
+    "germany": "DE",
+    "cine alemán": "DE",
+    "cine aleman": "DE",
+    # Brasil
+    "brasil": "BR",
+    "brasileña": "BR",
+    "brasileñas": "BR",
+    "brasileño": "BR",
+    "brasileños": "BR",
+    "brasilera": "BR",
+    "brasileras": "BR",
+    "brasilero": "BR",
+    "brasileros": "BR",
+    "brazil": "BR",
+    "brazilian": "BR",
+    "cine brasileño": "BR",
+    # Estados Unidos
+    "estados unidos": "US",
+    "eeuu": "US",
+    "ee.uu.": "US",
+    "estadounidense": "US",
+    "estadounidenses": "US",
+    "americana": "US",
+    "americanas": "US",
+    "americano": "US",
+    "americanos": "US",
+    "american": "US",
+    "usa": "US",
+    "cine estadounidense": "US",
+    # Chile
+    "chile": "CL",
+    "chilena": "CL",
+    "chilenas": "CL",
+    "chileno": "CL",
+    "chilenos": "CL",
+    "cine chileno": "CL",
+    # Uruguay
+    "uruguay": "UY",
+    "uruguaya": "UY",
+    "uruguayas": "UY",
+    "uruguayo": "UY",
+    "uruguayos": "UY",
+    "cine uruguayo": "UY",
+    # Colombia
+    "colombia": "CO",
+    "colombiana": "CO",
+    "colombianas": "CO",
+    "colombiano": "CO",
+    "colombianos": "CO",
+    "cine colombiano": "CO",
+    # Hong Kong
+    "hong kong": "HK",
+    "hongkonesa": "HK",
+    "hongkones": "HK",
+    "hongkong": "HK",
+    # China
+    "china": "CN",
+    "chinas": "CN",
+    "chino": "CN",
+    "chinos": "CN",
+    "chinese": "CN",
+    "cine chino": "CN",
+    # India
+    "india": "IN",
+    "indio": "IN",
+    "indias": "IN",
+    "indios": "IN",
+    "bollywood": "IN",
+    "indian": "IN",
+    "cine indio": "IN",
+    # Canadá
+    "canadá": "CA",
+    "canada": "CA",
+    "canadiense": "CA",
+    "canadienses": "CA",
+    "canadian": "CA",
+    # Australia
+    "australia": "AU",
+    "australiana": "AU",
+    "australiano": "AU",
+    "australian": "AU",
+    # Dinamarca
+    "dinamarca": "DK",
+    "danesa": "DK",
+    "danés": "DK",
+    "danes": "DK",
+    "danish": "DK",
+    "cine danés": "DK",
+    # Suecia
+    "suecia": "SE",
+    "sueca": "SE",
+    "sueco": "SE",
+    "swedish": "SE",
+    "cine sueco": "SE",
+    # Noruega
+    "noruega": "NO",
+    "noruego": "NO",
+    "norwegian": "NO",
+    "cine noruego": "NO",
+    # Rusia
+    "rusia": "RU",
+    "rusa": "RU",
+    "ruso": "RU",
+    "russian": "RU",
+    "cine ruso": "RU",
+    # Turquía
+    "turquía": "TR",
+    "turquia": "TR",
+    "turca": "TR",
+    "turco": "TR",
+    "turkish": "TR",
+    "turkey": "TR",
+    "series turcas": "TR",
+    "novelas turcas": "TR",
+    # Tailandia
+    "tailandia": "TH",
+    "tailandesa": "TH",
+    "thai": "TH",
+    "thailand": "TH",
+    # Polonia
+    "polonia": "PL",
+    "polaca": "PL",
+    "polaco": "PL",
+    "polish": "PL",
+    "poland": "PL",
+    # Irlanda
+    "irlanda": "IE",
+    "irlandesa": "IE",
+    "irlandés": "IE",
+    "irish": "IE",
+    "ireland": "IE",
+}
+
+# Mapeo de frases de idioma a códigos ISO 639-1
+LANGUAGE_KEYWORDS_MAP = {
+    # Español / Castellano
+    "en español": "es",
+    "en espanol": "es",
+    "en castellano": "es",
+    "en habla hispana": "es",
+    "de habla hispana": "es",
+    "habla hispana": "es",
+    "idioma español": "es",
+    "idioma espanol": "es",
+    "in spanish": "es",
+    # Inglés
+    "en inglés": "en",
+    "en ingles": "en",
+    "en lengua inglesa": "en",
+    "de habla inglesa": "en",
+    "habla inglesa": "en",
+    "in english": "en",
+    # Japonés
+    "en japonés": "ja",
+    "en japones": "ja",
+    "in japanese": "ja",
+    # Coreano
+    "en coreano": "ko",
+    "in korean": "ko",
+    # Francés
+    "en francés": "fr",
+    "en frances": "fr",
+    "in french": "fr",
+    # Italiano
+    "en italiano": "it",
+    "in italian": "it",
+    # Alemán
+    "en alemán": "de",
+    "en aleman": "de",
+    "in german": "de",
+    # Portugués
+    "en portugués": "pt",
+    "en portugues": "pt",
+    "in portuguese": "pt",
+    # Ruso
+    "en ruso": "ru",
+    "in russian": "ru",
+    # Chino
+    "en chino": ["zh", "cn"],
+    "en mandarín": ["zh", "cn"],
+    "en mandarin": ["zh", "cn"],
+    "en cantonés": ["zh", "cn"],
+    "en cantones": ["zh", "cn"],
+    "in chinese": ["zh", "cn"],
+    # Turco
+    "en turco": "tr",
+    "in turkish": "tr",
+    # Hindi
+    "en hindi": "hi",
+    "in hindi": "hi",
+    # Danés
+    "en danés": "da",
+    "en danes": "da",
+    "in danish": "da",
+    # Sueco
+    "en sueco": "sv",
+    "in swedish": "sv",
+    # Noruego
+    "en noruego": "no",
+    "in norwegian": "no",
+    # Tailandés
+    "en tailandés": "th",
+    "en tailandes": "th",
+    "in thai": "th",
+    # Polaco
+    "en polaco": "pl",
+    "in polish": "pl",
+}
+
+# Mapeo de ciudades icónicas a sus respectivos códigos de país ISO 3166-1
+CITY_TO_COUNTRY_MAP = {
+    "buenos aires": "AR",
+    "madrid": "ES",
+    "barcelona": "ES",
+    "sevilla": "ES",
+    "paris": "FR",
+    "parís": "FR",
+    "tokio": "JP",
+    "tokyo": "JP",
+    "kioto": "JP",
+    "seul": "KR",
+    "seúl": "KR",
+    "roma": "IT",
+    "venecia": "IT",
+    "milan": "IT",
+    "milán": "IT",
+    "florencia": "IT",
+    "londres": "GB",
+    "london": "GB",
+    "berlin": "DE",
+    "berlín": "DE",
+    "munich": "DE",
+    "múnich": "DE",
+    "nueva york": "US",
+    "new york": "US",
+    "los angeles": "US",
+    "los ángeles": "US",
+    "chicago": "US",
+    "miami": "US",
+    "rio de janeiro": "BR",
+    "río de janeiro": "BR",
+    "sao paulo": "BR",
+    "são paulo": "BR",
+    "ciudad de mexico": "MX",
+    "ciudad de méxico": "MX",
+    "cdmx": "MX",
+}
+
 
 async def get_user_recommendation_context(db: AsyncSession, usuario_id: int) -> dict:
     """Extrae el perfil condensado de gustos, favoritos y títulos vistos del usuario."""
@@ -1740,19 +2099,57 @@ async def get_recommendation_candidates(
     lower_prompt = search_prompt.lower()
     user_ctx = await get_user_recommendation_context(db, usuario_id) if usuario_id else None
 
-    # Detección de intenciones sobre títulos ya vistos
-    watched_phrases = [
-        "ya vi", "ya he visto", "que vi", "que ya vi", "mis vistas", "tengo vistas",
-        "de las vistas", "solo vistas", "already watched", "already seen", "from what i watched",
-        "from my watched", "among my watched", "de las que vi", "de lo que ya vi"
+    # Detección de intenciones sobre títulos ya vistos (Exclusivo vs. Inclusión Mixta vs. Por Defecto)
+    inclusion_rewatch_phrases = [
+        "puedes incluir", "puede incluir", "podés incluir", "pueden incluir",
+        "podia incluir", "podía incluir", "puedo incluir", "podrias incluir", "podrías incluir",
+        "incluyendo", "incluir algo que ya", "incluir lo que ya", "incluir las que ya",
+        "incluir que ya", "incluir algo que ya habia visto", "incluir algo que ya había visto",
+        "incluir peliculas ya", "incluir películas ya", "incluir titulos ya", "incluir títulos ya",
+        "incluir vistas", "incluso si ya", "incluso ya", "incluso las que ya", "incluso lo que ya",
+        "incluso peliculas ya vistas", "incluso películas ya vistas",
+        "no importa si ya", "sin importar si ya",
+        "aunque ya", "aunque la haya visto", "aunque las haya visto", "aunque ya la vi", "aunque ya las vi", "aunque ya vi",
+        "también las que", "también si ya", "también de mis vistas", "también ya vistas",
+        "tambien las que", "tambien si ya", "tambien de mis vistas", "tambien ya vistas",
+        "tanto vistas como no vistas", "vistas y no vistas", "nuevas o vistas", "vistas o nuevas", "nuevas y vistas",
+        "pueden ser repetidas", "puede ser repetida", "pueden ser vistas", "puede ser vista",
+        "permitir vistas", "permite vistas", "permitiendo vistas",
+        "can include watched", "include watched", "even if watched", "even if already seen",
+        "both watched and unwatched", "allow watched"
     ]
-    only_watched = any(wp in lower_prompt for wp in watched_phrases)
 
-    rewatch_phrases = [
-        "volver a ver", "repetir", "rewatch", "rever", "revivir", "incluso ya vistas",
-        "incluir vistas", "pueden ser repetidas", "include watched"
+    exclusive_watched_phrases = [
+        "solo de las que ya vi", "solo las que ya vi", "sólo lo que ya vi", "solo lo que ya vi",
+        "solo que ya vi", "sólo que ya vi", "unicamente lo que ya vi", "únicamente lo que ya vi",
+        "unicamente las que ya vi", "únicamente las que ya vi", "exclusivamente lo que ya vi",
+        "exclusivamente las que ya vi", "exclusivamente de mis vistas",
+        "solo de mis vistas", "sólo de mis vistas", "solo vistas", "sólo vistas", "solo titulos vistos",
+        "solo títulos vistos", "solo peliculas que ya vi", "solo películas que ya vi",
+        "de las que ya vi", "de lo que ya vi", "de los titulos que ya vi", "de los títulos que ya vi",
+        "de las peliculas que ya vi", "de las películas que ya vi", "de las pelis que ya vi",
+        "de mi biblioteca ya vista", "de mis vistas que valga", "de mis peliculas vistas",
+        "only watched", "only from what i watched", "only from my watched", "only already seen",
+        "exclusively from my watched", "from my watched list only"
     ]
-    allow_rewatch = only_watched or any(rp in lower_prompt for rp in rewatch_phrases)
+
+    pure_rewatch_phrases = [
+        "volver a ver", "repetir", "rewatch", "rever", "revivir"
+    ]
+
+    has_inclusion = any(ip in lower_prompt for ip in inclusion_rewatch_phrases)
+    has_exclusive = any(ep in lower_prompt for ep in exclusive_watched_phrases)
+    has_pure_rewatch = any(rp in lower_prompt for rp in pure_rewatch_phrases)
+
+    if has_inclusion:
+        only_watched = False
+        allow_rewatch = True
+    elif has_exclusive or has_pure_rewatch:
+        only_watched = True
+        allow_rewatch = True
+    else:
+        only_watched = False
+        allow_rewatch = False
 
     watched_ids = set(user_ctx.get("watched_ids", [])) if user_ctx else set()
 
@@ -1813,6 +2210,81 @@ async def get_recommendation_candidates(
             expanded_syn_terms.update(THEME_EXPANSION_MAP[t])
     syn_search_words = [w for w in expanded_syn_terms if len(w) >= 4]
 
+    # Detección de exclusiones negativas de género (Negative Filtering)
+    GENRE_NEGATION_MAP = {
+        "anime": ["Animación"],
+        "animacion": ["Animación"],
+        "animación": ["Animación"],
+        "animation": ["Animación"],
+        "comedia": ["Comedia"],
+        "comedy": ["Comedia"],
+        "terror": ["Terror"],
+        "horror": ["Terror"],
+        "miedo": ["Terror"],
+        "documental": ["Documental"],
+        "documentales": ["Documental"],
+        "documentary": ["Documental"],
+        "drama": ["Drama"],
+        "romance": ["Romance"],
+        "romantica": ["Romance"],
+        "romántica": ["Romance"],
+        "accion": ["Acción"],
+        "acción": ["Acción"],
+        "action": ["Acción"],
+        "ciencia ficcion": ["Ciencia ficción"],
+        "ciencia ficción": ["Ciencia ficción"],
+        "sci-fi": ["Ciencia ficción"],
+        "scifi": ["Ciencia ficción"],
+        "western": ["Western"],
+        "musical": ["Música"],
+    }
+    excluded_genres = set()
+    for neg_prefix in ("no", "sin", "nada de", "excepto", "not", "without", "exclude"):
+        for term, g_list in GENRE_NEGATION_MAP.items():
+            pattern = rf"\b{re.escape(neg_prefix)}\s+{re.escape(term)}\b"
+            if re.search(pattern, lower_prompt):
+                excluded_genres.update(g_list)
+
+    # Detección de intención de ambientación / locación (Setting) vs. producción (Origin)
+    is_setting_intent = any(re.search(pat, lower_prompt) for pat in SETTING_PATTERNS)
+
+    detected_country = None
+    detected_country_keyword = None
+    for kw in sorted(COUNTRY_KEYWORDS_MAP.keys(), key=len, reverse=True):
+        if re.search(rf"\b{re.escape(kw)}\b", lower_prompt):
+            detected_country = COUNTRY_KEYWORDS_MAP[kw]
+            detected_country_keyword = kw
+            break
+
+    # Si no detectó país por nombre de país/gentilicio, buscar si mencionó una ciudad icónica
+    if not detected_country:
+        for city, ccode in sorted(CITY_TO_COUNTRY_MAP.items(), key=lambda x: len(x[0]), reverse=True):
+            if re.search(rf"\b{re.escape(city)}\b", lower_prompt):
+                detected_country = ccode
+                detected_country_keyword = city
+                break
+
+    detected_language = None
+    for kw in sorted(LANGUAGE_KEYWORDS_MAP.keys(), key=len, reverse=True):
+        if re.search(rf"\b{re.escape(kw)}\b", lower_prompt):
+            detected_language = LANGUAGE_KEYWORDS_MAP[kw]
+            break
+
+    # Si hay intención de ambientación/locación (ej: "ambientada en Argentina" o "que transcurra en Buenos Aires"),
+    # incluir el término geográfico en la búsqueda de sinopsis para recuperar títulos situados allí
+    if is_setting_intent and detected_country_keyword:
+        syn_search_words.append(detected_country_keyword)
+        # Si el keyword fue una ciudad, o un país, agregar ambos a la búsqueda en sinopsis
+        if detected_country_keyword in CITY_TO_COUNTRY_MAP:
+            for c_kw, c_code in COUNTRY_KEYWORDS_MAP.items():
+                if c_code == detected_country and len(c_kw) >= 5 and " " not in c_kw:
+                    syn_search_words.append(c_kw)
+                    break
+        elif detected_country in ("AR", "ES", "FR", "IT", "JP", "KR", "GB", "US", "DE", "BR", "MX"):
+            for city_name, c_code in CITY_TO_COUNTRY_MAP.items():
+                if c_code == detected_country:
+                    syn_search_words.append(city_name)
+
     def apply_base_filters(query):
         if effective_tipo in ("movie", "tv"):
             query = query.where(Titulo.tipo == effective_tipo)
@@ -1820,6 +2292,18 @@ async def get_recommendation_candidates(
             query = query.where(extract("year", Titulo.fecha_estreno) >= min_year)
         if max_year:
             query = query.where(extract("year", Titulo.fecha_estreno) <= max_year)
+        # Si la intención es de Producción / Origen (no Setting), filtrar estrictamente por país
+        if detected_country and not is_setting_intent:
+            if isinstance(detected_country, list):
+                query = query.where(Titulo.pais.in_(detected_country))
+            else:
+                query = query.where(Titulo.pais == detected_country)
+        # Filtro estricto por idioma original
+        if detected_language:
+            if isinstance(detected_language, list):
+                query = query.where(Titulo.idioma_original.in_(detected_language))
+            else:
+                query = query.where(Titulo.idioma_original == detected_language)
         if only_watched:
             if watched_ids:
                 query = query.where(Titulo.id.in_(list(watched_ids)))
@@ -1827,18 +2311,189 @@ async def get_recommendation_candidates(
                 query = query.where(Titulo.id == -1)
         elif watched_ids and not allow_rewatch:
             query = query.where(Titulo.id.notin_(list(watched_ids)))
+        if excluded_genres:
+            ex_subq = (
+                select(titulos_generos.c.titulo_id)
+                .join(Genero, Genero.id == titulos_generos.c.genero_id)
+                .where(Genero.nombre.in_(list(excluded_genres)))
+                .scalar_subquery()
+            )
+            query = query.where(Titulo.id.notin_(ex_subq))
         return query
 
-    collected_titles: dict[int, Titulo] = {}
+    entity_titles: dict[int, Titulo] = {}
+    theme_titles: dict[int, Titulo] = {}
+    vector_titles: dict[int, Titulo] = {}
+    fallback_titles: dict[int, Titulo] = {}
+
+    is_postgres = False
+    try:
+        bind = db.bind or (db.get_bind() if hasattr(db, "get_bind") else None)
+        if bind and bind.dialect.name == "postgresql":
+            is_postgres = True
+    except Exception:
+        pass
+
+    # -------------------------------------------------------------------------
+    # 0. BÚSQUEDA POR ENTIDADES DIRECTAS (Actores, Directores, Nombres de títulos)
+    #    MÁXIMA PRIORIDAD: si el usuario nombró a un actor o director (ej: Ian McKellen, Brad Pitt),
+    #    estas obras DEBEN encabezar los candidatos antes de los resultados vectoriales genéricos.
+    #    Incluye Fuzzy Matching con pg_trgm para tolerar errores ortográficos (ej: 'brad pit', 'ian mckelen', 'scorsece').
+    # -------------------------------------------------------------------------
+    matched_actor_ids: set[int] = set()
+
+    # 0.0 Obras producidas en el país/locación ambientada:
+    # Si el usuario busca historias ambientadas en un país o ciudad (ej: ambientada en Argentina o Buenos Aires),
+    # incluir las mejores producciones de ese país (que naturalmente transcurren allí) como candidatas destacadas
+    if is_setting_intent and detected_country:
+        set_nat_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+        if isinstance(detected_country, list):
+            set_nat_q = set_nat_q.where(Titulo.pais.in_(detected_country))
+        else:
+            set_nat_q = set_nat_q.where(Titulo.pais == detected_country)
+        set_nat_q = apply_base_filters(set_nat_q)
+        set_nat_res = await db.execute(set_nat_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(8))
+        for t in set_nat_res.scalars().all():
+            entity_titles[t.id] = t
+
+    # A. Búsqueda exacta de actores y directores por bigramas (ej: "brad pitt", "ian mckellen")
+    if valid_bigrams:
+        for bg in valid_bigrams:
+            # Director por nombre completo
+            dir_bg_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+            dir_bg_q = apply_base_filters(dir_bg_q).where(Titulo.director.ilike(f"%{bg}%"))
+            dir_bg_res = await db.execute(dir_bg_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15))
+            for t in dir_bg_res.scalars().all():
+                entity_titles[t.id] = t
+
+            # Actor por nombre completo
+            act_res = await db.execute(select(Actor.id).where(Actor.nombre.ilike(f"%{bg}%")).limit(10))
+            for aid in act_res.scalars().all():
+                matched_actor_ids.add(aid)
+
+            # Fuzzy Trigram para bigramas completos (ej: 'brad pit' -> 'Brad Pitt', 'ian mckelen' -> 'Ian McKellen')
+            if is_postgres:
+                try:
+                    f_act = await db.execute(
+                        text("SELECT id FROM actores WHERE similarity(nombre, :bg) >= 0.45 ORDER BY similarity(nombre, :bg) DESC LIMIT 5"),
+                        {"bg": bg}
+                    )
+                    for r in f_act.all():
+                        matched_actor_ids.add(r[0])
+
+                    f_dir = await db.execute(
+                        text("SELECT DISTINCT director FROM titulos WHERE director IS NOT NULL AND similarity(director, :bg) >= 0.45 LIMIT 3"),
+                        {"bg": bg}
+                    )
+                    for r in f_dir.all():
+                        d_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+                        d_q = apply_base_filters(d_q).where(Titulo.director == r[0])
+                        d_res = await db.execute(d_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15))
+                        for t in d_res.scalars().all():
+                            entity_titles[t.id] = t
+                except Exception as e:
+                    logger.debug(f"pg_trgm fuzzy matching ignorado en bigrama: {e}")
+
+    # B. Búsqueda de actores y directores por términos individuales distintivos
+    # Se ejecuta principalmente si no se identificó ya un actor o director por nombre compuesto (bigrama)
+    if search_terms and not matched_actor_ids and not entity_titles:
+        long_terms = [t for t in search_terms if len(t) >= 4]
+        for t in long_terms:
+            # Directores por término exacto
+            dir_t_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+            dir_t_q = apply_base_filters(dir_t_q).where(Titulo.director.ilike(f"%{t}%"))
+            dir_t_res = await db.execute(dir_t_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15))
+            for tit in dir_t_res.scalars().all():
+                entity_titles[tit.id] = tit
+
+            # Actores por término exacto
+            act_t_res = await db.execute(select(Actor.id).where(Actor.nombre.ilike(f"%{t}%")).limit(10))
+            for aid in act_t_res.scalars().all():
+                matched_actor_ids.add(aid)
+
+            # Fuzzy para directores y actores con errores ortográficos (ej: 'scorsece' -> 'Martin Scorsese')
+            if is_postgres:
+                try:
+                    f_single_dir = await db.execute(
+                        text("SELECT DISTINCT director FROM titulos WHERE director IS NOT NULL AND (similarity(director, :term) >= 0.3 OR director ILIKE :pat) LIMIT 3"),
+                        {"term": t, "pat": f"%{t}%"}
+                    )
+                    for r in f_single_dir.all():
+                        d_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+                        d_q = apply_base_filters(d_q).where(Titulo.director == r[0])
+                        d_res = await db.execute(d_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15))
+                        for tit in d_res.scalars().all():
+                            entity_titles[tit.id] = tit
+
+                    if not matched_actor_ids:
+                        f_single_act = await db.execute(
+                            text("SELECT id FROM actores WHERE similarity(nombre, :term) >= 0.4 ORDER BY similarity(nombre, :term) DESC LIMIT 5"),
+                            {"term": t}
+                        )
+                        for r in f_single_act.all():
+                            matched_actor_ids.add(r[0])
+                except Exception as e:
+                    logger.debug(f"pg_trgm fuzzy matching ignorado en término: {e}")
+
+    # C. Búsqueda de títulos por nombre directo (solo si no se detectó actor o director prioritario)
+    if search_terms and not matched_actor_ids and not entity_titles:
+        title_terms = [t for t in search_terms if len(t) >= 4]
+        if title_terms:
+            name_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+            name_q = apply_base_filters(name_q).where(or_(*[Titulo.nombre.ilike(f"%{t}%") for t in title_terms]))
+            name_q = name_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15)
+            name_res = await db.execute(name_q)
+            for tit in name_res.scalars().all():
+                entity_titles[tit.id] = tit
+
+    # C. Si encontramos actores coincidentes, cargar sus títulos con máxima prioridad
+    if matched_actor_ids:
+        act_titles_q = (
+            select(Titulo)
+            .options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+            .join(titulos_elenco, titulos_elenco.c.titulo_id == Titulo.id)
+            .where(titulos_elenco.c.actor_id.in_(list(matched_actor_ids)))
+        )
+        act_titles_q = apply_base_filters(act_titles_q)
+        act_titles_res = await db.execute(
+            act_titles_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(20)
+        )
+        for t in act_titles_res.scalars().all():
+            entity_titles[t.id] = t
+
+    # -------------------------------------------------------------------------
+    # 1. BÚSQUEDA SEMÁNTICA VECTORIAL CON PGVECTOR (RAG HÍBRIDO)
+    # -------------------------------------------------------------------------
+    if is_postgres and settings.GEMINI_API_KEY:
+        try:
+            from app.services.embedding_service import EmbeddingService
+            emb_svc = EmbeddingService()
+            user_vec = await emb_svc.get_embedding(search_prompt)
+            if user_vec:
+                vector_q = (
+                    select(Titulo)
+                    .options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+                    .where(Titulo.embedding.isnot(None))
+                )
+                vector_q = apply_base_filters(vector_q)
+                # Exigir un piso razonable de votos para evitar registros con metadata vacía
+                vector_q = vector_q.where(Titulo.vote_count_tmdb >= 25)
+                # Ordenar por distancia coseno de pgvector
+                vector_q = vector_q.order_by(Titulo.embedding.cosine_distance(user_vec).asc()).limit(25)
+                v_res = await db.execute(vector_q)
+                for t in v_res.scalars().all():
+                    vector_titles[t.id] = t
+        except Exception as e:
+            logger.warning(f"Error en búsqueda semántica vectorial: {e}. Continuando con fallback léxico.")
 
     target_genres = list(detected_genres)
     # Solo recurrir a los géneros favoritos del usuario si no hubo géneros ni términos de búsqueda explícitos en el prompt
     if not target_genres and not search_terms and user_ctx and user_ctx.get("top_genres"):
         target_genres = user_ctx["top_genres"][:2]
 
-    # 1. BÚSQUEDA TEMÁTICA COMBINADA O POR SINOPSIS DE MÁXIMA PRIORIDAD
-    # Si hay géneros Y conceptos temáticos en el pedido (ej: 'thrillers de crimen' + 'planes elaborados'),
-    # priorizamos las obras que coincidan simultáneamente con ambos criterios.
+    # -------------------------------------------------------------------------
+    # 2. BÚSQUEDA TEMÁTICA COMBINADA O POR SINOPSIS (Términos expandidos bilingües)
+    # -------------------------------------------------------------------------
     if target_genres and syn_search_words:
         expanded_genres = []
         for tg in target_genres:
@@ -1858,9 +2513,8 @@ async def get_recommendation_candidates(
         theme_genre_q = theme_genre_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(25)
         tg_res = await db.execute(theme_genre_q)
         for t in tg_res.scalars().all():
-            collected_titles[t.id] = t
+            theme_titles[t.id] = t
     elif syn_search_words:
-        # Si no se detectaron géneros pero sí conceptos temáticos puntuales, priorizar sinopsis directamente
         theme_syn_q = (
             select(Titulo)
             .options(selectinload(Titulo.generos), selectinload(Titulo.actores))
@@ -1873,82 +2527,15 @@ async def get_recommendation_candidates(
         theme_syn_q = theme_syn_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(25)
         ts_res = await db.execute(theme_syn_q)
         for t in ts_res.scalars().all():
-            collected_titles[t.id] = t
+            theme_titles[t.id] = t
 
-    # 2. Búsqueda por entidades directas (Directores o Actores específicos por nombre completo)
-    if valid_bigrams:
-        for bg in valid_bigrams:
-            # Director por nombre completo
-            dir_bg_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-            dir_bg_q = apply_base_filters(dir_bg_q).where(Titulo.director.ilike(f"%{bg}%"))
-            dir_bg_res = await db.execute(dir_bg_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(12))
-            for t in dir_bg_res.scalars().all():
-                collected_titles[t.id] = t
+    # -------------------------------------------------------------------------
+    # 3. FALLBACKS DE CALIDAD Y GÉNEROS (Para completar el cupo requerido)
+    # -------------------------------------------------------------------------
+    total_accumulated = len(entity_titles) + len(theme_titles) + len(vector_titles)
 
-            # Actor por nombre completo
-            act_bg_q = (
-                select(Titulo)
-                .options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-                .join(titulos_elenco, titulos_elenco.c.titulo_id == Titulo.id)
-                .join(Actor, Actor.id == titulos_elenco.c.actor_id)
-            )
-            act_bg_q = apply_base_filters(act_bg_q).where(Actor.nombre.ilike(f"%{bg}%"))
-            act_bg_res = await db.execute(act_bg_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(12))
-            for t in act_bg_res.scalars().all():
-                collected_titles[t.id] = t
-
-    # 3. Búsqueda por términos individuales (Directores, Actores, Nombres de títulos)
-    if search_terms:
-        # Directores por término
-        dir_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-        dir_q = apply_base_filters(dir_q)
-        dir_q = dir_q.where(or_(*[Titulo.director.ilike(f"%{t}%") for t in search_terms]))
-        dir_q = dir_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(12)
-        dir_res = await db.execute(dir_q)
-        for t in dir_res.scalars().all():
-            collected_titles[t.id] = t
-
-        # Actores por término (solo términos de 4+ caracteres)
-        long_terms = [t for t in search_terms if len(t) >= 4]
-        if long_terms:
-            act_q = (
-                select(Titulo)
-                .options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-                .join(titulos_elenco, titulos_elenco.c.titulo_id == Titulo.id)
-                .join(Actor, Actor.id == titulos_elenco.c.actor_id)
-            )
-            act_q = apply_base_filters(act_q)
-            act_q = act_q.where(or_(*[Actor.nombre.ilike(f"%{t}%") for t in long_terms]))
-            act_q = act_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(12)
-            act_res = await db.execute(act_q)
-            for t in act_res.scalars().all():
-                collected_titles[t.id] = t
-
-        # Títulos por nombre
-        name_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-        name_q = apply_base_filters(name_q)
-        name_q = name_q.where(or_(*[Titulo.nombre.ilike(f"%{t}%") for t in search_terms]))
-        name_q = name_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(12)
-        name_res = await db.execute(name_q)
-        for t in name_res.scalars().all():
-            collected_titles[t.id] = t
-
-    # 4. Búsqueda temática en sinopsis (términos expandidos bilingües)
-    if syn_search_words and len(collected_titles) < 30:
-        sin_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-        sin_q = apply_base_filters(sin_q)
-        sin_q = sin_q.where(
-            Titulo.vote_count_tmdb >= 80,
-            Titulo.id.notin_(list(collected_titles.keys())) if collected_titles else True,
-            or_(*[Titulo.sinopsis.ilike(f"%{w}%") for w in syn_search_words])
-        )
-        sin_q = sin_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(20)
-        sin_res = await db.execute(sin_q)
-        for t in sin_res.scalars().all():
-            collected_titles[t.id] = t
-
-    # 5. Búsqueda por Géneros detectados (relleno de alta calidad)
-    if target_genres and len(collected_titles) < 35:
+    # Géneros detectados
+    if target_genres and total_accumulated < 25:
         expanded_genres = []
         for tg in target_genres:
             expanded_genres.extend(expand_genre_names(tg))
@@ -1961,55 +2548,67 @@ async def get_recommendation_candidates(
         g_q = apply_base_filters(g_q)
         g_q = g_q.where(
             Genero.nombre.in_(expanded_genres),
-            Titulo.vote_count_tmdb >= 150,  # Exigir un piso sólido de votos para evitar anomalías
-            Titulo.id.notin_(list(collected_titles.keys())) if collected_titles else True
+            Titulo.vote_count_tmdb >= 150
         )
-        g_q = g_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(35 - len(collected_titles))
+        g_q = g_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(20)
         g_res = await db.execute(g_q)
         for t in g_res.scalars().all():
-            collected_titles[t.id] = t
+            fallback_titles[t.id] = t
 
-    # Si el usuario solicitó exclusivamente títulos vistos (only_watched), asegurar que se incluyan en el pool
-    if only_watched and len(collected_titles) < 30:
+    # Obras exclusivamente vistas (only_watched) si es necesario complementar
+    if only_watched and (total_accumulated + len(fallback_titles)) < 25:
         ow_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
         ow_q = apply_base_filters(ow_q)
-        ow_q = ow_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(30)
+        ow_q = ow_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(25)
         ow_res = await db.execute(ow_q)
         for t in ow_res.scalars().all():
-            collected_titles[t.id] = t
+            fallback_titles[t.id] = t
 
-    # 3. Relleno diverso con obras aclamadas y populares (rotativo con semilla / random)
-    if len(collected_titles) < 30 and not only_watched:
-        needed = 40 - len(collected_titles)
+    # Relleno general diverso con obras aclamadas
+    if (total_accumulated + len(fallback_titles)) < 20 and not only_watched:
+        needed = 25 - (total_accumulated + len(fallback_titles))
         fill_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
         fill_q = apply_base_filters(fill_q)
         fill_q = fill_q.where(
             Titulo.vote_count_tmdb >= 150,
-            Titulo.rating_unificado >= 7.5,
-            Titulo.id.notin_(list(collected_titles.keys())) if collected_titles else True
+            Titulo.rating_unificado >= 7.5
         )
-        # Usamos func.random() para que consultas genéricas no devuelvan siempre los mismos 3 títulos
         fill_q = fill_q.order_by(func.random()).limit(needed)
         fill_res = await db.execute(fill_q)
         for t in fill_res.scalars().all():
-            collected_titles[t.id] = t
+            fallback_titles[t.id] = t
 
-    # 4. Si aún es chico y no tiene suficientes, añadir de popularidad general
-    if len(collected_titles) < 20 and not only_watched:
-        needed = 35 - len(collected_titles)
-        gen_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-        gen_q = apply_base_filters(gen_q)
-        gen_q = gen_q.where(
-            Titulo.vote_count_tmdb >= 50,
-            Titulo.id.notin_(list(collected_titles.keys())) if collected_titles else True
-        )
-        gen_q = gen_q.order_by(desc(Titulo.popularidad)).limit(needed)
-        gen_res = await db.execute(gen_q)
-        for t in gen_res.scalars().all():
-            collected_titles[t.id] = t
-
+    # -------------------------------------------------------------------------
+    # 4. ENSAMBLADO JERÁRQUICO FINAL DE CANDIDATOS
+    #    1º Entidades Directas (Actores / Directores / Títulos explícitos o fuzzy)
+    #    2º Coincidencias Temáticas / Sinopsis
+    #    3º Similitud Semántica Vectorial (pgvector)
+    #    4º Fallback de Género y Aclamadas
+    # -------------------------------------------------------------------------
     max_candidates = getattr(settings, "RECOMMENDATION_CANDIDATES_LIMIT", 20)
-    candidate_titles = list(collected_titles.values())[:max_candidates]
+    ordered_titles: dict[int, Titulo] = {}
+
+    for t in entity_titles.values():
+        if len(ordered_titles) >= max_candidates:
+            break
+        ordered_titles[t.id] = t
+
+    for t in theme_titles.values():
+        if len(ordered_titles) >= max_candidates:
+            break
+        ordered_titles[t.id] = t
+
+    for t in vector_titles.values():
+        if len(ordered_titles) >= max_candidates:
+            break
+        ordered_titles[t.id] = t
+
+    for t in fallback_titles.values():
+        if len(ordered_titles) >= max_candidates:
+            break
+        ordered_titles[t.id] = t
+
+    candidate_titles = list(ordered_titles.values())[:max_candidates]
 
     # Buscar fragmentos de reseñas locales para los candidatos
     cand_ids = [t.id for t in candidate_titles]
@@ -2039,6 +2638,8 @@ async def get_recommendation_candidates(
             "nombre": t.nombre,
             "tipo": t.tipo,
             "anio": t.anio_estreno,
+            "pais": t.pais,
+            "idioma_original": t.idioma_original,
             "generos": g_names,
             "director": t.director,
             "actores": actor_names,

@@ -257,6 +257,7 @@ export const RecommendationsPage: React.FC = () => {
   clarificationContextRef.current = clarificationContext
   const prevUserRef = useRef(user?.id)
   const isAuthChangingRef = useRef<boolean>(false)
+  const isClearingRef = useRef<boolean>(false)
 
   // Cancelar búsqueda en curso
   const handleCancelSearch = useCallback(() => {
@@ -389,6 +390,14 @@ export const RecommendationsPage: React.FC = () => {
   useEffect(() => {
     const queryPrompt = searchParams.get('prompt')?.trim()
 
+    // Si estamos en medio de una acción de limpiar/resetear, ignorar query params residuales
+    if (isClearingRef.current) {
+      if (!queryPrompt) {
+        isClearingRef.current = false
+      }
+      return
+    }
+
     // Si estamos en medio de una transición de sesión (login / logout), ignorar query params residuales
     if (isAuthChangingRef.current) {
       if (!queryPrompt) {
@@ -468,7 +477,7 @@ export const RecommendationsPage: React.FC = () => {
   }
 
   const syncFreshStates = useCallback(async () => {
-    if (!user) return
+    if (!user || isClearingRef.current) return
     const current = result
     if (!current?.recommendations?.length) return
 
@@ -484,11 +493,13 @@ export const RecommendationsPage: React.FC = () => {
         })
       )
 
+      if (isClearingRef.current) return
+
       setResult((prev) => {
-        const target = prev || current
-        if (!target) return prev
+        // Si el usuario limpió los resultados o no hay resultado activo, NUNCA resucitar
+        if (!prev) return null
         let hasChanges = false
-        const updatedRecs = target.recommendations.map((item: RecommendationItem) => {
+        const updatedRecs = prev.recommendations.map((item: RecommendationItem) => {
           const fresh = freshList.find((f) => f && f.id === item.title_id)
           if (fresh && fresh.st && item.title) {
             if (
@@ -509,8 +520,8 @@ export const RecommendationsPage: React.FC = () => {
           return item
         })
 
-        if (!hasChanges) return prev || current
-        const updated = { ...target, recommendations: updatedRecs }
+        if (!hasChanges) return prev
+        const updated = { ...prev, recommendations: updatedRecs }
         try {
           sessionStorage.setItem(CACHE_KEY, JSON.stringify({ prompt, result: updated, userId: user?.id || null }))
         } catch {
@@ -521,7 +532,7 @@ export const RecommendationsPage: React.FC = () => {
     } catch (err) {
       console.error('Error syncing recommendation user states:', err)
     }
-  }, [user, prompt])
+  }, [user, prompt, result])
 
   // Sincronizar estados cuando el usuario cambia, al montar la página o al volver del detalle
   useEffect(() => {
@@ -532,6 +543,7 @@ export const RecommendationsPage: React.FC = () => {
   }, [syncFreshStates])
 
   const handleClear = () => {
+    isClearingRef.current = true
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
@@ -625,7 +637,7 @@ export const RecommendationsPage: React.FC = () => {
 
       {/* Input Box & Presets */}
       <div className="p-5 sm:p-6 rounded-2xl bg-[#121212] border border-[#262626] shadow-xl space-y-4">
-        {result && (
+        {(result || clarificationContext) && (
           <div className="flex items-center justify-between border-b border-[#222222] pb-3">
             {clarificationContext ? (
               <span className="text-xs text-amber-300/90 font-medium flex items-center gap-1.5 truncate max-w-xs sm:max-w-md">

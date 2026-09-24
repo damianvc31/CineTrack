@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin
+from app.core.config import settings
 from app.db.session import AsyncSessionLocal, get_db
 from app.services import catalog_service
 from app.services.tmdb_client import TMDBClient
@@ -426,16 +427,19 @@ async def trigger_actor_photos_sync(
     Dispara la sincronización en segundo plano de fotos de actores desde TMDB,
     priorizando los actores de títulos más populares.
     """
+    limit: Optional[int] = None
+    desc: str = ""
     raw_limit = payload.limit if payload is not None else None
     if raw_limit == 0:
         limit = 0
         desc = "sin límite"
     elif raw_limit is not None:
         limit = raw_limit
-        desc = f"{limit}"
+        desc = str(limit)
     else:
         limit = None  # populate_actor_photos usará settings.TMDB_ACTOR_PHOTOS_LIMIT
         desc = f"config default ({settings.TMDB_ACTOR_PHOTOS_LIMIT})"
+
     actor_id = payload.actor_id if payload else None
     background_tasks.add_task(_run_job_actor_photos, limit=limit, actor_id=actor_id)
     return JobResponse(

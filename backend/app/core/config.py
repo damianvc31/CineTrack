@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import re
 from typing import Any
@@ -99,6 +100,8 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.6-flash"
     GEMINI_FALLBACK_MODELS: str = "gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.8-flash"
+    GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-001"
+    EMBEDDING_DIMENSION: int = 768
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "openai/gpt-oss-120b"
     GROQ_FALLBACK_MODELS: str = "openai/gpt-oss-20b,groq/compound-mini,qwen/qwen3.8-27b"
@@ -130,7 +133,7 @@ class Settings(BaseSettings):
         return self
 
     model_config = SettingsConfigDict(
-        env_file=(".env", "../.env", ".env.local"),
+        env_file=(os.getenv("ENV_FILE") or os.getenv("CINETRACK_ENV_FILE"),) if (os.getenv("ENV_FILE") or os.getenv("CINETRACK_ENV_FILE")) else (".env", "../.env"),
         env_file_encoding="utf-8",
         extra="ignore"
     )

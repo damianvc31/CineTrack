@@ -12,3 +12,4 @@ aiosqlite>=0.20.0
 greenlet>=3.0.0
 bcrypt>=4.1.0
 pyjwt>=2.8.0
+pgvector>=0.3.0

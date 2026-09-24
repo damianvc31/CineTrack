@@ -1,0 +1,58 @@
+flowchart TD
+    %% Estilos y Definiciones
+    classDef client fill:#1f2937,stroke:#f59e0b,stroke-width:2px,color:#fff;
+    classDef api fill:#111827,stroke:#3b82f6,stroke-width:2px,color:#fff;
+    classDef service fill:#1e1e2e,stroke:#10b981,stroke-width:2px,color:#fff;
+    classDef db fill:#261b36,stroke:#8b5cf6,stroke-width:2px,color:#fff;
+    classDef ai fill:#2d1a29,stroke:#ec4899,stroke-width:2px,color:#fff;
+
+    subgraph CLIENTE["Capas Frontend (React)"]
+        UI["RecommendationsPage"]:::client
+        PRESETS["Presets Dinámicos"]:::client
+        UI --> PRESETS
+    end
+
+    subgraph BACKEND["Capa de Backend (FastAPI)"]
+        ENDPOINT["POST /api/v1/recommendations"]:::api
+        AUTH["Contexto de Usuario\n(Favoritos, Vistos)"]:::api
+        ENDPOINT --> AUTH
+    end
+
+    subgraph RAG_ENGINE["Motor Híbrido RAG (ai_recommender_service)"]
+        VALIDATOR["Paso 1: Validador Determinista\n(Filtra teclado machacado)"]:::service
+        EXTRACTOR["Paso 2: LLM Ligero (Gemini Flash)\nExtrae filtros duros y exclusiones"]:::ai
+        EMBEDDING["Generador de Embeddings\nGoogle Text-Embedding API"]:::ai
+        
+        VALIDATOR -->|Prompt válido| EXTRACTOR
+        EXTRACTOR -->|Genera vector de intención| EMBEDDING
+        
+        EXTRACTOR -.->|Filtros (Ej: sin anime, actor X)| SQL_QUERY
+    end
+
+    subgraph PERSISTENCIA["Bases de Datos (Neon Postgres)"]
+        DB_TITULOS[(titulos + vector_embedding)]:::db
+        DB_ACTORES[(actores / elenco)]:::db
+        DB_ESTADOS[(estados_usuario)]:::db
+        
+        SQL_QUERY["Paso 3: Búsqueda SQL Híbrida\nWHERE filtros + ORDER BY pgvector"]:::db
+        EMBEDDING --> SQL_QUERY
+        SQL_QUERY --> DB_TITULOS
+        SQL_QUERY --> DB_ACTORES
+    end
+
+    subgraph LLM_FINAL["Generación Final"]
+        PROMPT_BUILDER["Paso 4: Grounding Final\nInyecta Top 20 candidatos al LLM"]:::service
+        FLAGSHIP["LLM Insignia (Gemini Pro/Groq)\nJustifica recomendaciones\ncon perfil de usuario"]:::ai
+        HYDRATE["Hidratación (TitleCardResponse)"]:::service
+        
+        SQL_QUERY --> PROMPT_BUILDER
+        AUTH -.-> PROMPT_BUILDER
+        PROMPT_BUILDER --> FLAGSHIP
+        FLAGSHIP --> HYDRATE
+    end
+
+    %% Flujo Global
+    UI -- "Request JSON" --> ENDPOINT
+    ENDPOINT --> VALIDATOR
+    HYDRATE -- "Response Estructurada" --> ENDPOINT
+    ENDPOINT --> UI
