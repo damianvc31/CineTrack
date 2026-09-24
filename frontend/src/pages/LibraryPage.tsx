@@ -13,7 +13,7 @@ interface OutletContextType {
 }
 
 export const LibraryPage: React.FC = () => {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { t, language } = useLanguage()
   const { openAuth } = useOutletContext<OutletContextType>()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -45,6 +45,15 @@ export const LibraryPage: React.FC = () => {
 
   const setTab = (newTab: string) => {
     setSearchParams({ tab: newTab })
+  }
+
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="w-10 h-10 border-3 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+        <p className="text-xs text-gray-400 font-medium">Loading library...</p>
+      </div>
+    )
   }
 
   if (!user) {

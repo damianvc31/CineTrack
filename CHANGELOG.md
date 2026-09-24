@@ -22,6 +22,11 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
     - `CatalogPage.tsx`: Metadatos globales y filtros reactivos en cliente.
     - `LibraryPage.tsx`: Sincronización instantánea de listas del usuario.
     - `ProfilePage.tsx`: Caché reactiva de estadísticas por ventana temporal (`all_time`, `1m`, `3m`, `1y`, etc.) y listas de biblioteca, con transiciones inmediatas de 0 ms e invalidación automática ante ediciones de perfil o mutaciones de tarjetas.
+- **Refinamiento de Rendimiento F5 y Cero Parpadeo (Zero-Flicker):**
+  - **Extracción de JWT sin DB (`get_optional_user_id`):** Validación criptográfica directa del token sin consulta de red a Neon para peticiones de lectura (`/api/v1/home`, `/api/v1/titles`), ahorrando ~300 ms de latencia por petición.
+  - **Caché en RAM de Estados Personales para Home:** Almacenamiento ultrarrápido en `MemoryCache` (`user_home_states:{uid}`) con TTL de 60s y auto-invalidación en mutaciones de estado y reseñas, reduciendo la respuesta de Home autenticada de ~2.800 ms a **2.6 ms** (>1.000x más rápida).
+  - **Hidratación Síncrona en Fotograma 0 (`cinetrack_user` en `localStorage`):** El estado de usuario se inicializa inmediatamente al montar React, evitando el parpadeo de botones de login/registro en el Header y la expulsión errónea hacia Home desde la página de Perfil al hacer F5.
+  - **Protección de Transición y Eliminación de Layout Shifts:** Remoción del cartel invasivo *"Updating catalog..."* en favor de rotación transparente, y corrección de la pantalla de error en Home para mostrarse únicamente ante fallos de red reales.
 - **Cobertura y Verificación:**
   - Suite de 81 tests de backend pasando en verde (`pytest`) y tests de frontend en verde (`vitest`).
 

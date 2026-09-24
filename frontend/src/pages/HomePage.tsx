@@ -279,7 +279,7 @@ export const HomePage: React.FC = () => {
     return <Film className="w-5 h-5 text-amber-400" />
   }
 
-  if (loading) {
+  if (authLoading || loading || (!data && !error)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div className="w-10 h-10 border-3 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
@@ -589,6 +589,8 @@ export const HomePage: React.FC = () => {
                 </div>
               </nav>
             </div>
+          ) : authLoading ? (
+            <div className="p-5 rounded-2xl bg-[#141414] border border-[#262626] shadow-xl animate-pulse h-64" />
           ) : (
             <div className="p-5 rounded-2xl bg-[#141414] border border-[#262626] shadow-xl space-y-4 text-center">
               <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto">

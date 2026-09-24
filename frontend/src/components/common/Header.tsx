@@ -14,7 +14,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
   const queryClient = useQueryClient()
-  const { user, logout } = useAuth()
+  const { user, logout, loading: authLoading } = useAuth()
   const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
@@ -224,6 +224,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   </div>
                 </div>
               ) : null
+            ) : authLoading ? (
+              <div className="w-20 h-8 bg-[#181818] animate-pulse rounded-full" />
             ) : (
               <div className="flex items-center gap-2">
                 <button
@@ -370,7 +372,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
               </>
             )}
 
-            {!user && (
+            {!user && !authLoading && (
               <div className="pt-2 border-t border-[#262626] flex flex-col gap-2">
                 <button
                   onClick={() => {

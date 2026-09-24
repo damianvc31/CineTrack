@@ -28,7 +28,7 @@ import { DonutGenreChart } from '@/components/profile/DonutGenreChart'
 import { getAvatarUrl } from '@/utils/avatarUtils'
 
 export const ProfilePage: React.FC = () => {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { t, language } = useLanguage()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -38,10 +38,10 @@ export const ProfilePage: React.FC = () => {
   const [avatarImgError, setAvatarImgError] = useState(false)
 
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       navigate('/')
     }
-  }, [user, navigate])
+  }, [authLoading, user, navigate])
 
   const {
     data: stats,
@@ -80,6 +80,15 @@ export const ProfilePage: React.FC = () => {
   const handleProfileUpdateSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['userStats'] })
     queryClient.invalidateQueries({ queryKey: ['userLibrary'] })
+  }
+
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="w-10 h-10 border-3 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+        <p className="text-xs text-gray-400 font-medium">Loading profile...</p>
+      </div>
+    )
   }
 
   if (!user) return null
