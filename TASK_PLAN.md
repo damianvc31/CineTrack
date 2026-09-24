@@ -173,15 +173,41 @@
 
 ---
 
-## Próximos Hitos:
-### Fase 9: Optimización de Rendimiento y Latencia en Home
-- [ ] Diagnóstico de cuellos de botella en la composición de carruseles múltiples (`GET /api/v1/home`).
-- [ ] Paralelización asíncrona de consultas (`asyncio.gather`), optimización de índices en PostgreSQL / Neon, y posible caché en memoria / TTL para colecciones de Home.
+## Hito Actual: Fase 9 — Optimización de Rendimiento y Latencia Cross-Web (v1.2.0)
+- [x] **Paso 9.1: Motor de Caché en Memoria en Backend (FastAPI)**
+  - [x] Implementar gestor de caché con TTL en memoria (`backend/app/core/cache.py`) sin dependencias externas pesadas.
+  - [x] Refactorizar `get_home_sections` en `catalog_service.py`: cachear los pools de títulos (Trending, Classics, Top Rated, New Releases, By Genre) en memoria.
+  - [x] Preservar la rotación aleatoria ejecutando `random.sample` sobre los pools cacheados en cada petición (0 queries a base de datos para estructura del catálogo).
+  - [x] Consulta atómica unificada de estados de usuario para inyectar `favorito`, `estado`, `rating` y abandono de series.
+  - [x] Cachear conteos y consultas frecuentes en `get_titles` (Explorar Catálogo).
+  - [x] Optimizar `get_user_library` para no cargar episodios de títulos que no están en seguimiento.
+  - [x] Integrar invalidación de caché en jobs de sincronización TMDB y endpoints administrativos (`clear_cache`).
+  - [x] Tests automatizados en `backend/tests/test_catalog.py` (81/81 tests pasando en verde).
+- [ ] **Paso 9.2: Integración de React Query en Frontend**
+  - [ ] Instalar `@tanstack/react-query` en `frontend/package.json`.
+  - [ ] Configurar `QueryClientProvider` en `frontend/src/App.tsx` con políticas de retención (`staleTime: 5 min`, `refetchOnWindowFocus: true`).
+- [ ] **Paso 9.3: Optimistic UI & Máquina de Estados Reactiva**
+  - [ ] Crear sistema centralizado de mutaciones optimistas para títulos y episodios (`useTitleMutations.ts` / hooks de estado).
+  - [ ] `onMutate`: actualización instantánea (0ms) en la caché local para feedback visual inmediato (corazón, watchlist, vista, seguir).
+  - [ ] `onError`: rollback seguro al snapshot anterior y notificación amigable al usuario (toast / mensaje flotante no intrusivo).
+  - [ ] `onSettled`: invalidación y revalidación suave en background.
+- [ ] **Paso 9.4: Migración de Páginas Clave a React Query**
+  - [ ] Migrar `HomePage.tsx` para consumir queries cacheadas sin re-fetching innecesario.
+  - [ ] Migrar `CatalogPage.tsx` con soporte de paginación y filtros instantáneos en cliente.
+  - [ ] Migrar `LibraryPage.tsx` y detalle de títulos.
+- [ ] **Paso 9.5: Verificación Integral, Tests y Documentación Viva**
+  - [ ] Ejecutar suite de pruebas de backend (`pytest`) y frontend (`vitest`).
+  - [ ] Comprobar ausencia de regresiones visuales y funcionales.
+  - [ ] Actualizar `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` y `ROADMAP.md`.
+  - [ ] Commit y tag `v1.2.0`.
 
-### Backlog / Versión Superior (Post-Entrega):
+---
+
+## Backlog / Versión Superior (Post-Entrega):
 - [ ] Sistema de notificaciones in-app para estrenos y cambios de status en series.
 - [ ] Badge visual "Viendo Actualmente" (🔥).
 - [ ] Soporte multirregión para plataformas de streaming (JustWatch / TMDB Watch Providers).
 - [ ] Selector de idioma para títulos y sinopsis.
+
 
 

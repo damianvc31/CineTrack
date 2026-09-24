@@ -121,6 +121,10 @@ class Settings(BaseSettings):
     HOME_TOP_RATED_POOL_SIZE: int = 100
     HOME_GENRE_POOL_SIZE: int = 100
     HOME_GENRE_MIN_TITLES_FOR_CAROUSEL: int = 10
+
+    # Cache Configuration (Memoria en backend)
+    CACHE_HOME_TTL_SECONDS: int = 3600      # 1 hora para los pools de Home
+    CACHE_CATALOG_TTL_SECONDS: int = 300     # 5 minutos para conteos y queries frecuentes
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
         if self.ENVIRONMENT == "production":

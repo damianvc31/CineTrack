@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 import app.models  # noqa: F401 - Register all models into Base.metadata
+from app.core.cache import cache
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app as fastapi_app
@@ -23,6 +24,14 @@ TestingSessionLocal = async_sessionmaker(
     expire_on_commit=False,
     autoflush=False
 )
+
+
+@pytest_asyncio.fixture(autouse=True)
+def clear_cache_between_tests():
+    """Garantiza que la caché en memoria esté vacía al inicio y fin de cada test."""
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest_asyncio.fixture

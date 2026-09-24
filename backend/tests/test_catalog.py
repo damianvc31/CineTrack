@@ -480,3 +480,88 @@ async def test_catalog_genre_canonical_expansion_and_and_or_toggle(async_client:
     assert "Science Fiction" in genre_names
     assert "Comedy" in genre_names
 
+
+@pytest.mark.asyncio
+async def test_home_cache_behavior_and_invalidation(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica que la Home use la caché en memoria y responda a la invalidación explícita."""
+    from app.core.cache import cache
+    from app.services.catalog_service import clear_catalog_cache
+
+    # 1. Crear un título que califique para New Releases
+    t1 = Titulo(
+        id=601,
+        tmdb_id=6001,
+        tipo="movie",
+        nombre="Cached Premiere 1",
+        fecha_estreno=date.today() - timedelta(days=5),
+        popularidad=150.0
+    )
+    db_session.add(t1)
+    await db_session.commit()
+
+    # Primera llamada: puebla la caché
+    res1 = await async_client.get("/api/v1/home")
+    assert res1.status_code == 200
+    assert cache.get("home_pools:all") is not None
+    ids1 = [t["id"] for t in res1.json()["new_releases"]]
+    assert 601 in ids1
+
+    # 2. Agregar un segundo título directamente en la BD
+    t2 = Titulo(
+        id=602,
+        tmdb_id=6002,
+        tipo="movie",
+        nombre="Cached Premiere 2",
+        fecha_estreno=date.today() - timedelta(days=2),
+        popularidad=200.0
+    )
+    db_session.add(t2)
+    await db_session.commit()
+
+    # Segunda llamada: debe responder desde la caché (602 aún no debe aparecer)
+    res2 = await async_client.get("/api/v1/home")
+    assert res2.status_code == 200
+    ids2 = [t["id"] for t in res2.json()["new_releases"]]
+    assert 602 not in ids2
+
+    # 3. Invalidar la caché y volver a consultar
+    clear_catalog_cache()
+    res3 = await async_client.get("/api/v1/home")
+    assert res3.status_code == 200
+    ids3 = [t["id"] for t in res3.json()["new_releases"]]
+    assert 602 in ids3
+
+
+@pytest.mark.asyncio
+async def test_cached_catalog_user_state_hydration(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica que un usuario autenticado reciba sus estados personales incluso cuando el catálogo base viene de caché."""
+    uid, token = await create_user_and_token(async_client, "cacheuser")
+
+    t = Titulo(id=701, tmdb_id=7001, tipo="movie", nombre="Hydrate Test Movie", popularidad=100.0)
+    db_session.add(t)
+    await db_session.commit()
+
+    # Consulta anónima primero (puebla la caché de catálogo)
+    res_anon = await async_client.get("/api/v1/titles?q=Hydrate")
+    assert res_anon.status_code == 200
+    item_anon = res_anon.json()["items"][0]
+    assert item_anon["user_favorito"] is False
+    assert item_anon["user_estado"] is None
+
+    # El usuario marca el título como favorito vía API
+    headers = {"Authorization": f"Bearer {token}"}
+    fav_res = await async_client.post("/api/v1/titles/701/favorite", headers=headers)
+    assert fav_res.status_code == 200
+
+    # Consulta autenticada: la base viene de la misma caché pero se hidrata con los estados de u
+    res_auth = await async_client.get(
+        "/api/v1/titles?q=Hydrate",
+        headers=headers
+    )
+    assert res_auth.status_code == 200
+    item_auth = res_auth.json()["items"][0]
+    assert item_auth["id"] == 701
+    assert item_auth["user_favorito"] is True
+
+
+

@@ -825,6 +825,13 @@ class TMDBSyncService:
         except Exception as e:
             logger.warning(f"No se pudieron sincronizar embeddings tras sync diaria: {e}")
 
+        # 7. Invalidar caché del catálogo y Home en memoria
+        try:
+            from app.services.catalog_service import clear_catalog_cache
+            clear_catalog_cache()
+        except Exception as e:
+            logger.warning(f"No se pudo limpiar la caché tras sync diaria: {e}")
+
         logger.info(
             f"Sincronización diaria terminada: {updated_series_count} series actualizadas, "
             f"{new_movies_count} nuevos estrenos de películas, {new_series_count} nuevas series."

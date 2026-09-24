@@ -6,6 +6,7 @@ from sqlalchemy import and_, delete, desc, extract, func, or_, select, text, uni
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.cache import cache
 from app.core.config import settings
 from app.models import (
     Actor,
@@ -148,6 +149,84 @@ async def get_titles(
     usuario_id: Optional[int] = None,
     exclude_watched: bool = False
 ) -> TitleListResponse:
+    # -------------------------------------------------------------------------
+    # Caché en memoria para exploración de catálogo sin filtro dinámico de vistos
+    # -------------------------------------------------------------------------
+    cache_key = None
+    if not (exclude_watched and usuario_id):
+        p_generos = ",".join(generos) if isinstance(generos, list) else (generos or "")
+        p_paises = ",".join(paises) if isinstance(paises, list) else (paises or "")
+        p_idiomas = ",".join(idiomas) if isinstance(idiomas, list) else (idiomas or "")
+        cache_key = (
+            f"cat:{tipo or ''}:{genero_id or ''}:{genero or ''}:{p_generos}:{genre_op}:"
+            f"{actor_id or ''}:{actor or ''}:{pais or ''}:{p_paises}:{idioma or ''}:{p_idiomas}:{section or ''}:"
+            f"{q or ''}:{sort_by}:{order}:{page}:{page_size}"
+        )
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            cached_cards, total = cached_data
+            if not usuario_id or not cached_cards:
+                return TitleListResponse(items=cached_cards, total=total, page=page, page_size=page_size)
+
+            title_ids = [c.id for c in cached_cards]
+            st_res = await db.execute(
+                select(EstadoUsuarioTitulo).where(
+                    EstadoUsuarioTitulo.usuario_id == usuario_id,
+                    EstadoUsuarioTitulo.titulo_id.in_(title_ids)
+                )
+            )
+            user_states_map = {st.titulo_id: st for st in st_res.scalars().all()}
+
+            r_res = await db.execute(
+                select(Resena.titulo_id, Resena.puntaje).where(
+                    Resena.usuario_id == usuario_id,
+                    Resena.titulo_id.in_(title_ids),
+                    Resena.puntaje.isnot(None)
+                )
+            )
+            user_ratings_map = {r_tid: r_score for r_tid, r_score in r_res.all()}
+
+            tv_ids = [c.id for c in cached_cards if c.tipo == "tv"]
+            tv_abandoned_ids = set()
+            if tv_ids:
+                w_res = await db.execute(
+                    select(Temporada.titulo_id)
+                    .join(Episodio, Episodio.temporada_id == Temporada.id)
+                    .join(EpisodioVisto, EpisodioVisto.episodio_id == Episodio.id)
+                    .where(
+                        EpisodioVisto.usuario_id == usuario_id,
+                        Temporada.titulo_id.in_(tv_ids)
+                    )
+                    .distinct()
+                )
+                watched_tv_ids = set(w_res.scalars().all())
+                for tid in watched_tv_ids:
+                    st = user_states_map.get(tid)
+                    if not st or st.estado not in ("siguiendo", "vista"):
+                        tv_abandoned_ids.add(tid)
+
+            def _hydrate_cat(c: TitleCardResponse) -> TitleCardResponse:
+                st = user_states_map.get(c.id)
+                u_fav = st.favorito if st else False
+                u_est = st.estado if st else None
+                if c.tipo == "tv" and (u_est is None or u_est == "abandonada") and (c.id in tv_abandoned_ids):
+                    u_est = "abandonada"
+                u_rat = user_ratings_map.get(c.id)
+                if c.user_favorito == u_fav and c.user_estado == u_est and c.user_rating == u_rat:
+                    return c
+                return c.model_copy(update={
+                    "user_favorito": u_fav,
+                    "user_estado": u_est,
+                    "user_rating": u_rat,
+                })
+
+            return TitleListResponse(
+                items=[_hydrate_cat(c) for c in cached_cards],
+                total=total,
+                page=page,
+                page_size=page_size
+            )
+
     query = (
         select(Titulo)
         .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
@@ -425,6 +504,13 @@ async def get_titles(
                 if not st or st.estado not in ("siguiendo", "vista"):
                     tv_abandoned_ids.add(tid)
 
+    base_cards = [
+        _build_title_card(t)
+        for t in titulos
+    ]
+    if cache_key:
+        cache.set(cache_key, (base_cards, total), ttl_seconds=settings.CACHE_CATALOG_TTL_SECONDS)
+
     items = [
         _build_title_card(
             t,
@@ -437,30 +523,28 @@ async def get_titles(
     return TitleListResponse(items=items, total=total, page=page, page_size=page_size)
 
 
-async def get_home_sections(
+async def _fetch_and_cache_home_pools(
     db: AsyncSession,
-    tipo: Optional[str] = None,
-    usuario_id: Optional[int] = None
-) -> HomeSectionsResponse:
+    tipo: Optional[str] = None
+) -> Dict[str, Any]:
     """
-    Devuelve las secciones curadas para la Home:
-    - New Releases (últimos N días, configurable)
-    - Trending (últimos N días por popularidad, extensible con última temporada en series)
-    - Classics (películas con > N años y alto rating, pool aleatorio)
-    - Top Rated (pool aleatorio de las mejores calificadas)
-    - By Genre (carrusel propio para géneros con >= min_titles)
-    - Others (pool aleatorio de géneros minoritarios con < min_titles)
+    Obtiene y almacena en memoria los pools base de títulos para la Home.
+    Se cachean objetos TitleCardResponse base (sin estados de usuario) para
+    máxima velocidad, nulo consumo de Neon DB en visitas posteriores y aislamiento
+    completo de sesiones SQLAlchemy.
     """
+    cache_key = f"home_pools:{tipo or 'all'}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     today = date.today()
     sample_size = settings.HOME_SECTION_SAMPLE_SIZE
 
     def _apply_base_filters(query):
         return query
 
-    # -------------------------------------------------------------------------
-    # 1. New Releases (últimos HOME_NEW_RELEASES_DAYS días, ordenados por fecha desc)
-    # Series entran si su propio estreno fue en esa ventana.
-    # -------------------------------------------------------------------------
+    # 1. New Releases (pool de hasta sample_size * 3)
     nr_cutoff = today - timedelta(days=settings.HOME_NEW_RELEASES_DAYS)
     nr_query = (
         select(Titulo)
@@ -474,13 +558,10 @@ async def get_home_sections(
     if tipo in ("movie", "tv"):
         nr_query = nr_query.where(Titulo.tipo == tipo)
     nr_query = _apply_base_filters(nr_query)
-    nr_query = nr_query.order_by(desc(Titulo.fecha_estreno), desc(Titulo.popularidad)).limit(sample_size)
+    nr_query = nr_query.order_by(desc(Titulo.fecha_estreno), desc(Titulo.popularidad)).limit(sample_size * 3)
     new_releases_titulos = (await db.execute(nr_query)).scalars().all()
 
-    # -------------------------------------------------------------------------
-    # 2. Trending (últimos HOME_TRENDING_DAYS días, ordenados por popularidad desc)
-    # Series entran si su fecha de estreno o la de su última temporada entra en la ventana.
-    # -------------------------------------------------------------------------
+    # 2. Trending (pool de hasta sample_size * 3)
     tr_cutoff = today - timedelta(days=settings.HOME_TRENDING_DAYS)
     latest_ep_subq = (
         select(func.max(Episodio.fecha_estreno))
@@ -516,13 +597,10 @@ async def get_home_sections(
             )
         )
     tr_query = _apply_base_filters(tr_query)
-    tr_query = tr_query.order_by(desc(Titulo.popularidad), desc(Titulo.id)).limit(sample_size)
+    tr_query = tr_query.order_by(desc(Titulo.popularidad), desc(Titulo.id)).limit(sample_size * 3)
     trending_titulos = (await db.execute(tr_query)).scalars().all()
 
-    # -------------------------------------------------------------------------
-    # 3. Classics (solo películas con > HOME_CLASSICS_MIN_YEARS, rating >= 7.5, votos >= 500)
-    # Pool de 50 más populares -> muestra aleatoria de sample_size (10)
-    # -------------------------------------------------------------------------
+    # 3. Classics (pool completo de hasta HOME_CLASSICS_POOL_SIZE)
     classics_titulos = []
     if tipo != "tv":
         classics_cutoff_year = today.year - settings.HOME_CLASSICS_MIN_YEARS
@@ -540,15 +618,9 @@ async def get_home_sections(
         )
         cl_query = _apply_base_filters(cl_query)
         cl_query = cl_query.order_by(desc(Titulo.popularidad), desc(Titulo.id)).limit(settings.HOME_CLASSICS_POOL_SIZE)
-        cl_pool = (await db.execute(cl_query)).scalars().all()
-        if len(cl_pool) > sample_size:
-            classics_titulos = random.sample(cl_pool, sample_size)
-        else:
-            classics_titulos = list(cl_pool)
+        classics_titulos = (await db.execute(cl_query)).scalars().all()
 
-    # -------------------------------------------------------------------------
-    # 4. Top Rated (pool de 100 mejores calificadas con >= 100 votos -> muestra aleatoria de 10)
-    # -------------------------------------------------------------------------
+    # 4. Top Rated (pool completo de hasta HOME_TOP_RATED_POOL_SIZE)
     tr_pool_query = (
         select(Titulo)
         .options(selectinload(Titulo.generos), selectinload(Titulo.temporadas))
@@ -560,17 +632,9 @@ async def get_home_sections(
         tr_pool_query = tr_pool_query.where(Titulo.tipo == tipo)
     tr_pool_query = _apply_base_filters(tr_pool_query)
     tr_pool_query = tr_pool_query.order_by(desc(Titulo.rating_unificado), desc(Titulo.vote_count_tmdb)).limit(settings.HOME_TOP_RATED_POOL_SIZE)
-    tr_pool = (await db.execute(tr_pool_query)).scalars().all()
-    if len(tr_pool) > sample_size:
-        top_rated_titulos = random.sample(tr_pool, sample_size)
-    else:
-        top_rated_titulos = list(tr_pool)
+    top_rated_titulos = (await db.execute(tr_pool_query)).scalars().all()
 
-    # -------------------------------------------------------------------------
-    # 5. By Genre (Carrusel propio para géneros canónicos con >= HOME_GENRE_MIN_TITLES_FOR_CAROUSEL)
-    # Se excluyen duplas híbridas de TMDB (Action & Adventure, Sci-Fi & Fantasy, War & Politics)
-    # y se expanden los géneros canónicos para abarcar películas y series conjuntamente.
-    # -------------------------------------------------------------------------
+    # 5. By Genre (carrusel propio para géneros con >= HOME_GENRE_MIN_TITLES_FOR_CAROUSEL)
     genre_count_q = (
         select(Genero.id, Genero.nombre, func.count(titulos_generos.c.titulo_id).label("cnt"))
         .join(titulos_generos, titulos_generos.c.genero_id == Genero.id)
@@ -604,28 +668,79 @@ async def get_home_sections(
         g_q = _apply_base_filters(g_q)
         g_q = g_q.order_by(desc(Titulo.popularidad), desc(Titulo.id)).limit(settings.HOME_GENRE_POOL_SIZE)
         g_pool = (await db.execute(g_q)).scalars().all()
-        if len(g_pool) > sample_size:
-            by_genre_titulos[gname] = random.sample(g_pool, sample_size)
-        else:
-            by_genre_titulos[gname] = list(g_pool)
+        by_genre_titulos[gname] = [_build_title_card(t) for t in g_pool]
 
-    # -------------------------------------------------------------------------
-    # Estados de usuario consolidados (1 sola consulta para todos los títulos)
-    # -------------------------------------------------------------------------
+    pools = {
+        "new_releases": [_build_title_card(t) for t in new_releases_titulos],
+        "trending": [_build_title_card(t) for t in trending_titulos],
+        "classics": [_build_title_card(t) for t in classics_titulos],
+        "top_rated": [_build_title_card(t) for t in top_rated_titulos],
+        "by_genre": by_genre_titulos,
+    }
+
+    cache.set(cache_key, pools, ttl_seconds=settings.CACHE_HOME_TTL_SECONDS)
+    return pools
+
+
+async def get_home_sections(
+    db: AsyncSession,
+    tipo: Optional[str] = None,
+    usuario_id: Optional[int] = None
+) -> HomeSectionsResponse:
+    """
+    Devuelve las secciones curadas para la Home:
+    - New Releases
+    - Trending
+    - Classics (aleatoriedad dinámica sobre pool en memoria)
+    - Top Rated (aleatoriedad dinámica sobre pool en memoria)
+    - By Genre (aleatoriedad dinámica sobre pool en memoria por cada género)
+    - Others
+    Aprovecha la caché en memoria para 0 latencia de base de datos y preserva
+    rotación viva por petición.
+    """
+    sample_size = settings.HOME_SECTION_SAMPLE_SIZE
+    pools = await _fetch_and_cache_home_pools(db, tipo)
+
+    new_releases_cards = pools["new_releases"][:sample_size]
+    trending_cards = pools["trending"][:sample_size]
+
+    cl_pool = pools["classics"]
+    classics_cards = random.sample(cl_pool, sample_size) if len(cl_pool) > sample_size else list(cl_pool)
+
+    tr_pool = pools["top_rated"]
+    top_rated_cards = random.sample(tr_pool, sample_size) if len(tr_pool) > sample_size else list(tr_pool)
+
+    by_genre_cards = {}
+    for gname, gpool in pools["by_genre"].items():
+        by_genre_cards[gname] = random.sample(gpool, sample_size) if len(gpool) > sample_size else list(gpool)
+
+    # Si es invitado / sin usuario autenticado, respuesta instantánea
+    if not usuario_id:
+        return HomeSectionsResponse(
+            trending=trending_cards,
+            new_releases=new_releases_cards,
+            classics=classics_cards,
+            top_rated=top_rated_cards,
+            by_genre=by_genre_cards,
+            others=[]
+        )
+
+    # Para usuario autenticado: fusionar estados personales en 1 sola ronda
     all_selected = (
-        trending_titulos
-        + new_releases_titulos
-        + classics_titulos
-        + top_rated_titulos
+        trending_cards
+        + new_releases_cards
+        + classics_cards
+        + top_rated_cards
     )
-    for g_list in by_genre_titulos.values():
+    for g_list in by_genre_cards.values():
         all_selected.extend(g_list)
 
     user_states_map = {}
     user_ratings_map = {}
     tv_abandoned_ids = set()
-    if usuario_id and all_selected:
-        unique_ids = list({t.id for t in all_selected})
+
+    if all_selected:
+        unique_ids = list({card.id for card in all_selected})
         st_res = await db.execute(
             select(EstadoUsuarioTitulo).where(
                 EstadoUsuarioTitulo.usuario_id == usuario_id,
@@ -644,7 +759,7 @@ async def get_home_sections(
         for r_tid, r_score in r_res.all():
             user_ratings_map[r_tid] = r_score
 
-        tv_ids = [t.id for t in all_selected if t.tipo == "tv"]
+        tv_ids = [card.id for card in all_selected if card.tipo == "tv"]
         if tv_ids:
             w_res = await db.execute(
                 select(Temporada.titulo_id)
@@ -662,22 +777,31 @@ async def get_home_sections(
                 if not st or st.estado not in ("siguiendo", "vista"):
                     tv_abandoned_ids.add(tid)
 
-    def _build_card(t):
-        return _build_title_card(
-            t,
-            user_states_map.get(t.id),
-            is_abandoned=(t.id in tv_abandoned_ids),
-            user_rating=user_ratings_map.get(t.id)
-        )
+    def _hydrate_card(card: TitleCardResponse) -> TitleCardResponse:
+        st = user_states_map.get(card.id)
+        u_favorito = st.favorito if st else False
+        u_estado = st.estado if st else None
+        if card.tipo == "tv" and (u_estado is None or u_estado == "abandonada") and (card.id in tv_abandoned_ids):
+            u_estado = "abandonada"
+        u_rating = user_ratings_map.get(card.id)
+
+        if card.user_favorito == u_favorito and card.user_estado == u_estado and card.user_rating == u_rating:
+            return card
+
+        return card.model_copy(update={
+            "user_favorito": u_favorito,
+            "user_estado": u_estado,
+            "user_rating": u_rating,
+        })
 
     return HomeSectionsResponse(
-        trending=[_build_card(t) for t in trending_titulos],
-        new_releases=[_build_card(t) for t in new_releases_titulos],
-        classics=[_build_card(t) for t in classics_titulos],
-        top_rated=[_build_card(t) for t in top_rated_titulos],
+        trending=[_hydrate_card(c) for c in trending_cards],
+        new_releases=[_hydrate_card(c) for c in new_releases_cards],
+        classics=[_hydrate_card(c) for c in classics_cards],
+        top_rated=[_hydrate_card(c) for c in top_rated_cards],
         by_genre={
-            gname: [_build_card(t) for t in titles]
-            for gname, titles in by_genre_titulos.items()
+            gname: [_hydrate_card(c) for c in cards]
+            for gname, cards in by_genre_cards.items()
         },
         others=[]
     )
@@ -1030,12 +1154,23 @@ async def get_user_library(
         .join(EstadoUsuarioTitulo, EstadoUsuarioTitulo.titulo_id == Titulo.id)
         .options(
             selectinload(Titulo.generos),
-            selectinload(Titulo.temporadas).selectinload(Temporada.episodios)
+            selectinload(Titulo.temporadas)
         )
         .where(EstadoUsuarioTitulo.usuario_id == usuario_id)
     )
     res = await db.execute(q)
     rows = res.all()
+
+    # Cargar episodios detallados únicamente para las series en seguimiento
+    following_tv_ids = [t.id for t, st in rows if st.estado == "siguiendo" and t.tipo == "tv"]
+    following_series_map = {}
+    if following_tv_ids:
+        following_res = await db.execute(
+            select(Titulo)
+            .options(selectinload(Titulo.temporadas).selectinload(Temporada.episodios))
+            .where(Titulo.id.in_(following_tv_ids))
+        )
+        following_series_map = {t.id: t for t in following_res.scalars().all()}
 
     # Obtener IDs de episodios vistos del usuario
     vistos_q = select(EpisodioVisto.episodio_id).where(EpisodioVisto.usuario_id == usuario_id)
@@ -1070,8 +1205,9 @@ async def get_user_library(
         if st.estado == "siguiendo" and titulo.tipo == "tv":
             seasons_prog = []
             earliest_uncompleted = None
+            series_obj = following_series_map.get(titulo.id, titulo)
             valid_seasons = sorted(
-                [s for s in titulo.temporadas if s.numero > 0],
+                [s for s in series_obj.temporadas if s.numero > 0],
                 key=lambda x: x.numero
             )
             for s in valid_seasons:
@@ -1405,6 +1541,7 @@ async def clear_entire_catalog(db: AsyncSession) -> Dict[str, int]:
     del_actores = await db.execute(delete(Actor))
 
     await db.commit()
+    cache.clear()
 
     return {
         "titulos": del_titulos.rowcount if del_titulos.rowcount != -1 else 0,
@@ -1414,6 +1551,12 @@ async def clear_entire_catalog(db: AsyncSession) -> Dict[str, int]:
         "estados_usuario": del_estados.rowcount if del_estados.rowcount != -1 else 0,
         "actores": del_actores.rowcount if del_actores.rowcount != -1 else 0,
     }
+
+
+def clear_catalog_cache(prefix: Optional[str] = None) -> int:
+    """Invalida la caché del catálogo en memoria (Home pools y consultas frecuentes)."""
+    return cache.clear(prefix=prefix)
+
 
 
 async def get_available_countries(db: AsyncSession) -> list[CountryItem]:
