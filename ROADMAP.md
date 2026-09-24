@@ -104,4 +104,14 @@
   - Job CLI `python -m app.jobs.sync_tmdb --expand` con filtro por género (individual o masivo), tipo de medio (`both`, `movie`, `tv`) y umbrales configurables de votos (`min_vote_count`) y calificación (`min_vote_average`) sin duplicar títulos existentes ni rehacer la ingesta inicial completa.
 - [x] **Recomendador avanzado (RAG Híbrido):** *(Completado en Fase 8)*
   - Búsqueda semántica vectorial con embeddings de 768 dimensiones vía Google AI Studio y `pgvector` en PostgreSQL Neon con índice HNSW, filtrado negativo estricto y fallback léxico.
+- [ ] **Control de Variabilidad / Temperatura del Recomendador IA (Slider UX):**
+  - Configuración personalizada del parámetro `temperature` del LLM en el asistente de recomendaciones.
+  - Control en frontend mediante un slider semántico intuitivo en Settings o en el panel de IA:
+    - *Nula* (`0.0`): Determinismo total, devuelve siempre los mismos títulos y orden ante idéntico prompt.
+    - *Muy Baja* (`0.15`): Mínima oscilación.
+    - *Baja / Default actual* (`0.3`): Rigor temático estricto con leve frescura entre consultas repetidas.
+    - *Media* (`0.5`): Mayor variedad y alternancia de títulos del pool.
+    - *Alta* (`0.7`): Hallazgos más diversos y combinaciones creativas.
+    - *Muy Alta* (`0.9`): Máxima exploración y sorpresa dentro del pool recuperado.
+  - Persistencia en preferencias de usuario para cuentas autenticadas y valor por defecto configurable vía variable de entorno (`AI_RECOMMENDER_DEFAULT_TEMPERATURE=0.3`) para usuarios invitados.
 - [ ] Posible refinamiento UX en desmarques de episodios: diálogo opcional para advertir al usuario o resetear progreso posterior al desmarcar un episodio intermedio.
