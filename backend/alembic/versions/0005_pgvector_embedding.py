@@ -26,6 +26,7 @@ def upgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
         op.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+        op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
 
     with op.batch_alter_table('titulos') as batch_op:
         batch_op.add_column(sa.Column('embedding', Vector(768), nullable=True))
