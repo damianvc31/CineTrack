@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useOutletContext } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { Filter, Search, ChevronLeft, ChevronRight, Film, Tv, Sparkles, AlertCircle, X, RotateCcw, Compass, User } from 'lucide-react'
-import { catalogService, type TitlesResponse, type CountryItem, type LanguageItem } from '@/services/catalogService'
+import { catalogService, type TitlesResponse } from '@/services/catalogService'
 import { TitleCard } from '@/components/common/TitleCard'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { MultiSelectDropdown, type MultiSelectOption } from '@/components/common/MultiSelectDropdown'
@@ -16,12 +17,30 @@ export const CatalogPage: React.FC = () => {
   const { language, t, translateGenreName } = useLanguage()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [data, setData] = useState<TitlesResponse | null>(null)
-  const [genres, setGenres] = useState<string[]>([])
-  const [countries, setCountries] = useState<CountryItem[]>([])
-  const [languages, setLanguages] = useState<LanguageItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Metadatos con caché global (60 min)
+  const { data: genresData } = useQuery({
+    queryKey: ['genres'],
+    queryFn: async () => {
+      const res = await catalogService.getGenres()
+      return res.map((g) => (typeof g === 'string' ? g : g.nombre))
+    },
+    staleTime: 60 * 60 * 1000,
+  })
+  const genres = genresData || []
+
+  const { data: countriesData } = useQuery({
+    queryKey: ['countries'],
+    queryFn: () => catalogService.getCountries(),
+    staleTime: 60 * 60 * 1000,
+  })
+  const countries = countriesData || []
+
+  const { data: languagesData } = useQuery({
+    queryKey: ['languages'],
+    queryFn: () => catalogService.getLanguages(),
+    staleTime: 60 * 60 * 1000,
+  })
+  const languages = languagesData || []
 
   // Extraer parámetros de la URL
   const query = searchParams.get('q') || ''
@@ -69,26 +88,7 @@ export const CatalogPage: React.FC = () => {
   // Input local para búsqueda de texto
   const [searchInput, setSearchInput] = useState(query)
 
-  // Cargar metadatos disponibles (géneros, países e idiomas)
-  useEffect(() => {
-    catalogService
-      .getGenres()
-      .then((res) => {
-        const names = res.map((g) => (typeof g === 'string' ? g : g.nombre))
-        setGenres(names)
-      })
-      .catch(console.error)
 
-    catalogService
-      .getCountries()
-      .then(setCountries)
-      .catch(console.error)
-
-    catalogService
-      .getLanguages()
-      .then(setLanguages)
-      .catch(console.error)
-  }, [])
 
   // Nombres localizados para países e idiomas
   const getCountryLabel = useCallback(
@@ -147,47 +147,37 @@ export const CatalogPage: React.FC = () => {
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [languages, getLanguageLabel])
 
-  const fetchTitles = useCallback(
-    async (showSpinner = true) => {
-      if (showSpinner) setLoading(true)
-      setError(null)
-      try {
-        const res = await catalogService.getTitles({
-          q: query || undefined,
-          tipo,
-          section,
-          generos: selectedGenres.length > 0 ? selectedGenres : undefined,
-          genre_op: genreOp,
-          paises: selectedCountries.length > 0 ? selectedCountries : undefined,
-          idiomas: selectedLanguages.length > 0 ? selectedLanguages : undefined,
-          actor,
-          sort_by: sortBy,
-          order,
-          page,
-          page_size: 24,
-        })
-        setData(res)
-      } catch (err: unknown) {
-        if (err instanceof Error) {
-          setError(err.message)
-        } else {
-          setError('Error al consultar el catálogo')
-        }
-      } finally {
-        if (showSpinner) setLoading(false)
-      }
-    },
+  const catalogFilters = useMemo(
+    () => ({
+      q: query || undefined,
+      tipo,
+      section,
+      generos: selectedGenres.length > 0 ? selectedGenres : undefined,
+      genre_op: genreOp,
+      paises: selectedCountries.length > 0 ? selectedCountries : undefined,
+      idiomas: selectedLanguages.length > 0 ? selectedLanguages : undefined,
+      actor,
+      sort_by: sortBy,
+      order,
+      page,
+      page_size: 24,
+    }),
     [query, tipo, section, selectedGenres, genreOp, selectedCountries, selectedLanguages, actor, sortBy, order, page]
   )
 
-  useEffect(() => {
-    fetchTitles(true)
-  }, [fetchTitles])
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery<TitlesResponse>({
+    queryKey: ['catalog', catalogFilters],
+    queryFn: () => catalogService.getTitles(catalogFilters),
+  })
 
-  const handleCardStateChange = (action: 'favorite' | 'watchlist' | 'watched') => {
-    if (action === 'watched') {
-      fetchTitles(false)
-    }
+  const error = queryError ? (queryError instanceof Error ? queryError.message : 'Error al consultar el catálogo') : null
+
+  const handleCardStateChange = (_action: 'favorite' | 'watchlist' | 'watched') => {
+    // Las mutaciones optimistas de useTitleMutations ya actualizan la caché en memoria instantáneamente
   }
 
   const updateParam = (key: string, value: string | undefined) => {

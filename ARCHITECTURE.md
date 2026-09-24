@@ -303,3 +303,34 @@ Para la puesta en producción y entrega final del proyecto, se adopta una **Arqu
 4. **Filtro de Idioma Original:** Mapeo a ISO 639-1 y filtrado estricto sobre `Titulo.idioma_original`.
 5. **Cascada de Resiliencia Multi-Nivel:** Conmutación automática ante errores 429/500 entre Google AI Studio y Groq API con motor heurístico local determinista como red de seguridad final.
 
+---
+
+## 8. Rendimiento, Caché en Memoria y Reactividad Optimista (Fase 9)
+
+Para mitigar la latencia de red entre servicios de nube en tiers gratuitos (FastAPI en Render Web Service y PostgreSQL Serverless en Neon) y garantizar una experiencia de usuario instantánea:
+
+### 8.1. Backend: Caché Asíncrona en Memoria (FastAPI)
+- **Cero Infraestructura Externa (`MemoryCache`):** Gestor de caché liviano (`backend/app/core/cache.py`) basado en diccionarios en memoria con TTL y purga por prefijos. Elimina la necesidad de desplegar instancias pagas de Redis o Memcached, operando estrictamente dentro del límite de 512 MB de RAM de Render.
+- **Estrategia de Caché de Pools vs. Listas Fijas:**
+  - En lugar de cachear el JSON final de 10 elementos por carrusel de Home (`/api/v1/home`), se cachean los pools extendidos de candidatos (Top Rated: 100 títulos, Classics: 50 títulos, Trending: 100 títulos, New Releases, By Genre).
+  - En cada petición, Python ejecuta un muestreo aleatorio en memoria (`random.sample`) sobre el pool cacheado. Esto preserva la rotación dinámica y fresca entre recargas con **0 consultas SQL a la base de datos**.
+- **Hidratación Atómica de Estados de Usuario:**
+  - Para usuarios anónimos: la respuesta de Home se sirve íntegramente de memoria sin tocar PostgreSQL.
+  - Para usuarios autenticados: la estructura del catálogo proviene de memoria y los estados específicos del usuario (`favorito`, `watchlist`, `siguiendo`, `vista`, `user_rating`, abandono de series) se resuelven en una única consulta optimizada indexada sobre los IDs seleccionados.
+- **Optimización de Biblioteca (`/users/me/library`):**
+  - Eliminación de la carga ansiosa de episodios para títulos marcados como favoritos, watchlist o vistos; la jerarquía episódica se consulta exclusivamente para series activas en seguimiento (`siguiendo`).
+- **Invalidación Proactiva de Caché:**
+  - Se purga la caché de catálogo (`clear_catalog_cache()`) automáticamente tras ingestas masivas (`--clear`, `clear_entire_catalog`) y sincronizaciones periódicas de TMDB (`run_daily_sync`).
+- **Desactivación Flexible en Desarrollo Local:**
+  - Fijando `CACHE_HOME_TTL_SECONDS=0` y `CACHE_CATALOG_TTL_SECONDS=0` (como en `.env.local`), el gestor omite la caché y ejecuta consultas directas contra SQLite local (1-5 ms) para permitir modificaciones inmediatas sin persistencia intermedia.
+
+### 8.2. Frontend: React Query y Optimistic UI
+- **Caché en Cliente con TanStack React Query (`QueryClientProvider`):**
+  - `staleTime` global de 5 minutos y `gcTime` de 15 minutos en `App.tsx` para evitar refetching redundante al navegar entre pestañas.
+  - Almacenamiento en caché de metadatos estáticos (géneros, países, idiomas) durante 60 minutos en `CatalogPage.tsx`.
+  - Caché multi-ventana para métricas de usuario en `ProfilePage.tsx` (`all_time`, `1m`, `3m`, `1y`), permitiendo alternancia instantánea sin latencia.
+- **Mutaciones Optimistas con Feedback de 0 ms (`useTitleMutations`):**
+  - Acciones rápidas de usuario (alternar favorito, marcar watchlist o visto) aplican un parche inmediato a la caché en memoria del navegador antes de emitir la petición HTTP.
+  - **Manejo de Errores y Rollback Amigable:** Ante fallas de conexión o errores 500, el estado se revierte instantáneamente al snapshot previo y se dispara una notificación flotante amigable (`ToastContext.tsx`) detallando el motivo sin romper la interfaz.
+  - **Invalidación Automática en Background (`onSettled`):** Tras completar la mutación, se revalidan en segundo plano las consultas vinculadas (`homeSections`, `catalog`, `titleDetail`, `userLibrary`, `userStats`).
+

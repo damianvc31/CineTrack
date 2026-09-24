@@ -75,10 +75,17 @@
 - [x] **Batería de Pruebas y Cobertura (v1.1.0):**
   - Suite de 20 casos de prueba de borde con 100% de éxito, 79 tests de backend (`pytest`) y 2 tests de frontend (`vitest`) en verde.
 
-### Fase 9: Optimización de Rendimiento y Latencia en Home
-- [ ] **Optimización de Latencia en Home (`GET /api/v1/home`):**
-  - Diagnóstico de cuellos de botella en la composición de carruseles múltiples (Trending, New Releases, Classics, Top Rated y By Genre).
-  - Estrategias de paralelización asíncrona de consultas (`asyncio.gather`), optimización de índices en PostgreSQL / Neon, y posible caché en memoria / TTL para colecciones de Home.
+### Fase 9: Optimización de Rendimiento, Latencia Cross-Web y UI Reactiva (v1.2.0)
+- [x] **Motor de Caché Asíncrono en Memoria (FastAPI):**
+  - Implementación de `MemoryCache` con TTL configurable y purga por prefijos sin dependencias externas pesadas ni costos cloud.
+  - Caché de pools candidatos en Home (Trending, Classics, Top Rated, New Releases, By Genre) manteniendo la rotación dinámica aleatoria con 0 queries a PostgreSQL.
+  - Hidratación atómica de estados de usuario autenticado en una sola consulta SQL optimizada.
+  - Caché de conteos y metadatos en Catálogo y optimización de carga diferida de episodios en Biblioteca de usuario.
+- [x] **React Query & Optimistic UI (0 ms de latencia percibida):**
+  - Integración de `@tanstack/react-query` en toda la aplicación con políticas de retención global.
+  - Mutaciones optimistas en `TitleCard` y `TitleDetailPage` para cambios instantáneos de favoritos, watchlist y vistos.
+  - Rollback transparente con notificaciones flotantes amigables (`ToastContext`) ante errores de red.
+  - Suite de 81 tests de backend y pruebas de frontend en verde.
 
 ---
 

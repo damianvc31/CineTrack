@@ -153,7 +153,7 @@ async def get_titles(
     # Caché en memoria para exploración de catálogo sin filtro dinámico de vistos
     # -------------------------------------------------------------------------
     cache_key = None
-    if not (exclude_watched and usuario_id):
+    if not (exclude_watched and usuario_id) and settings.CACHE_CATALOG_TTL_SECONDS > 0:
         p_generos = ",".join(generos) if isinstance(generos, list) else (generos or "")
         p_paises = ",".join(paises) if isinstance(paises, list) else (paises or "")
         p_idiomas = ",".join(idiomas) if isinstance(idiomas, list) else (idiomas or "")
@@ -534,9 +534,10 @@ async def _fetch_and_cache_home_pools(
     completo de sesiones SQLAlchemy.
     """
     cache_key = f"home_pools:{tipo or 'all'}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
+    if settings.CACHE_HOME_TTL_SECONDS > 0:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
 
     today = date.today()
     sample_size = settings.HOME_SECTION_SAMPLE_SIZE
@@ -678,7 +679,8 @@ async def _fetch_and_cache_home_pools(
         "by_genre": by_genre_titulos,
     }
 
-    cache.set(cache_key, pools, ttl_seconds=settings.CACHE_HOME_TTL_SECONDS)
+    if settings.CACHE_HOME_TTL_SECONDS > 0:
+        cache.set(cache_key, pools, ttl_seconds=settings.CACHE_HOME_TTL_SECONDS)
     return pools
 
 

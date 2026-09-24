@@ -36,6 +36,7 @@ Variables clave requeridas:
   - `TMDB_EXPAND_MIN_VOTE_AVERAGE`: Umbral mínimo de calificación en TMDB (default: `7.0`).
   - `TMDB_EXPAND_TITLES_PER_GENRE`: Títulos objetivo a ingerir por género (default: `50`).
 - `HOME_*`: Parámetros de ajuste de ventanas temporales, pools y umbrales de Home (`HOME_NEW_RELEASES_DAYS=30`, `HOME_TRENDING_DAYS=90`, `HOME_TRENDING_MIN_POPULARITY_PERCENTILE=0.80`, etc.)
+- `CACHE_*`: Parámetros de caché en memoria TTL (`CACHE_HOME_TTL_SECONDS=3600`, `CACHE_CATALOG_TTL_SECONDS=300`)
 
 ### Gestión de Ambientes en Desarrollo (`.env` vs `.env.local`)
 El proyecto admite alternar fluidamente entre dos bases de datos para desarrollo local:

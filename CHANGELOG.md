@@ -2,6 +2,29 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.2.0] - 2026-09-24
+### Agregado & Mejorado (Fase 9: Optimización de Rendimiento, Latencia Cross-Web y UI Reactiva)
+- **Backend: Motor de Caché en Memoria (FastAPI):**
+  - Implementación de `MemoryCache` (`app/core/cache.py`) asíncrono con expiración por TTL y purga por prefijos sin costes de infraestructura externa (100% free tier en Render).
+  - **Estrategia de Caché de Pools para Home (`/api/v1/home`):** Se cachean los pools base de candidatos en lugar de listas fijas de 10 elementos. La aleatoriedad y rotación dinámica se ejecutan en memoria de Python con `random.sample`, logrando 0 consultas a PostgreSQL para usuarios no autenticados sin perder frescura visual.
+  - **Hidratación Atómica de Estados de Usuario:** Para usuarios autenticados, se inyectan estados personales (`favorito`, `watchlist`, `siguiendo`, `vista`, `user_rating`, abandono de series) con una única consulta SQL indexada sobre los IDs seleccionados.
+  - **Optimización de Biblioteca (`/users/me/library`):** Se eliminó la carga ansiosa pesada de episodios para títulos en favoritos, watchlist o vistas; los episodios solo se cargan para series que el usuario está siguiendo activamente.
+  - **Caché en Catálogo (`/api/v1/titles`):** Almacenamiento en caché con TTL de búsquedas y conteos frecuentes sin exclusión de vistos.
+  - **Invalidación Proactiva de Caché:** Purga automática (`clear_catalog_cache()`) en sync diaria de TMDB y tareas administrativas de limpieza.
+  - **Desactivación Flexible para Entorno Local (`TTL <= 0`):** Soporte para desactivar completamente la caché fijando `CACHE_HOME_TTL_SECONDS=0` y `CACHE_CATALOG_TTL_SECONDS=0` (configurado en `.env.local`), permitiendo iteración inmediata sin retención sobre SQLite local.
+- **Frontend: TanStack React Query y Optimistic UI:**
+  - Configuración global de `QueryClientProvider` con `staleTime: 5 min` y `gcTime: 15 min`.
+  - Caché de metadatos estáticos (géneros, países e idiomas) durante 60 minutos en `CatalogPage.tsx`.
+  - **Mutaciones Optimistas Integrales (0 ms):** Feedback visual inmediato tanto a nivel de título (favorito, watchlist, visto, seguir/abandonar) como a nivel episódico (marcado atómico de episodio y temporada completa en `TitleDetailPage.tsx`) con recálculo dinámico de progreso, rollback ante fallos y emisión de toasts informativos.
+  - **Rollback y Notificaciones Amigables (`ToastContext.tsx`):** Ante fallas de conexión o errores en el servidor, se revierte de inmediato el estado en la caché y se notifica al usuario con un toast no invasivo.
+  - **Migración Reactiva Integral de Páginas:**
+    - `HomePage.tsx`: Consultas de secciones cacheadas sin re-fetching innecesario al cambiar de vistas.
+    - `CatalogPage.tsx`: Metadatos globales y filtros reactivos en cliente.
+    - `LibraryPage.tsx`: Sincronización instantánea de listas del usuario.
+    - `ProfilePage.tsx`: Caché reactiva de estadísticas por ventana temporal (`all_time`, `1m`, `3m`, `1y`, etc.) y listas de biblioteca, con transiciones inmediatas de 0 ms e invalidación automática ante ediciones de perfil o mutaciones de tarjetas.
+- **Cobertura y Verificación:**
+  - Suite de 81 tests de backend pasando en verde (`pytest`) y tests de frontend en verde (`vitest`).
+
 ## [v1.1.0] - 2026-09-23
 ### Agregado & Mejorado (Fase 8: Recomendador Inteligente RAG Híbrido, Batería de Pruebas y Procedencia)
 - **Motor de Recomendación RAG Híbrido (Vectorial + SQL):**

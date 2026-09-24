@@ -2,12 +2,12 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Star, Heart, Bookmark, Eye, EyeOff, Play, X } from 'lucide-react'
 import type { TitleCard as TitleCardType } from '@/types/catalog'
-import { catalogService } from '@/services/catalogService'
 import { useAuth } from '@/context/AuthContext'
 import posterFallback from '@/assets/placeholders/poster-empty.svg'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { SeasonProgressBar } from '@/components/profile/SeasonProgressBar'
 import { useLanguage } from '@/context/LanguageContext'
+import { useTitleMutations } from '@/hooks/useTitleMutations'
 
 interface TitleCardProps {
   title: TitleCardType
@@ -20,7 +20,6 @@ export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOp
   const { user } = useAuth()
   const { language } = useLanguage()
   const [imgError, setImgError] = useState(false)
-  const [isUpdating, setIsUpdating] = useState(false)
   const [isFavorite, setIsFavorite] = useState(title.user_favorito ?? false)
   const [userEstado, setUserEstado] = useState(title.user_estado ?? null)
 
@@ -71,34 +70,51 @@ export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOp
     navigate(`/titles/${title.id}`)
   }
 
-  const handleQuickAction = async (e: React.MouseEvent, action: 'favorite' | 'watchlist' | 'watched') => {
+  const { favoriteMutation, watchlistMutation, watchedMutation } = useTitleMutations()
+  const isUpdating =
+    (favoriteMutation.isPending && favoriteMutation.variables === title.id) ||
+    (watchlistMutation.isPending && watchlistMutation.variables === title.id) ||
+    (watchedMutation.isPending && watchedMutation.variables === title.id)
+
+  const handleQuickAction = (e: React.MouseEvent, action: 'favorite' | 'watchlist' | 'watched') => {
     e.stopPropagation()
     if (!user) {
       if (onOpenAuth) onOpenAuth()
       return
     }
 
-    setIsUpdating(true)
-    try {
-      if (action === 'favorite') {
-        const res = await catalogService.toggleFavorite(title.id)
-        setIsFavorite(res.favorito)
-        setJustToggledFav(true)
-      } else if (action === 'watchlist') {
-        const res = await catalogService.toggleWatchlist(title.id)
-        setUserEstado(res.nuevo_estado ?? null)
-        setJustToggledWl(true)
-      } else if (action === 'watched') {
-        const res = await catalogService.toggleWatched(title.id)
-        setUserEstado(res.nuevo_estado ?? null)
-        setJustToggledWatched(true)
-      }
-      if (onStateChange) onStateChange(action, title.id)
-    } catch (err) {
-      console.error('Error al actualizar estado:', err)
-    } finally {
-      setIsUpdating(false)
+    if (action === 'favorite') {
+      const prevFav = isFavorite
+      const nextFav = !prevFav
+      setIsFavorite(nextFav)
+      setJustToggledFav(true)
+      favoriteMutation.mutate(title.id, {
+        onError: () => {
+          setIsFavorite(prevFav)
+        },
+      })
+    } else if (action === 'watchlist') {
+      const prevEstado = userEstado
+      const nextEstado = prevEstado === 'watchlist' ? null : 'watchlist'
+      setUserEstado(nextEstado)
+      setJustToggledWl(true)
+      watchlistMutation.mutate(title.id, {
+        onError: () => {
+          setUserEstado(prevEstado)
+        },
+      })
+    } else if (action === 'watched') {
+      const prevEstado = userEstado
+      const nextEstado = prevEstado === 'vista' ? null : 'vista'
+      setUserEstado(nextEstado)
+      setJustToggledWatched(true)
+      watchedMutation.mutate(title.id, {
+        onError: () => {
+          setUserEstado(prevEstado)
+        },
+      })
     }
+    if (onStateChange) onStateChange(action, title.id)
   }
 
   const isWatched = userEstado === 'vista'

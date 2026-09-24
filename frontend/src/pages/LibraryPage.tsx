@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React from 'react'
 import { useSearchParams, Link, useOutletContext } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { Bookmark, Heart, Play, CheckCircle2, AlertCircle } from 'lucide-react'
 import { catalogService } from '@/services/catalogService'
 import { useAuth } from '@/context/AuthContext'
@@ -18,42 +19,28 @@ export const LibraryPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const tab = searchParams.get('tab') || 'favoritos'
-  const [data, setData] = useState<UserLibrary | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  const loadLibrary = useCallback(async (isBackground = false) => {
-    if (!user) return
-    if (!isBackground) {
-      setLoading(true)
-    }
-    setError(null)
-    try {
-      const res = await catalogService.getLibrary()
-      setData(res)
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError(language === 'es' ? 'Error al cargar la biblioteca.' : 'Failed to load library.')
-      }
-    } finally {
-      if (!isBackground) {
-        setLoading(false)
-      }
-    }
-  }, [user, language])
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+    refetch,
+  } = useQuery<UserLibrary>({
+    queryKey: ['userLibrary', user?.id],
+    queryFn: () => catalogService.getLibrary(),
+    enabled: Boolean(user),
+  })
 
-  useEffect(() => {
-    if (!user) {
-      setLoading(false)
-    } else {
-      loadLibrary(false)
-    }
-  }, [user, loadLibrary])
+  const error = queryError
+    ? queryError instanceof Error
+      ? queryError.message
+      : language === 'es'
+      ? 'Error al cargar la biblioteca.'
+      : 'Failed to load library.'
+    : null
 
   const handleCardStateChange = () => {
-    loadLibrary(true)
+    refetch()
   }
 
   const setTab = (newTab: string) => {

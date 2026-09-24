@@ -28,8 +28,10 @@ class MemoryCache:
         return value
 
     def set(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> None:
-        """Almacena un valor con TTL en segundos (None para default_ttl)."""
+        """Almacena un valor con TTL en segundos (None para default_ttl). Si TTL <= 0, no almacena nada (desactivado)."""
         ttl = ttl_seconds if ttl_seconds is not None else self._default_ttl
+        if ttl is not None and ttl <= 0:
+            return
         expires_at = time.monotonic() + ttl if ttl and ttl > 0 else None
         self._cache[key] = (value, expires_at)
 

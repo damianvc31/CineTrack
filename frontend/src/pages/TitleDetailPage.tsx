@@ -29,6 +29,9 @@ import { catalogService } from '@/services/catalogService'
 import type { TitleDetail, ReviewItem, SeasonItem } from '@/types/catalog'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
+import { useTitleMutations } from '@/hooks/useTitleMutations'
+import { useQueryClient } from '@tanstack/react-query'
+import { useToast } from '@/context/ToastContext'
 import posterFallback from '@/assets/placeholders/poster-empty.svg'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { getLanguageName } from '@/utils/countryUtils'
@@ -72,6 +75,8 @@ export const TitleDetailPage: React.FC = () => {
   const { user } = useAuth()
   const { language, translateGenreName } = useLanguage()
   const { openAuth } = useOutletContext<OutletContextType>()
+  const queryClient = useQueryClient()
+  const { showToast } = useToast()
 
   const [title, setTitle] = useState<TitleDetail | null>(null)
   const [reviews, setReviews] = useState<ReviewItem[]>([])
@@ -168,60 +173,67 @@ export const TitleDetailPage: React.FC = () => {
     loadData(true)
   }, [loadData])
 
-  const handleFavoriteToggle = async () => {
+  const { favoriteMutation, watchlistMutation, watchedMutation } = useTitleMutations()
+
+  const handleFavoriteToggle = () => {
     if (!user) {
       openAuth()
       return
     }
-    try {
-      const res = await catalogService.toggleFavorite(titleId)
-      setIsFavorite(res.favorito)
-      setJustToggledFav(true)
-    } catch (err) {
-      console.error('Error toggling favorite:', err)
-    }
+    const prevFav = isFavorite
+    const nextFav = !prevFav
+    setIsFavorite(nextFav)
+    setJustToggledFav(true)
+    favoriteMutation.mutate(titleId, {
+      onError: () => setIsFavorite(prevFav),
+    })
   }
 
-  const handleWatchlistToggle = async () => {
+  const handleWatchlistToggle = () => {
     if (!user) {
       openAuth()
       return
     }
-    try {
-      const res = await catalogService.toggleWatchlist(titleId)
-      setUserEstado(res.nuevo_estado ?? null)
-      setJustToggledWl(true)
-    } catch (err) {
-      console.error('Error toggling watchlist:', err)
-    }
+    const prevEstado = userEstado
+    const nextEstado = prevEstado === 'watchlist' ? null : 'watchlist'
+    setUserEstado(nextEstado)
+    setJustToggledWl(true)
+    watchlistMutation.mutate(titleId, {
+      onError: () => setUserEstado(prevEstado),
+    })
   }
 
-  const handleWatchedToggle = async () => {
+  const handleWatchedToggle = () => {
     if (!user) {
       openAuth()
       return
     }
-    try {
-      const isCurrentlyWatched = userEstado === 'vista'
-      // Si estamos desmarcando vista en una serie, limpiamos optimísticamente los episodios vistos en memoria
-      // para evitar que hasWatchedEpisodes quede en true durante el fetch y parpadee el botón "Serie Abandonada"
-      if (isCurrentlyWatched && title?.tipo === 'tv' && title.temporadas) {
-        setTitle((prev) => {
-          if (!prev || !prev.temporadas) return prev
-          const resetTemporadas = prev.temporadas.map((s) => ({
-            ...s,
-            episodios: s.episodios?.map((e) => ({ ...e, visto: false })) || [],
-          }))
-          return { ...prev, temporadas: resetTemporadas }
-        })
-      }
-      const res = await catalogService.toggleWatched(titleId)
-      setUserEstado(res.nuevo_estado ?? null)
-      setJustToggledWatched(true)
-      loadData(false)
-    } catch (err) {
-      console.error('Error toggling watched:', err)
+    const prevEstado = userEstado
+    const isCurrentlyWatched = prevEstado === 'vista'
+    const nextEstado = isCurrentlyWatched ? null : 'vista'
+
+    if (isCurrentlyWatched && title?.tipo === 'tv' && title.temporadas) {
+      setTitle((prev) => {
+        if (!prev || !prev.temporadas) return prev
+        const resetTemporadas = prev.temporadas.map((s) => ({
+          ...s,
+          episodios: s.episodios?.map((e) => ({ ...e, visto: false })) || [],
+        }))
+        return { ...prev, temporadas: resetTemporadas }
+      })
     }
+
+    setUserEstado(nextEstado)
+    setJustToggledWatched(true)
+    watchedMutation.mutate(titleId, {
+      onError: () => {
+        setUserEstado(prevEstado)
+        loadData(false)
+      },
+      onSuccess: () => {
+        loadData(false)
+      },
+    })
   }
 
   const handleUnfollow = async () => {
@@ -229,12 +241,23 @@ export const TitleDetailPage: React.FC = () => {
       openAuth()
       return
     }
+    const prevEstado = userEstado
+    setUserEstado(null)
     try {
       const res = await catalogService.unfollowSeries(titleId)
       setUserEstado(res.nuevo_estado ?? null)
-      loadData(false)
+      queryClient.invalidateQueries({ queryKey: ['userLibrary'] })
+      queryClient.invalidateQueries({ queryKey: ['userStats'] })
+      queryClient.invalidateQueries({ queryKey: ['homeSections'] })
+      queryClient.invalidateQueries({ queryKey: ['catalog'] })
     } catch (err) {
-      console.error('Error dropping series:', err)
+      setUserEstado(prevEstado)
+      showToast(
+        language === 'es'
+          ? 'No se pudo abandonar la serie. Por favor, reintenta.'
+          : 'Could not drop series. Please try again.',
+        'error'
+      )
     }
   }
 
@@ -243,12 +266,23 @@ export const TitleDetailPage: React.FC = () => {
       openAuth()
       return
     }
+    const prevEstado = userEstado
+    setUserEstado('siguiendo')
     try {
       const res = await catalogService.followSeries(titleId)
       setUserEstado(res.nuevo_estado ?? 'siguiendo')
-      loadData(false)
+      queryClient.invalidateQueries({ queryKey: ['userLibrary'] })
+      queryClient.invalidateQueries({ queryKey: ['userStats'] })
+      queryClient.invalidateQueries({ queryKey: ['homeSections'] })
+      queryClient.invalidateQueries({ queryKey: ['catalog'] })
     } catch (err) {
-      console.error('Error resuming series:', err)
+      setUserEstado(prevEstado)
+      showToast(
+        language === 'es'
+          ? 'No se pudo reanudar el seguimiento. Por favor, reintenta.'
+          : 'Could not resume following. Please try again.',
+        'error'
+      )
     }
   }
 
@@ -263,23 +297,64 @@ export const TitleDetailPage: React.FC = () => {
       return
     }
     if (isUnreleased && !isWatched) {
-      setEpisodeNotice(`Episode E${episodeNum} has not aired yet. Only aired episodes can be marked.`)
+      setEpisodeNotice(
+        language === 'es'
+          ? `El episodio E${episodeNum} aún no se ha estrenado. Solo se pueden marcar episodios emitidos.`
+          : `Episode E${episodeNum} has not aired yet. Only aired episodes can be marked.`
+      )
       setTimeout(() => setEpisodeNotice(null), 4500)
       return
     }
+
+    const prevTitle = title
+    const prevEstado = userEstado
+    const nextWatched = !isWatched
+
+    // 1. Parche optimista instantáneo (0 ms) en temporadas y episodios
+    setTitle((prev) => {
+      if (!prev || !prev.temporadas) return prev
+      const updatedSeasons = prev.temporadas.map((s) => {
+        if (s.numero !== seasonNum) return s
+        const updatedEpisodes =
+          s.episodios?.map((e) => {
+            if (e.numero !== episodeNum) return e
+            return { ...e, visto: nextWatched }
+          }) || []
+        const watchedCount = updatedEpisodes.filter((e) => e.visto).length
+        return {
+          ...s,
+          episodios: updatedEpisodes,
+          episodios_vistos: watchedCount,
+          temporada_vista: s.cantidad_episodios > 0 && watchedCount === s.cantidad_episodios,
+        }
+      })
+      return { ...prev, temporadas: updatedSeasons }
+    })
+
+    // 2. Parche semántico en el estado de la serie
+    if (nextWatched && prevEstado !== 'siguiendo' && prevEstado !== 'vista') {
+      setUserEstado('siguiendo')
+    }
+
+    // 3. Envío al backend en background
     try {
       const res = await catalogService.toggleEpisodeWatch(titleId, seasonNum, episodeNum)
       if (res.nuevo_estado_serie !== undefined) {
         setUserEstado(res.nuevo_estado_serie)
       }
-      loadData(false)
+      queryClient.invalidateQueries({ queryKey: ['userLibrary'] })
+      queryClient.invalidateQueries({ queryKey: ['userStats'] })
+      queryClient.invalidateQueries({ queryKey: ['homeSections'] })
+      queryClient.invalidateQueries({ queryKey: ['catalog'] })
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setEpisodeNotice(err.message)
-      } else {
-        setEpisodeNotice('Failed to update episode.')
-      }
-      setTimeout(() => setEpisodeNotice(null), 4500)
+      setTitle(prevTitle)
+      setUserEstado(prevEstado)
+      showToast(
+        language === 'es'
+          ? 'No se pudo actualizar el episodio. Por favor, reintenta.'
+          : 'Could not update episode. Please try again.',
+        'error'
+      )
     }
   }
 
@@ -288,15 +363,61 @@ export const TitleDetailPage: React.FC = () => {
       openAuth()
       return
     }
+    if (!title || !title.temporadas) return
+    const currentSeason = title.temporadas.find((s) => s.numero === seasonNum)
+    if (!currentSeason) return
+
+    const prevTitle = title
+    const prevEstado = userEstado
+    const wasSeasonWatched = !!currentSeason.temporada_vista
+    const targetWatched = !wasSeasonWatched
+    const todayStr = new Date().toISOString().split('T')[0]
+
+    // 1. Parche optimista instantáneo (0 ms) en la temporada
+    setTitle((prev) => {
+      if (!prev || !prev.temporadas) return prev
+      const updatedSeasons = prev.temporadas.map((s) => {
+        if (s.numero !== seasonNum) return s
+        const updatedEpisodes =
+          s.episodios?.map((e) => {
+            const isUnreleased = !!(e.fecha_estreno && e.fecha_estreno > todayStr)
+            if (targetWatched && isUnreleased) return e
+            return { ...e, visto: targetWatched }
+          }) || []
+        const watchedCount = updatedEpisodes.filter((e) => e.visto).length
+        return {
+          ...s,
+          episodios: updatedEpisodes,
+          episodios_vistos: watchedCount,
+          temporada_vista: targetWatched,
+        }
+      })
+      return { ...prev, temporadas: updatedSeasons }
+    })
+
+    if (targetWatched && prevEstado !== 'siguiendo' && prevEstado !== 'vista') {
+      setUserEstado('siguiendo')
+    }
+
     setSeasonWatchLoading(true)
     try {
       const res = await catalogService.toggleSeasonWatch(titleId, seasonNum)
       if (res.nuevo_estado_serie !== undefined) {
         setUserEstado(res.nuevo_estado_serie)
       }
-      loadData(false)
+      queryClient.invalidateQueries({ queryKey: ['userLibrary'] })
+      queryClient.invalidateQueries({ queryKey: ['userStats'] })
+      queryClient.invalidateQueries({ queryKey: ['homeSections'] })
+      queryClient.invalidateQueries({ queryKey: ['catalog'] })
     } catch (err) {
-      console.error('Error marcando temporada completa:', err)
+      setTitle(prevTitle)
+      setUserEstado(prevEstado)
+      showToast(
+        language === 'es'
+          ? 'No se pudo actualizar la temporada completa. Por favor, reintenta.'
+          : 'Could not update full season. Please try again.',
+        'error'
+      )
     } finally {
       setSeasonWatchLoading(false)
     }

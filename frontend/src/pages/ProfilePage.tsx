@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Clock,
   Calendar,
@@ -30,56 +31,56 @@ export const ProfilePage: React.FC = () => {
   const { user } = useAuth()
   const { t, language } = useLanguage()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
-  const [stats, setStats] = useState<UserStats | null>(null)
-  const [library, setLibrary] = useState<UserLibrary | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [statsLoading, setStatsLoading] = useState(false)
   const [selectedWindow, setSelectedWindow] = useState<string>('all_time')
-  const [error, setError] = useState<string | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [avatarImgError, setAvatarImgError] = useState(false)
-
-  const fetchData = async () => {
-    setLoading(true)
-    try {
-      const [statsData, libData] = await Promise.all([
-        catalogService.getStats(selectedWindow),
-        catalogService.getLibrary(),
-      ])
-      setStats(statsData)
-      setLibrary(libData)
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError('Failed to fetch profile information.')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleWindowChange = async (newWindow: string) => {
-    setSelectedWindow(newWindow)
-    setStatsLoading(true)
-    try {
-      const updatedStats = await catalogService.getStats(newWindow)
-      setStats(updatedStats)
-    } catch (err) {
-      console.error('Failed to load stats for window:', newWindow, err)
-    } finally {
-      setStatsLoading(false)
-    }
-  }
 
   useEffect(() => {
     if (!user) {
       navigate('/')
-      return
     }
-    fetchData()
   }, [user, navigate])
+
+  const {
+    data: stats,
+    isLoading: statsLoadingInitial,
+    isFetching: statsFetching,
+    error: statsError,
+  } = useQuery<UserStats>({
+    queryKey: ['userStats', selectedWindow, user?.id],
+    queryFn: () => catalogService.getStats(selectedWindow),
+    enabled: Boolean(user),
+  })
+
+  const {
+    data: library,
+    isLoading: libraryLoading,
+    error: libraryError,
+  } = useQuery<UserLibrary>({
+    queryKey: ['userLibrary', user?.id],
+    queryFn: () => catalogService.getLibrary(),
+    enabled: Boolean(user),
+  })
+
+  const loading = (statsLoadingInitial && !stats) || (libraryLoading && !library)
+  const statsLoading = statsFetching && !statsLoadingInitial
+  const queryErr = statsError || libraryError
+  const error = queryErr
+    ? queryErr instanceof Error
+      ? queryErr.message
+      : 'Failed to fetch profile information.'
+    : null
+
+  const handleWindowChange = (newWindow: string) => {
+    setSelectedWindow(newWindow)
+  }
+
+  const handleProfileUpdateSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['userStats'] })
+    queryClient.invalidateQueries({ queryKey: ['userLibrary'] })
+  }
 
   if (!user) return null
 
@@ -611,7 +612,7 @@ export const ProfilePage: React.FC = () => {
       <EditProfileModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
-        onSuccess={fetchData}
+        onSuccess={handleProfileUpdateSuccess}
       />
     </div>
   )

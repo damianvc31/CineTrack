@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   Bot,
   Sparkles,
@@ -146,13 +147,22 @@ export const HomePage: React.FC = () => {
   const { t, translateGenreName, language } = useLanguage()
   const navigate = useNavigate()
 
-  const [data, setData] = useState<HomeSections | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [filtering, setFiltering] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [activeTipo, setActiveTipo] = useState<'all' | 'movie' | 'tv'>('all')
   const [aiPrompt, setAiPrompt] = useState('')
   const [sidebarPresetOffset, setSidebarPresetOffset] = useState(0)
+
+  const {
+    data,
+    isLoading: loading,
+    isFetching: filtering,
+    error: queryError,
+    refetch: reloadHome,
+  } = useQuery<HomeSections>({
+    queryKey: ['homeSections', activeTipo, user?.id],
+    queryFn: () => catalogService.getHome(activeTipo !== 'all' ? { tipo: activeTipo } : undefined),
+  })
+
+  const error = queryError ? (queryError instanceof Error ? queryError.message : 'Could not connect to CineTrack catalog.') : null
 
   const visibleSidebarPresets = useMemo(() => {
     const total = HOME_SIDEBAR_PRESETS.length
@@ -165,33 +175,8 @@ export const HomePage: React.FC = () => {
     return slice
   }, [sidebarPresetOffset])
 
-  const loadHome = async (tipo: 'all' | 'movie' | 'tv' = activeTipo, isFilterChange = false) => {
-    if (isFilterChange) {
-      setFiltering(true)
-    } else {
-      setLoading(true)
-    }
-    setError(null)
-    try {
-      const filters = tipo !== 'all' ? { tipo } : undefined
-      const res = await catalogService.getHome(filters)
-      setData(res)
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError('Could not connect to CineTrack catalog.')
-      }
-    } finally {
-      setLoading(false)
-      setFiltering(false)
-    }
-  }
-
   const handleTipoChange = (tipo: 'all' | 'movie' | 'tv') => {
-    if (tipo === activeTipo) return
     setActiveTipo(tipo)
-    loadHome(tipo, true)
   }
 
   // Al marcar watched, dejamos el título en pantalla para no desvirtuar listas (actualiza atómicamente su tarjeta)
@@ -294,10 +279,6 @@ export const HomePage: React.FC = () => {
     return <Film className="w-5 h-5 text-amber-400" />
   }
 
-  useEffect(() => {
-    loadHome(activeTipo)
-  }, [user])
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -314,7 +295,7 @@ export const HomePage: React.FC = () => {
         <h3 className="text-lg font-bold text-white mb-1">Failed to load content</h3>
         <p className="text-xs text-gray-400 mb-6">{error || 'An unexpected error occurred'}</p>
         <button
-          onClick={() => loadHome(activeTipo)}
+          onClick={() => reloadHome()}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md transition-all"
         >
           <RefreshCw className="w-3.5 h-3.5" /> Retry

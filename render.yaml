@@ -113,3 +113,10 @@ services:
         value: "100"
       - key: HOME_GENRE_MIN_TITLES_FOR_CAROUSEL
         value: "10"
+
+      # --- Rendimiento y Caché en Memoria (FastAPI) ---
+      - key: CACHE_HOME_TTL_SECONDS
+        value: "3600"
+      - key: CACHE_CATALOG_TTL_SECONDS
+        value: "300"
+
