@@ -519,4 +519,26 @@ async def test_daily_sync_exhaustive_pagination_and_active_series(db_session, mo
     assert res["updated_series"] >= 1
 
 
+@pytest.mark.asyncio
+async def test_upsert_series_skips_already_completed_seasons(db_session, mock_tmdb_client):
+    """Verifica que temporadas ya completadas y finalizadas no vuelvan a consultar get_season_details."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    await service.sync_genres()
+
+    # Primera ingesta: debe consultar get_season_details
+    mock_tmdb_client.get_season_details.reset_mock()
+    series = await service.upsert_series(1396, MOCK_SERIES_DETAILS, fetch_episodes=True)
+    await db_session.commit()
+    assert mock_tmdb_client.get_season_details.call_count == 1
+
+    # Segunda sincronización de la misma serie:
+    # Como la serie es 'Ended' y la temporada 1 ya tiene sus 2 episodios completos en BD,
+    # debe omitir la llamada a get_season_details.
+    mock_tmdb_client.get_season_details.reset_mock()
+    series_updated = await service.upsert_series(1396, MOCK_SERIES_DETAILS, fetch_episodes=True)
+    await db_session.commit()
+    mock_tmdb_client.get_season_details.assert_not_called()
+
+
+
 

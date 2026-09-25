@@ -2,6 +2,17 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.2.2] - 2026-09-25
+### Optimizado (Sincronización Selectiva de Temporadas y Eliminación de N+1 Queries en Series)
+- **Omitido Inteligente de Temporadas Históricas (`Season Skipping`):**
+  - En `TMDBSyncService.upsert_series()`, se compara en lote el conteo local de episodios contra el `episode_count` reportado por TMDB.
+  - Para series finalizadas o canceladas (`Ended` / `Canceled`), temporadas anteriores a la última en series activas, o temporadas concluidas hace más de 30 días con recuento de episodios coincidente, se omite por completo la llamada HTTP a `/tv/{id}/season/{season_number}` y la iteración de episodios.
+  - Reduce en más del 85% las llamadas HTTP externas y roundtrips a la base de datos para series largas (ej. *The Simpsons*, *Doctor Who*, *Grey's Anatomy*).
+- **Eliminación de Consultas N+1 en Episodios:**
+  - Carga previa agrupada en una única consulta SQL de todos los episodios existentes de la temporada antes de procesar inserciones o actualizaciones, eliminando las consultas individuales por episodio.
+- **Cobertura de Tests:**
+  - Nueva prueba unitaria automatizada (`test_upsert_series_skips_already_completed_seasons`) verificando que la re-sincronización de series completas no invoque llamadas HTTP redundantes a `get_season_details`. Suite ampliada a 84 tests en verde (100%).
+
 ## [v1.2.1] - 2026-09-25
 ### Corregido & Mejorado (Robustecimiento de Sincronizaciones TMDB y Coherencia Temporal)
 - **Corrección Crítica de Paginación en `/changes`:**

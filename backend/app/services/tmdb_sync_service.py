@@ -470,9 +470,50 @@ class TMDBSyncService:
         # Temporadas y Episodios
         if fetch_episodes:
             seasons_info = details.get("seasons", [])
-            for s_info in seasons_info:
+            valid_seasons = [s for s in seasons_info if s.get("season_number") is not None and s.get("season_number") >= 1]
+            max_s_num = max([s["season_number"] for s in valid_seasons], default=0)
+
+            # Cargar temporadas existentes y conteo de episodios locales en una sola query
+            existing_seasons = {}
+            if titulo.id:
+                stmt = (
+                    select(
+                        Temporada.id,
+                        Temporada.numero,
+                        Temporada.fecha_estreno,
+                        func.count(Episodio.id).label("ep_count"),
+                    )
+                    .outerjoin(Episodio, Episodio.temporada_id == Temporada.id)
+                    .where(Temporada.titulo_id == titulo.id)
+                    .group_by(Temporada.id, Temporada.numero, Temporada.fecha_estreno)
+                )
+                res_seasons = await self.db.execute(stmt)
+                existing_seasons = {row.numero: row for row in res_seasons.all()}
+
+            for s_info in valid_seasons:
                 s_num = s_info.get("season_number")
-                if s_num is None or s_num < 1:  # Ignorar especiales (temporada 0)
+                tmdb_ep_count = s_info.get("episode_count", 0)
+                local_season = existing_seasons.get(s_num)
+
+                # Criterio de omisión (skip): evitar llamadas HTTP y loops de episodios para temporadas pasadas ya completas
+                should_skip = False
+                if local_season and local_season.ep_count == tmdb_ep_count and tmdb_ep_count > 0:
+                    # 1. Si la serie finalizó o fue cancelada, sus temporadas pasadas no cambian
+                    if status in ("Ended", "Canceled"):
+                        should_skip = True
+                    # 2. Si es una temporada anterior a la última en una serie activa
+                    elif s_num < max_s_num:
+                        should_skip = True
+                    # 3. Si es la última temporada pero ya terminó de emitirse hace más de 30 días
+                    elif s_num == max_s_num and not fecha_prox_ep and lad_str:
+                        try:
+                            lad_date = datetime.strptime(lad_str, "%Y-%m-%d").date()
+                            if (today - lad_date).days > 30:
+                                should_skip = True
+                        except ValueError:
+                            pass
+
+                if should_skip:
                     continue
 
                 s_details = {}
@@ -498,15 +539,8 @@ class TMDBSyncService:
                             except ValueError:
                                 pass
 
-                res_temp = await self.db.execute(
-                    select(Temporada).where(
-                        Temporada.titulo_id == titulo.id,
-                        Temporada.numero == s_num
-                    )
-                )
-                temporada = res_temp.scalar_one_or_none()
                 overview_text = s_details.get("overview") or s_info.get("overview")
-                if not temporada:
+                if not local_season:
                     temporada = Temporada(
                         titulo_id=titulo.id,
                         numero=s_num,
@@ -516,45 +550,48 @@ class TMDBSyncService:
                     self.db.add(temporada)
                     await self.db.flush()
                 else:
+                    res_t = await self.db.execute(select(Temporada).where(Temporada.id == local_season.id))
+                    temporada = res_t.scalar_one()
                     if overview_text:
                         temporada.sinopsis = overview_text
                     if s_air_date:
                         temporada.fecha_estreno = s_air_date
 
-                # Episodios de la temporada (si existen)
-                for ep_data in s_details.get("episodes", []):
-                    ep_num = ep_data.get("episode_number")
-                    if ep_num is None:
-                        continue
-
-                    ep_air_date = None
-                    ep_ad_str = ep_data.get("air_date")
-                    if ep_ad_str:
-                        try:
-                            ep_air_date = datetime.strptime(ep_ad_str, "%Y-%m-%d").date()
-                        except ValueError:
-                            pass
-
-                    res_ep = await self.db.execute(
-                        select(Episodio).where(
-                            Episodio.temporada_id == temporada.id,
-                            Episodio.numero == ep_num
-                        )
+                # Episodios de la temporada: cargar existentes en 1 query para evitar N+1
+                episodes_data = s_details.get("episodes", [])
+                if episodes_data:
+                    res_eps = await self.db.execute(
+                        select(Episodio).where(Episodio.temporada_id == temporada.id)
                     )
-                    episodio = res_ep.scalar_one_or_none()
-                    if not episodio:
-                        episodio = Episodio(
-                            temporada_id=temporada.id,
-                            numero=ep_num,
-                            nombre=ep_data.get("name", f"Episodio {ep_num}"),
-                            fecha_estreno=ep_air_date,
-                            duracion=ep_data.get("runtime"),
-                        )
-                        self.db.add(episodio)
-                    else:
-                        episodio.nombre = ep_data.get("name", episodio.nombre)
-                        episodio.fecha_estreno = ep_air_date or episodio.fecha_estreno
-                        episodio.duracion = ep_data.get("runtime", episodio.duracion)
+                    existing_eps = {ep.numero: ep for ep in res_eps.scalars().all()}
+
+                    for ep_data in episodes_data:
+                        ep_num = ep_data.get("episode_number")
+                        if ep_num is None:
+                            continue
+
+                        ep_air_date = None
+                        ep_ad_str = ep_data.get("air_date")
+                        if ep_ad_str:
+                            try:
+                                ep_air_date = datetime.strptime(ep_ad_str, "%Y-%m-%d").date()
+                            except ValueError:
+                                pass
+
+                        episodio = existing_eps.get(ep_num)
+                        if not episodio:
+                            episodio = Episodio(
+                                temporada_id=temporada.id,
+                                numero=ep_num,
+                                nombre=ep_data.get("name", f"Episodio {ep_num}"),
+                                fecha_estreno=ep_air_date,
+                                duracion=ep_data.get("runtime"),
+                            )
+                            self.db.add(episodio)
+                        else:
+                            episodio.nombre = ep_data.get("name", episodio.nombre)
+                            episodio.fecha_estreno = ep_air_date or episodio.fecha_estreno
+                            episodio.duracion = ep_data.get("runtime", episodio.duracion)
 
         # Reseñas de TMDB (hasta 20)
         if fetch_reviews:

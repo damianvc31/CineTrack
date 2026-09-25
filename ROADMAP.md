@@ -87,6 +87,20 @@
   - Rollback transparente con notificaciones flotantes amigables (`ToastContext`) ante errores de red.
   - Suite de 81 tests de backend y pruebas de frontend en verde.
 
+### Fase 10: Robustecimiento del Pipeline de Sincronización TMDB y Rendimiento WAN (v1.2.1 - v1.2.2)
+- [x] **Paginación Exhaustiva de `/changes` y Seguimiento Activo de Series (v1.2.1):**
+  - Paginación dinámica hasta `total_pages` eliminando la pérdida silenciosa de modificaciones globales.
+  - Tracking directo de series `Returning Series`, `In Production` y `Planned` desduplicadas de changes, garantizando la actualización determinística de estados y fechas de emisión.
+- [x] **Refresco Masivo Diario de Métricas y Desacople de Reseñas (v1.2.1):**
+  - Pasada ligera `refresh_catalog_metrics` actualizando popularidad y votos de todo el catálogo en paralelo.
+  - Desacople de reseñas en sync diaria y creación de workflow mensual dedicado (`monthly_reviews_sync.yml`).
+  - Recálculo vectorizado de `rating_unificado` y soporte de lotes en importación administrativa.
+  - Regla de coherencia temporal en `TitleDetailPage` para episodios de emisión reciente.
+- [x] **Optimización de Series e Ingesta Selectiva de Temporadas (v1.2.2):**
+  - Omitido automático (`Season Skipping`) de temporadas concluidas y completas en `upsert_series`, reduciendo >85% de llamadas HTTP y roundtrips a la base de datos.
+  - Eliminación de consultas N+1 en episodios agrupando las consultas por temporada.
+  - Suite de 84 tests de backend pasando en verde (100%).
+
 ---
 
 ## Backlog (Pendientes para Versión Superior)

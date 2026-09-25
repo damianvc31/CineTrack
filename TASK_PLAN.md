@@ -218,6 +218,14 @@
 
 ---
 
+## Hito Actual: Sincronización Selectiva de Temporadas y Rendimiento WAN (v1.2.2)
+- [x] **Omitido Inteligente de Temporadas Históricas (`Season Skipping`):** En `upsert_series`, detección en lote de temporadas previas completas en series terminadas/activas para evitar invocar llamadas HTTP redundantes a `get_season_details` y el loop de episodios.
+- [x] **Agrupación de Consultas SQL en Episodios:** Carga en una sola consulta de todos los episodios existentes por temporada, erradicando el problema de consultas N+1 sobre conexiones de red con latencia WAN.
+- [x] **Suite de Tests Automatizada:** Nuevo test unitario `test_upsert_series_skips_already_completed_seasons`, elevando la suite a 84 tests en verde (100%).
+- [ ] **Verificación en Neon Dev:** Ejecución de la daily sync con ventana de 72h contra la base de datos remota para corroborar los tiempos de ejecución.
+
+---
+
 ## Backlog / Versión Superior (Post-Entrega):
 - [ ] Purga selectiva de títulos en idiomas/alfabetos no legibles sin traducción.
 - [ ] Sistema de notificaciones in-app para estrenos y cambios de status en series.
