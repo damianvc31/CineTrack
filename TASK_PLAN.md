@@ -258,6 +258,54 @@
 
 ---
 
+## Hito Completado: Modo Upcoming en Expansión, Ingesta Manual Desbloqueada y Badges Visuales (v1.5.0)
+- [x] **Expansión de Catálogo en Modo Próximos Estrenos (`--expand --upcoming`):**
+  - [x] Búsqueda enfocada exclusivamente en títulos futuros/no emitidos (`primary_release_date.gte = hoy`).
+  - [x] Ventana temporal configurable (`--upcoming-days`, default 365 días / `TMDB_EXPAND_UPCOMING_DAYS`).
+  - [x] Relajación de filtros de votos (`vote_count = None`, `vote_average = None`).
+  - [x] Umbral de popularidad mínima basado en la variable existente `TMDB_DAILY_SYNC_POP_THRESHOLD` (10.0), sin crear variables redundantes.
+  - [x] Target de 10 títulos por defecto para un género específico, o 10 títulos en total global si no se especifica género (`TMDB_EXPAND_UPCOMING_TARGET`).
+  - [x] Soporte en CLI `sync_tmdb.py` y endpoint administrativo `POST /api/v1/admin/sync/expand`.
+- [x] **Desbloqueo de Ingesta Manual con `--allow-unreleased`:**
+  - [x] `import_from_json_data` y `--import-tmdb-id` / `--import-json` ahora admiten `--allow-unreleased` independientemente de `TMDB_ALLOW_UNRELEASED=false` en el entorno.
+  - [x] Endpoint `POST /api/v1/admin/sync/import-tmdb` con `allow_unreleased: true` por defecto.
+- [x] **Refinamiento Visual de Badges en Detalle de Título (`TitleDetailPage.tsx`):**
+  - [x] Desambiguación cromática: "Renewed TBA" preserva su púrpura original (`purple-950`), mientras "En Producción" adopta tono **Teal** (`teal-950/80`, borde `teal-500/60`, texto `teal-300`).
+  - [x] Badge "Estrenada" (`Released`) en verde esmeralda (`emerald-950/80`, borde `emerald-500/60`, texto `emerald-300`) para películas estrenadas.
+- [x] **Variables de Entorno y Configuración:**
+  - [x] `TMDB_EXPAND_UPCOMING_TARGET=10` y `TMDB_EXPAND_UPCOMING_DAYS=365` incorporadas en `config.py`, `.env`, `.env.local`, `.env.example` y `render.yaml`.
+- [x] **Pruebas y Verificación:**
+  - [x] 2 nuevos tests unitarios en `test_tmdb_sync.py` (`test_expand_catalog_by_genres_upcoming_single_genre` y `test_expand_catalog_by_genres_upcoming_global_no_genre`).
+  - [x] Suite completa de backend (97/97 tests pasando en verde), frontend (2 tests y build de Vite impecable).
+  - [x] Ejecución validada con base local SQLite (`cinetrack.db`).
+
+---
+
+## Hito Completado: Corrección de Series Estreno Mismo Día en Upcoming/New Releases y Chips de Catálogo
+- [x] **Clasificación Estricta de Series con Estreno el Mismo Día:**
+  - [x] Series cuyo episodio 1 estrena en la fecha actual (`fecha_estreno == today`) y cuyo episodio aún no fue transmitido (`proximo_episodio_fecha >= today` o `None`) ahora se clasifican como **Próximos Estrenos (`upcoming=true`)** y se excluyen de **New Releases** y catálogo regular hasta que la sincronización diaria o cambio de fecha registre el estreno.
+  - [x] Lógica booleana SQL `NULL-safe` en `get_released_filter_condition(today)` para evitar el descarte accidental de títulos con fechas nulas bajo lógica trivaluada de SQL.
+  - [x] Aplicación de `get_released_filter_condition(today)` a través de `_apply_base_filters` en `_fetch_and_cache_home_pools` para limpiar todos los carruseles de la Home (New Releases, Trending, Classics, Top Rated, By Genre).
+  - [x] Limpieza de defaults de ordenamiento en `/api/v1/titles` para no forzar `popularity desc` cuando el usuario solicita ordenamientos específicos.
+  - [x] Test unitario específico `test_catalog_same_day_premiere_tv_series_upcoming_vs_released` en `test_catalog.py` (99/99 tests backend pasando en verde).
+- [x] **Corrección Visual de Chips de Filtro en Catálogo (`CatalogPage.tsx`):**
+  - [x] Función `getSectionLabel(sec)` para mapear adecuadamente `new_releases` -> `🕒 New Releases` y `top_rated` -> `⭐ Top Rated`.
+  - [x] Resolución del bug de traducción que buscaba claves inexistentes `sectionNew_releases` y `sectionTop_rated`.
+  - [x] Verificación de suite de frontend y compilación de producción con Vite exitosa.
+- [x] **Desacoplamiento de Límites en Expansión Upcoming (`--expand --upcoming`):**
+  - [x] Soporte para `--upcoming-days 0`: omite `release_date_lte` para buscar sin fecha tope hacia el futuro infinito hasta completar el target.
+  - [x] Soporte para `--limit 0` (o `--target-per-genre 0`): omite el tope de cantidad para ingestar todos los títulos con popularidad $\ge 10.0$ en la ventana de días indicada.
+  - [x] Aliases `--limit` y `--target` en CLI `sync_tmdb.py` y esquema `ExpandCatalogRequest` en API administrativa.
+  - [x] Tests unitarios `test_expand_catalog_by_genres_upcoming_infinite_days` y `test_expand_catalog_by_genres_upcoming_unlimited_target` (101/101 tests backend en verde).
+  - [x] Documentación exhaustiva en `README.md`.
+- [x] **Renombrado y Consolidación de Variables de Entorno Operativas:**
+  - [x] Sustitución de `TMDB_CHANGES_HOURS_WINDOW=48` por `TMDB_CHANGES_DAYS_WINDOW=7` (alineado a la rutina semanal de /changes).
+  - [x] Renombrado de `TMDB_DAILY_SYNC_DAYS_WINDOW=15` a `TMDB_RELEASES_DAYS_WINDOW=15` (ventana común de estrenos para jobs diario y semanal).
+  - [x] Soporte de retrocompatibilidad en `config.py` con `@property` y `@model_validator` para entornos existentes.
+  - [x] Actualización de `.env.example`, `render.yaml`, `.env`, `.env.local` y documentación.
+
+---
+
 ## Backlog / Versión Superior (Post-Entrega):
 - [ ] Carrusel y Filtro "Upcoming / Próximamente" en Home y Catálogo (sección destacada en Home y filtro en Catálogo con badges "Muy Pronto" y fechas confirmadas).
 - [ ] Purga selectiva de títulos en idiomas/alfabetos no legibles sin traducción.
@@ -265,6 +313,7 @@
 - [ ] Badge visual "Viendo Actualmente" (🔥).
 - [ ] Soporte multirregión para plataformas de streaming (JustWatch / TMDB Watch Providers).
 - [ ] Selector de idioma para títulos y sinopsis.
+
 
 
 

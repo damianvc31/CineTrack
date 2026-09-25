@@ -2,6 +2,50 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.5.0] - 2026-09-25
+### Agregado (Expansión de Próximos Estrenos, Desacoplamiento de Límites y Desbloqueo de Ingesta Manual)
+- **Modo Próximos Estrenos en Expansión de Catálogo (`--expand --upcoming`):**
+  - Implementación de modo de expansión orientado exclusivamente a títulos futuros (`primary_release_date.gte = hoy`).
+  - Ventana temporal configurable (`--upcoming-days`, por defecto 365 días / `TMDB_EXPAND_UPCOMING_DAYS`).
+  - Sin restricciones de votos mínimos (`vote_count = None`, `vote_average = None`), permitiendo la ingesta de proyectos anticipados sin calificar.
+  - Filtro de popularidad mínima ligado a la variable existente `TMDB_DAILY_SYNC_POP_THRESHOLD` (10.0), asegurando tracción y relevancia sin agregar nuevas variables de popularidad redundantes.
+  - Cuota configurable por género (10 por defecto) o global si no se especifica género (`TMDB_EXPAND_UPCOMING_TARGET=10` en total, no por cada género).
+  - Disponible tanto en CLI (`sync_tmdb.py --expand --upcoming`) como en el endpoint de administración `POST /api/v1/admin/sync/expand`.
+- **Desacoplamiento de Límites en Expansión Upcoming:**
+  - Soporte para `--upcoming-days 0`: omite `release_date_lte` para buscar en el horizonte futuro infinito hasta completar el target de títulos solicitados.
+  - Soporte para `--limit 0` (o `--target-per-genre 0`): omite el tope de cantidad para ingestar todos los títulos con popularidad $\ge 10.0$ dentro de la ventana de días indicada.
+  - Aliases `--limit` y `--target` en la CLI `sync_tmdb.py` y soporte del campo `limit` en el endpoint `POST /api/v1/admin/sync/expand`.
+- **Desbloqueo de Ingesta Manual con `--allow-unreleased`:**
+  - Opciones `--import-tmdb-id` e `--import-json` ahora admiten `--allow-unreleased`, permitiendo importar manualmente títulos futuros sin importar la variable de entorno global `TMDB_ALLOW_UNRELEASED=false`.
+  - Soporte en endpoint API `POST /api/v1/admin/sync/import-tmdb` con `allow_unreleased: true` por defecto.
+
+### Mejorado & Corregido
+- **Clasificación Estricta de Series con Estreno el Mismo Día:**
+  - Series cuyo episodio 1 debuta en la fecha actual (`fecha_estreno == today`) y cuyo primer episodio aún no fue emitido (`proximo_episodio_fecha >= today` o `None`) ahora se clasifican como **Próximos Estrenos (`upcoming=true`)** y se excluyen de **New Releases** y catálogo regular.
+  - Lógica booleana SQL `NULL-safe` en `get_released_filter_condition(today)` para evitar el descarte accidental de títulos con fechas nulas bajo lógica trivaluada de SQL.
+  - Aplicación de `get_released_filter_condition(today)` a través de `_apply_base_filters` en `_fetch_and_cache_home_pools` garantizando que ningún carrusel de la Home (New Releases, Trending, Classics, Top Rated, By Genre) mezcle títulos unreleased.
+  - Limpieza de defaults de ordenamiento en `/api/v1/titles` para no forzar `popularity desc` cuando el usuario solicita ordenamientos específicos.
+- **Iconos y Etiquetas de Chips de Filtro en Catálogo (`CatalogPage.tsx`):**
+  - Función `getSectionLabel(sec)` para mapear adecuadamente `new_releases` -> `🕒 New Releases` y `top_rated` -> `⭐ Top Rated`.
+  - Corrección de claves de internacionalización rotas (`sectionNew_releases` y `sectionTop_rated`).
+- **Desambiguación Cromática de Badges en Detalle de Título:**
+  - "Renewed TBA" / "Renovada (Fecha TBA)" preserva su color púrpura original (`purple-950`).
+  - "En Producción" / "In Production" adopta tono **Teal** (`teal-950/80`, borde `teal-500/60`, texto `teal-300`), emparentado con la familia cian pero con menor saturación para proyectos en rodaje.
+  - Badge "Estrenada" (`Released`) en verde esmeralda (`emerald-950/80`, borde `emerald-500/60`, texto `emerald-300`) para películas estrenadas, unificando la experiencia visual con el badge "Finalizada" / "Emitida" de series.
+- **Renombrado y Ajuste de Variables de Entorno Operativas:**
+  - Sustitución de `TMDB_CHANGES_HOURS_WINDOW=48` por `TMDB_CHANGES_DAYS_WINDOW=7`, alineando la configuración al nuevo workflow semanal profundo (`weekly_deep_sync`).
+  - Renombrado de `TMDB_DAILY_SYNC_DAYS_WINDOW=15` a `TMDB_RELEASES_DAYS_WINDOW=15`, explicitando que la ventana de estrenos en cartelera aplica tanto a la sincronización diaria como a la semanal.
+  - Preservación de retrocompatibilidad transparente en `backend/app/core/config.py` mediante `@property` y `@model_validator` para alias heredados. Actualizados `.env`, `.env.local`, `.env.example` y `render.yaml`.
+
+### Cobertura de Tests
+- 5 nuevas pruebas unitarias en el backend:
+  - `test_expand_catalog_by_genres_upcoming_single_genre` (validación de discover de futuros por género sin filtro de votos).
+  - `test_expand_catalog_by_genres_upcoming_global_no_genre` (validación de búsqueda global con `with_genres=None` y tope total).
+  - `test_expand_catalog_by_genres_upcoming_infinite_days` (validación de `--upcoming-days 0` sin límite temporal futuro).
+  - `test_expand_catalog_by_genres_upcoming_unlimited_target` (validación de `--limit 0` sin tope numérico).
+  - `test_catalog_same_day_premiere_tv_series_upcoming_vs_released` (validación de series debutantes el mismo día en Upcoming vs New Releases y Home).
+- Suite de backend ampliada a 101 tests unitarios e integración en verde (100%).
+
 ## [v1.4.1] - 2026-09-25
 ### Corregido (Detalle de Título)
 - **Preservación del Badge "Renovada" en Nuevas Temporadas:**

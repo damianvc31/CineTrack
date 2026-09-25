@@ -45,10 +45,10 @@ services:
         value: "15"
       - key: TMDB_CREW_WRITERS_LIMIT
         value: "3"
-      - key: TMDB_DAILY_SYNC_DAYS_WINDOW
+      - key: TMDB_RELEASES_DAYS_WINDOW
         value: "15"
-      - key: TMDB_CHANGES_HOURS_WINDOW
-        value: "48"
+      - key: TMDB_CHANGES_DAYS_WINDOW
+        value: "7"
       - key: TMDB_DAILY_SYNC_POP_THRESHOLD
         value: "10.0"
       - key: TMDB_INGEST_PRIORITY
@@ -65,6 +65,10 @@ services:
         value: "7.0"
       - key: TMDB_EXPAND_TITLES_PER_GENRE
         value: "50"
+      - key: TMDB_EXPAND_UPCOMING_TARGET
+        value: "10"
+      - key: TMDB_EXPAND_UPCOMING_DAYS
+        value: "365"
 
       # --- Ingesta de Fotos de Actores ---
       - key: TMDB_ACTOR_PHOTOS_LIMIT

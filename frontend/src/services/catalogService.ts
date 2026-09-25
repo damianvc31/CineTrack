@@ -38,6 +38,7 @@ export interface TitleFilters {
   order?: 'desc' | 'asc'
   page?: number
   page_size?: number
+  upcoming?: boolean
 }
 
 export interface TitlesResponse {

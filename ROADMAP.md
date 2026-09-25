@@ -116,6 +116,15 @@
   - Matriz de workflows de GitHub Actions sin colisiones (`daily_sync.yml` lun-sáb 03:00 UTC, `weekly_deep_sync.yml` dom 02:00 UTC).
   - Nuevo endpoint administrativo `POST /api/v1/admin/sync/deep` y flags CLI `--deep` y `--changes-days`.
   - Suite ampliada a 95 tests automatizados de backend en verde (100%).
+- [x] **Modo Upcoming en Expansión, Ingesta Manual Desbloqueada y Badges Visuales (v1.5.0):**
+  - Expansión de catálogo orientada a títulos futuros (`--expand --upcoming`) con ventana temporal configurable (`--upcoming-days`, default 365 días), sin filtros de votos y con umbral de popularidad mínima (`TMDB_DAILY_SYNC_POP_THRESHOLD >= 10.0`).
+  - Desacoplamiento de límites en upcoming: `--upcoming-days 0` para horizonte temporal infinito y `--limit 0` para ingesta de todos los títulos que califiquen en la ventana de días indicada.
+  - Target de 10 títulos por defecto para género específico, o 10 títulos en total global si no se especifica género (`TMDB_EXPAND_UPCOMING_TARGET`). Aliases `--limit` y `--target` en CLI y endpoint administrativo.
+  - Desbloqueo de `--allow-unreleased` en importaciones manuales (`--import-tmdb-id`, `--import-json` y API `POST /api/v1/admin/sync/import-tmdb`).
+  - Clasificación estricta de series con estreno el mismo día (upcoming vs released) y segregación total en carruseles de Home (`_apply_base_filters`).
+  - Desambiguación cromática de badges en detalle de título: "Renewed TBA" preserva púrpura (`purple-950`), "En Producción" adopta Teal (`teal-950/80`), y nuevo badge "Estrenada" (`Released`) en verde esmeralda para películas.
+  - Corrección de etiquetas e iconos en chips de sección de Catálogo (`⭐ Top Rated`, `🕒 New Releases`).
+  - Suite de backend ampliada a 101 tests unitarios e integración en verde (100%).
 
 ---
 

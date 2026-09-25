@@ -41,11 +41,13 @@ async def main():
     parser.add_argument("--import-tmdb-id", type=str, help="Importar o actualizar títulos por ID(s) de TMDB (ej. 319562 o separados por coma: 319562,550)")
     parser.add_argument("--type", choices=["movie", "tv"], default="movie", help="Tipo de título para --import-tmdb-id")
     parser.add_argument("--expand", action="store_true", help="Expande el catálogo por géneros vía /discover con filtros de calidad (Criterio 1)")
+    parser.add_argument("--upcoming", action="store_true", help="Activar modo de próximos estrenos (unreleased) para --expand")
+    parser.add_argument("--upcoming-days", type=int, default=None, help="Ventana máxima en días hacia el futuro para --upcoming (default config: 365)")
     parser.add_argument("--genre", type=str, default=None, help="Género específico para --expand (nombre o ID). Si se omite, procesa todos los géneros")
     parser.add_argument("--media-type", choices=["both", "movie", "tv"], default="both", help="Tipo de medio a expandir ('both', 'movie' o 'tv')")
     parser.add_argument("--min-vote-count", type=int, default=None, help="Mínimo de votos para --expand (default config)")
     parser.add_argument("--min-vote-average", type=float, default=None, help="Mínimo de calificación promedio para --expand (default config)")
-    parser.add_argument("--target-per-genre", type=int, default=None, help="Cantidad objetivo de títulos por género para --expand (default config)")
+    parser.add_argument("--target-per-genre", "--limit", "--target", dest="target_per_genre", type=int, default=None, help="Cantidad objetivo de títulos por género (o límite global en modo upcoming) para --expand (default config)")
     parser.add_argument("--clear", action="store_true", help="Vaciar todo el catálogo de títulos y entidades dependientes")
 
     args = parser.parse_args()
@@ -127,12 +129,13 @@ async def main():
                 if not path.exists():
                     logger.error(f"El archivo {args.import_json} no existe.")
                     sys.exit(1)
-                logger.info(f"-> Importando títulos desde {path}...")
+                allow_unrel_arg = True if args.allow_unreleased else None
+                logger.info(f"-> Importando títulos desde {path} (allow_unreleased: {args.allow_unreleased})...")
                 with open(path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 if not isinstance(data, list):
                     data = [data]
-                res = await service.import_from_json_data(data)
+                res = await service.import_from_json_data(data, allow_unreleased=allow_unrel_arg)
                 logger.info(f"Importación completada: {res['imported']} importados, {len(res['errors'])} errores.")
                 if res["errors"]:
                     for err in res["errors"]:
@@ -145,15 +148,16 @@ async def main():
                     logger.error(f"Valor inválido para --import-tmdb-id: {args.import_tmdb_id}")
                     sys.exit(1)
 
-                logger.info(f"-> Importando/actualizando {len(raw_ids)} títulos ({args.type}): {raw_ids}...")
+                allow_unrel_arg = True if args.allow_unreleased else None
+                logger.info(f"-> Importando/actualizando {len(raw_ids)} títulos ({args.type}, allow_unreleased: {args.allow_unreleased}): {raw_ids}...")
                 success_count = 0
                 for r_id_str in raw_ids:
                     t_id = int(r_id_str)
                     try:
                         if args.type == "movie":
-                            titulo = await service.upsert_movie(t_id, fetch_reviews=True)
+                            titulo = await service.upsert_movie(t_id, allow_unreleased=allow_unrel_arg, fetch_reviews=True)
                         else:
-                            titulo = await service.upsert_series(t_id, fetch_episodes=True, fetch_reviews=True)
+                            titulo = await service.upsert_series(t_id, fetch_episodes=True, allow_unreleased=allow_unrel_arg, fetch_reviews=True)
                         if titulo:
                             await db.commit()
                             success_count += 1
@@ -179,8 +183,9 @@ async def main():
                 logger.info(f"Importación de IDs completada: {success_count}/{len(raw_ids)} procesados con éxito.")
 
             elif args.expand:
-                genre_desc = args.genre or "TODOS los géneros"
-                logger.info(f"-> Ejecutando expansión de catálogo por géneros (Criterio 1) para: {genre_desc}...")
+                mode_desc = "[UPCOMING] " if args.upcoming else ""
+                genre_desc = args.genre or ("TODOS (límite global)" if args.upcoming else "TODOS los géneros")
+                logger.info(f"-> Ejecutando expansión de catálogo {mode_desc}para: {genre_desc}...")
                 res = await service.expand_catalog_by_genres(
                     genre=args.genre,
                     media_type=args.media_type,
@@ -188,6 +193,8 @@ async def main():
                     min_vote_count=args.min_vote_count,
                     min_vote_average=args.min_vote_average,
                     allow_unreleased=args.allow_unreleased,
+                    upcoming=args.upcoming,
+                    upcoming_days=args.upcoming_days,
                 )
             elif args.backfill_countries:
                 logger.info("-> Ejecutando backfill de países consolidados para todo el catálogo...")

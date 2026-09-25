@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "CineTrack API"
-    VERSION: str = "1.4.1"
+    VERSION: str = "1.5.0"
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
     
@@ -78,17 +78,27 @@ class Settings(BaseSettings):
     TMDB_MIN_VOTE_COUNT: int = 100
     TMDB_CAST_LIMIT: int = 15
     TMDB_CREW_WRITERS_LIMIT: int = 3
-    TMDB_DAILY_SYNC_DAYS_WINDOW: int = 15
-    TMDB_CHANGES_HOURS_WINDOW: int = 48
+    TMDB_RELEASES_DAYS_WINDOW: int = 15
+    TMDB_CHANGES_DAYS_WINDOW: int = 7
     TMDB_DAILY_SYNC_POP_THRESHOLD: float = 10.0
     TMDB_INGEST_PRIORITY: str = "popular_first"  # "popular_first" o "toprated_first"
     TMDB_REVIEWS_PER_TITLE_LIMIT: int = 20
     TMDB_ALLOW_UNRELEASED: bool = False
 
+    @property
+    def TMDB_DAILY_SYNC_DAYS_WINDOW(self) -> int:
+        return self.TMDB_RELEASES_DAYS_WINDOW
+
+    @property
+    def TMDB_CHANGES_HOURS_WINDOW(self) -> int:
+        return self.TMDB_CHANGES_DAYS_WINDOW * 24
+
     # TMDB Expand Configuration (Criterio 1: Expansión por géneros vía /discover)
     TMDB_EXPAND_MIN_VOTE_COUNT: int = 300
     TMDB_EXPAND_MIN_VOTE_AVERAGE: float = 7.0
     TMDB_EXPAND_TITLES_PER_GENRE: int = 50
+    TMDB_EXPAND_UPCOMING_TARGET: int = 10
+    TMDB_EXPAND_UPCOMING_DAYS: int = 365
 
     # Ingesta de Fotos de Actores
     TMDB_ACTOR_PHOTOS_LIMIT: int = 500
@@ -125,6 +135,20 @@ class Settings(BaseSettings):
     # Cache Configuration (Memoria en backend)
     CACHE_HOME_TTL_SECONDS: int = 3600      # 1 hora para los pools de Home
     CACHE_CATALOG_TTL_SECONDS: int = 300     # 5 minutos para conteos y queries frecuentes
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_env_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "TMDB_RELEASES_DAYS_WINDOW" not in data and "TMDB_DAILY_SYNC_DAYS_WINDOW" in data:
+                data["TMDB_RELEASES_DAYS_WINDOW"] = data["TMDB_DAILY_SYNC_DAYS_WINDOW"]
+            if "TMDB_CHANGES_DAYS_WINDOW" not in data and "TMDB_CHANGES_HOURS_WINDOW" in data:
+                try:
+                    data["TMDB_CHANGES_DAYS_WINDOW"] = max(1, int(data["TMDB_CHANGES_HOURS_WINDOW"]) // 24)
+                except Exception:
+                    pass
+        return data
+
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
         if self.ENVIRONMENT == "production":

@@ -621,15 +621,17 @@ export const TitleDetailPage: React.FC = () => {
         )
       }
 
+      // 1.c: En Producción (Teal - sobrio, familia del cian)
       if (st.includes('production')) {
         return (
-          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-500/60 text-purple-300 text-xs font-bold shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-purple-400" />
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-950/80 border border-teal-500/60 text-teal-300 text-xs font-bold shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-teal-400" />
             <span>{language === 'es' ? 'En Producción' : 'In Production'}{movieDate ? (language === 'es' ? ` — Estreno el ${movieDate}` : ` — Release on ${movieDate}`) : ' (TBA)'}</span>
           </span>
         )
       }
 
+      // 1.d: Planificada (Slate)
       if (st.includes('planned')) {
         return (
           <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-slate-300 text-xs font-semibold">
@@ -639,11 +641,22 @@ export const TitleDetailPage: React.FC = () => {
         )
       }
 
+      // 1.e: Próximo Estreno con fecha lejana (> 15 días)
       if (movieDate && movieDate > todayStr) {
         return (
           <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/60 border border-amber-600/50 text-amber-300 text-xs font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
             <span>{language === 'es' ? 'Próximo Estreno' : 'Upcoming Release'} — {language === 'es' ? `el ${movieDate}` : `on ${movieDate}`}</span>
+          </span>
+        )
+      }
+
+      // 1.f: Película ya estrenada (Verde esmeralda)
+      if (st.includes('released') || (movieDate && movieDate <= todayStr)) {
+        return (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 text-xs font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>{language === 'es' ? 'Estrenada' : 'Released'}</span>
           </span>
         )
       }
@@ -762,11 +775,11 @@ export const TitleDetailPage: React.FC = () => {
         )
       }
 
-      // 2.b: TMDB status En Producción (Púrpura)
+      // 2.b: TMDB status En Producción (Teal - sobrio, familia del cian)
       if (st.includes('production')) {
         return (
-          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-500/60 text-purple-300 text-xs font-bold shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-purple-400" />
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-950/80 border border-teal-500/60 text-teal-300 text-xs font-bold shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-teal-400" />
             <span>{language === 'es' ? 'En Producción' : 'In Production'}{premiereDate ? (language === 'es' ? ` — Estreno el ${premiereDate}` : ` — Premiere on ${premiereDate}`) : ' (TBA)'}</span>
           </span>
         )

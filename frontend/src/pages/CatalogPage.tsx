@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useOutletContext } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Filter, Search, ChevronLeft, ChevronRight, Film, Tv, Sparkles, AlertCircle, X, RotateCcw, Compass, User } from 'lucide-react'
+import { Filter, Search, ChevronLeft, ChevronRight, Film, Tv, Sparkles, AlertCircle, X, RotateCcw, Compass, User, CalendarClock } from 'lucide-react'
 import { catalogService, type TitlesResponse } from '@/services/catalogService'
 import { TitleCard } from '@/components/common/TitleCard'
 import { CountryFlag } from '@/components/common/CountryFlag'
@@ -46,11 +46,13 @@ export const CatalogPage: React.FC = () => {
   // Extraer parámetros de la URL
   const query = searchParams.get('q') || ''
   const tipo = (searchParams.get('tipo') as 'movie' | 'tv') || undefined
-  const section = (searchParams.get('section') as any) || undefined
+  const upcoming = searchParams.get('upcoming') === 'true'
+  const section = (!upcoming && (searchParams.get('section') as any)) || undefined
   const actor = searchParams.get('actor') || undefined
   const rawSort = searchParams.get('sort_by')
-  const sortBy = (rawSort as any) || (section === 'top_rated' ? 'rating' : section === 'new_releases' ? 'release_date' : 'popularity')
-  const order = (searchParams.get('order') as any) || 'desc'
+  const rawOrder = searchParams.get('order')
+  const sortBy = (rawSort as any) || (upcoming ? 'release_date' : section === 'top_rated' ? 'rating' : section === 'new_releases' ? 'release_date' : 'popularity')
+  const order = (rawOrder as any) || (upcoming && !rawSort ? 'asc' : 'desc')
   const page = parseInt(searchParams.get('page') || '1', 10)
 
   // Multi-select filters parsing (con desglose automático de duplas de géneros)
@@ -102,6 +104,19 @@ export const CatalogPage: React.FC = () => {
     [language]
   )
 
+  const getSectionLabel = useCallback(
+    (sec: string) => {
+      const map: Record<string, string> = {
+        trending: 'sectionTrending',
+        new_releases: 'sectionNewReleases',
+        classics: 'sectionClassics',
+        top_rated: 'sectionTopRated',
+      }
+      return t(map[sec] || sec)
+    },
+    [t]
+  )
+
   // Opciones formateadas para dropdowns
   const genreOptions = useMemo<MultiSelectOption[]>(() => {
     return genres
@@ -137,7 +152,8 @@ export const CatalogPage: React.FC = () => {
     () => ({
       q: query || undefined,
       tipo,
-      section,
+      section: upcoming ? undefined : section,
+      upcoming: upcoming || undefined,
       generos: selectedGenres.length > 0 ? selectedGenres : undefined,
       genre_op: genreOp,
       paises: selectedCountries.length > 0 ? selectedCountries : undefined,
@@ -148,7 +164,7 @@ export const CatalogPage: React.FC = () => {
       page,
       page_size: 24,
     }),
-    [query, tipo, section, selectedGenres, genreOp, selectedCountries, selectedLanguages, actor, sortBy, order, page]
+    [query, tipo, section, upcoming, selectedGenres, genreOp, selectedCountries, selectedLanguages, actor, sortBy, order, page]
   )
 
   const {
@@ -174,6 +190,28 @@ export const CatalogPage: React.FC = () => {
       next.delete(key)
     }
     next.set('page', '1') // Reset page on filter change
+    setSearchParams(next)
+  }
+
+  const handleUpcomingToggle = (enabled: boolean) => {
+    const next = new URLSearchParams(searchParams)
+    if (enabled) {
+      next.set('upcoming', 'true')
+      next.delete('section')
+      // Por defecto ordenar del más próximo al más lejano (release_date asc),
+      // salvo que el usuario ya tenga configurado un orden explícito no default
+      if (!rawSort || rawSort === 'popularity') {
+        next.set('sort_by', 'release_date')
+        next.set('order', 'asc')
+      }
+    } else {
+      next.delete('upcoming')
+      if (rawSort === 'release_date' && rawOrder === 'asc') {
+        next.delete('sort_by')
+        next.delete('order')
+      }
+    }
+    next.set('page', '1')
     setSearchParams(next)
   }
 
@@ -232,8 +270,8 @@ export const CatalogPage: React.FC = () => {
 
   const handleClearAllFilters = () => {
     const next = new URLSearchParams()
-    if (sortBy !== 'popularity') next.set('sort_by', sortBy)
-    if (order !== 'desc') next.set('order', order)
+    if (sortBy !== 'popularity' && !upcoming) next.set('sort_by', sortBy)
+    if (order !== 'desc' && !upcoming) next.set('order', order)
     setSearchInput('')
     setSearchParams(next)
   }
@@ -249,6 +287,7 @@ export const CatalogPage: React.FC = () => {
     query ||
     actor ||
     tipo ||
+    upcoming ||
     section ||
     selectedGenres.length > 0 ||
     selectedCountries.length > 0 ||
@@ -327,11 +366,36 @@ export const CatalogPage: React.FC = () => {
           <option value="tv">{t('series')}</option>
         </select>
 
+        {/* Upcoming Releases Checkbox */}
+        <label
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs cursor-pointer select-none transition-all ${
+            upcoming
+              ? 'bg-amber-500/15 border-amber-500/50 text-amber-300 font-semibold shadow-sm shadow-amber-500/10'
+              : 'bg-[#0d0d0d] border-[#262626] text-gray-400 hover:text-gray-200 hover:border-gray-600'
+          }`}
+          title={language === 'es' ? 'Mostrar exclusivamente títulos no estrenados' : 'Show exclusively unreleased titles'}
+        >
+          <input
+            type="checkbox"
+            checked={upcoming}
+            onChange={(e) => handleUpcomingToggle(e.target.checked)}
+            className="w-3.5 h-3.5 rounded bg-[#141414] border-[#333] text-amber-500 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-amber-500"
+          />
+          <CalendarClock className={`w-3.5 h-3.5 shrink-0 ${upcoming ? 'text-amber-400' : 'text-gray-400'}`} />
+          <span>{language === 'es' ? 'Próximos Estrenos' : 'Upcoming Releases'}</span>
+        </label>
+
         {/* Section Filter */}
         <select
-          value={section || ''}
+          value={upcoming ? '' : (section || '')}
+          disabled={upcoming}
           onChange={(e) => updateParam('section', e.target.value || undefined)}
-          className="px-3 py-1.5 rounded-lg bg-[#0d0d0d] border border-[#262626] text-xs text-gray-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
+          className={`px-3 py-1.5 rounded-lg bg-[#0d0d0d] border text-xs transition-colors ${
+            upcoming
+              ? 'opacity-40 cursor-not-allowed border-[#1f1f1f] text-gray-500'
+              : 'border-[#262626] text-gray-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500'
+          }`}
+          title={upcoming ? (language === 'es' ? 'Las secciones no se mezclan con próximos estrenos' : 'Sections do not mix with upcoming releases') : undefined}
         >
           <option value="">{t('allSections')}</option>
           <option value="trending">{t('sectionTrending')}</option>
@@ -450,9 +514,24 @@ export const CatalogPage: React.FC = () => {
             </span>
           )}
 
+          {upcoming && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-amber-500/15 text-amber-300 border border-amber-500/40 font-medium">
+              <CalendarClock className="w-3 h-3 text-amber-400 shrink-0" />
+              <span>{language === 'es' ? 'Próximos Estrenos' : 'Upcoming Releases'}</span>
+              <button
+                type="button"
+                onClick={() => handleUpcomingToggle(false)}
+                className="hover:text-white transition-colors"
+                title={language === 'es' ? 'Quitar filtro de próximos estrenos' : 'Remove upcoming filter'}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
           {section && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-[#1f1f1f] text-gray-200 border border-[#333]">
-              <span>{t(`section${section.charAt(0).toUpperCase() + section.slice(1)}`) || section}</span>
+              <span>{getSectionLabel(section)}</span>
               <button type="button" onClick={() => updateParam('section', undefined)} className="hover:text-amber-400">
                 <X className="w-3 h-3" />
               </button>

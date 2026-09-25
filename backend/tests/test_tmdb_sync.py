@@ -1,5 +1,5 @@
 import pytest
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import AsyncMock, patch
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -705,6 +705,196 @@ async def test_purge_invalid_or_incomplete_titles(db_session, mock_tmdb_client):
     assert "名探偵コナン" not in remaining
     assert "No Date Show" not in remaining
     assert "No Country Film" not in remaining
+
+
+@pytest.mark.asyncio
+async def test_expand_catalog_by_genres_upcoming_single_genre(db_session, mock_tmdb_client):
+    """Verifica que el modo upcoming filtre títulos no estrenados con ventana futura, sin filtro de votos."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    await service.sync_genres()
+
+    from datetime import timedelta
+    today = date.today()
+    expected_lte = (today + timedelta(days=180)).strftime("%Y-%m-%d")
+
+    mock_tmdb_client.discover.return_value = {
+        "page": 1,
+        "total_pages": 1,
+        "results": [
+            {"id": 200001, "title": "Upcoming High Pop", "popularity": 25.0},
+            {"id": 200002, "title": "Upcoming Low Pop", "popularity": 2.0},
+        ],
+    }
+
+    future_movie = {
+        "title": "Upcoming High Pop",
+        "release_date": (today + timedelta(days=30)).strftime("%Y-%m-%d"),
+        "status": "In Production",
+        "original_language": "en",
+        "origin_country": ["US"],
+        "genres": [{"id": 878, "name": "Ciencia ficción"}],
+    }
+    mock_tmdb_client.get_details.side_effect = lambda m, id_, *args, **kwargs: future_movie
+
+    res = await service.expand_catalog_by_genres(
+        genre="Ciencia ficción",
+        media_type="movie",
+        upcoming=True,
+        upcoming_days=180,
+        target_per_genre=5,
+    )
+
+    assert res["genres_processed"] == 1
+    assert res["movies_added"] == 1  # Solo 200001 porque 200002 está por debajo del umbral de popularidad (10.0)
+
+    mock_tmdb_client.discover.assert_called_with(
+        media_type="movie",
+        sort_by="popularity.desc",
+        page=1,
+        vote_count_gte=None,
+        vote_average_gte=None,
+        with_genres="878",
+        release_date_gte=today.strftime("%Y-%m-%d"),
+        release_date_lte=expected_lte,
+    )
+
+
+@pytest.mark.asyncio
+async def test_expand_catalog_by_genres_upcoming_global_no_genre(db_session, mock_tmdb_client):
+    """Verifica que el modo upcoming sin género busque globalmente (with_genres=None) y limite al target total."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+
+    from datetime import timedelta
+    today = date.today()
+
+    mock_tmdb_client.discover.return_value = {
+        "page": 1,
+        "total_pages": 1,
+        "results": [
+            {"id": 300001, "title": "Global Upcoming 1", "popularity": 20.0},
+            {"id": 300002, "title": "Global Upcoming 2", "popularity": 18.0},
+            {"id": 300003, "title": "Global Upcoming 3", "popularity": 15.0},
+        ],
+    }
+
+    mock_movie = {
+        "title": "Global Upcoming",
+        "release_date": (today + timedelta(days=60)).strftime("%Y-%m-%d"),
+        "status": "Planned",
+        "original_language": "en",
+        "origin_country": ["US"],
+        "genres": [],
+    }
+    mock_tmdb_client.get_details.side_effect = lambda m, id_, *args, **kwargs: mock_movie
+
+    res = await service.expand_catalog_by_genres(
+        genre=None,
+        media_type="movie",
+        upcoming=True,
+        target_per_genre=2,  # Target total de 2 títulos
+    )
+
+    assert res["genres_processed"] == 1
+    assert res["movies_added"] == 2
+    assert res["total_added"] == 2
+
+    mock_tmdb_client.discover.assert_called_with(
+        media_type="movie",
+        sort_by="popularity.desc",
+        page=1,
+        vote_count_gte=None,
+        vote_average_gte=None,
+        with_genres=None,
+        release_date_gte=today.strftime("%Y-%m-%d"),
+        release_date_lte=(today + timedelta(days=365)).strftime("%Y-%m-%d"),
+    )
+
+
+@pytest.mark.asyncio
+async def test_expand_catalog_by_genres_upcoming_infinite_days(db_session, mock_tmdb_client):
+    """Verifica que upcoming_days=0 omita release_date_lte para buscar sin fecha tope hacia el futuro."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    today = date.today()
+
+    mock_tmdb_client.discover.return_value = {
+        "page": 1,
+        "total_pages": 1,
+        "results": [
+            {"id": 400001, "title": "Far Future Title", "popularity": 25.0},
+        ],
+    }
+
+    mock_movie = {
+        "title": "Far Future Title",
+        "release_date": "2030-01-01",
+        "status": "Planned",
+        "original_language": "en",
+        "origin_country": ["US"],
+        "genres": [],
+    }
+    mock_tmdb_client.get_details.side_effect = lambda m, id_, *args, **kwargs: mock_movie
+
+    res = await service.expand_catalog_by_genres(
+        genre=None,
+        media_type="movie",
+        upcoming=True,
+        target_per_genre=1,
+        upcoming_days=0,  # 0 = sin límite de días
+    )
+
+    assert res["total_added"] == 1
+    mock_tmdb_client.discover.assert_called_with(
+        media_type="movie",
+        sort_by="popularity.desc",
+        page=1,
+        vote_count_gte=None,
+        vote_average_gte=None,
+        with_genres=None,
+        release_date_gte=today.strftime("%Y-%m-%d"),
+        release_date_lte=None,  # Confirmamos que no hay fecha tope
+    )
+
+
+@pytest.mark.asyncio
+async def test_expand_catalog_by_genres_upcoming_unlimited_target(db_session, mock_tmdb_client):
+    """Verifica que target_per_genre=0 permita procesar todos los títulos que califiquen sin límite fijo."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+    today = date.today()
+
+    # 3 títulos calificados y uno con popularidad por debajo del umbral (5.0 < 10.0) que corta la paginación
+    mock_tmdb_client.discover.return_value = {
+        "page": 1,
+        "total_pages": 1,
+        "results": [
+            {"id": 500001, "title": "Upcoming Unl 1", "popularity": 30.0},
+            {"id": 500002, "title": "Upcoming Unl 2", "popularity": 25.0},
+            {"id": 500003, "title": "Upcoming Unl 3", "popularity": 15.0},
+            {"id": 500004, "title": "Low Pop Stop", "popularity": 5.0},
+        ],
+    }
+
+    mock_movie = {
+        "title": "Upcoming Movie",
+        "release_date": (today + timedelta(days=45)).strftime("%Y-%m-%d"),
+        "status": "In Production",
+        "original_language": "en",
+        "origin_country": ["US"],
+        "genres": [],
+    }
+    mock_tmdb_client.get_details.side_effect = lambda m, id_, *args, **kwargs: mock_movie
+
+    res = await service.expand_catalog_by_genres(
+        genre=None,
+        media_type="movie",
+        upcoming=True,
+        target_per_genre=0,  # 0 = sin límite fijo
+        upcoming_days=60,
+    )
+
+    # Debe haber agregado los 3 que superaron popularidad >= 10.0
+    assert res["total_added"] == 3
+
+
 
 
 

@@ -790,7 +790,7 @@ class TMDBSyncService:
         h_changes = changes_hours_window if changes_hours_window is not None else (hours_window or 0)
 
         # Ventana para estrenos en cartelera
-        d_releases = releases_days_window or settings.TMDB_DAILY_SYNC_DAYS_WINDOW
+        d_releases = releases_days_window or settings.TMDB_RELEASES_DAYS_WINDOW
         releases_start_date = (today - timedelta(days=d_releases)).strftime("%Y-%m-%d")
         if allow_unrel:
             releases_end_date = (today + timedelta(days=d_releases)).strftime("%Y-%m-%d")
@@ -1019,11 +1019,11 @@ class TMDBSyncService:
         allow_unrel = settings.TMDB_ALLOW_UNRELEASED if allow_unreleased is None else allow_unreleased
 
         # TMDB permite máximo 14 días en /changes
-        c_days = min(14, max(1, changes_days_window or 7))
+        c_days = min(14, max(1, changes_days_window or settings.TMDB_CHANGES_DAYS_WINDOW))
         changes_start_date = (today - timedelta(days=c_days)).strftime("%Y-%m-%d")
         changes_end_date = today.strftime("%Y-%m-%d")
 
-        d_releases = releases_days_window or settings.TMDB_DAILY_SYNC_DAYS_WINDOW
+        d_releases = releases_days_window or settings.TMDB_RELEASES_DAYS_WINDOW
         releases_start_date = (today - timedelta(days=d_releases)).strftime("%Y-%m-%d")
         if allow_unrel:
             releases_end_date = (today + timedelta(days=d_releases)).strftime("%Y-%m-%d")
@@ -1297,7 +1297,11 @@ class TMDBSyncService:
     # -------------------------------------------------------------------------
     # CARGA MANUAL POR JSON
     # -------------------------------------------------------------------------
-    async def import_from_json_data(self, items_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def import_from_json_data(
+        self,
+        items_data: List[Dict[str, Any]],
+        allow_unreleased: Optional[bool] = None,
+    ) -> Dict[str, Any]:
         """Importa títulos desde una lista de diccionarios con esquema TituloManualImportSchema."""
         imported_count = 0
         errors = []
@@ -1320,9 +1324,9 @@ class TMDBSyncService:
                 if tmdb_id:
                     # Enriquecer directo desde TMDB
                     if item.tipo == "movie":
-                        await self.upsert_movie(tmdb_id)
+                        await self.upsert_movie(tmdb_id, allow_unreleased=allow_unreleased)
                     else:
-                        await self.upsert_series(tmdb_id, fetch_episodes=True)
+                        await self.upsert_series(tmdb_id, fetch_episodes=True, allow_unreleased=allow_unreleased)
                     await self.db.commit()
                     imported_count += 1
                 else:
@@ -1660,7 +1664,7 @@ class TMDBSyncService:
         return len(reviewed_titles)
 
     # -------------------------------------------------------------------------
-    # EXPANSIÓN DE CATÁLOGO POR GÉNEROS (CRITERIO 1)
+    # EXPANSIÓN DE CATÁLOGO POR GÉNEROS (CRITERIO 1) Y PRÓXIMOS ESTRENOS
     # -------------------------------------------------------------------------
     async def expand_catalog_by_genres(
         self,
@@ -1670,29 +1674,63 @@ class TMDBSyncService:
         min_vote_count: Optional[int] = None,
         min_vote_average: Optional[float] = None,
         allow_unreleased: Optional[bool] = None,
+        upcoming: bool = False,
+        upcoming_days: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Criterio 1: Expande el catálogo vía /discover filtrando por género y umbrales de calidad.
         Permite especificar un género (ID o nombre) o procesar todos los géneros existentes.
+        Si upcoming=True:
+          - Filtra estrictamente obras no estrenadas a partir de hoy (release_date_gte=today).
+          - Omite filtros de votos y calificación mínima (obras futuras tienen 0 votos).
+          - Aplica umbral de popularidad mínima (TMDB_DAILY_SYNC_POP_THRESHOLD).
+          - Si no se especifica género, ingesta hasta target títulos en total a través de cualquier género.
         """
-        target = target_per_genre if target_per_genre is not None else settings.TMDB_EXPAND_TITLES_PER_GENRE
-        min_votes = min_vote_count if min_vote_count is not None else settings.TMDB_EXPAND_MIN_VOTE_COUNT
-        min_avg = min_vote_average if min_vote_average is not None else settings.TMDB_EXPAND_MIN_VOTE_AVERAGE
-        allow_unrel = settings.TMDB_ALLOW_UNRELEASED if allow_unreleased is None else allow_unreleased
-        release_date_lte = None if allow_unrel else date.today().strftime("%Y-%m-%d")
+        today = date.today()
 
-        # 1. Asegurar catálogo de géneros
-        res_genres = await self.db.execute(select(Genero).order_by(Genero.id))
-        all_db_genres = res_genres.scalars().all()
-        if not all_db_genres:
-            logger.info("Catálogo de géneros vacío en base de datos. Sincronizando desde TMDB...")
-            await self.sync_genres()
+        if upcoming:
+            # Si target_per_genre <= 0, significa "sin límite numérico fijo" (None)
+            if target_per_genre is not None and target_per_genre <= 0:
+                target = None
+            else:
+                target = target_per_genre if target_per_genre is not None else settings.TMDB_EXPAND_UPCOMING_TARGET
+
+            # Si upcoming_days <= 0, significa "sin fecha tope futura" (None)
+            if upcoming_days is not None and upcoming_days <= 0:
+                u_days = None
+            else:
+                u_days = upcoming_days if upcoming_days is not None else settings.TMDB_EXPAND_UPCOMING_DAYS
+
+            release_date_gte = today.strftime("%Y-%m-%d")
+            release_date_lte = (today + timedelta(days=u_days)).strftime("%Y-%m-%d") if u_days else None
+            min_votes = None
+            min_avg = None
+            allow_unrel = True
+            pop_threshold = settings.TMDB_DAILY_SYNC_POP_THRESHOLD
+        else:
+            if target_per_genre is not None and target_per_genre <= 0:
+                target = None
+            else:
+                target = target_per_genre if target_per_genre is not None else settings.TMDB_EXPAND_TITLES_PER_GENRE
+
+            min_votes = min_vote_count if min_vote_count is not None else settings.TMDB_EXPAND_MIN_VOTE_COUNT
+            min_avg = min_vote_average if min_vote_average is not None else settings.TMDB_EXPAND_MIN_VOTE_AVERAGE
+            allow_unrel = settings.TMDB_ALLOW_UNRELEASED if allow_unreleased is None else allow_unreleased
+            release_date_gte = None
+            release_date_lte = None if allow_unrel else today.strftime("%Y-%m-%d")
+            pop_threshold = 0.0
+
+        # 1. Asegurar catálogo de géneros si se necesita filtrar por género
+        target_genres: List[Optional[Genero]] = []
+        if genre is not None:
             res_genres = await self.db.execute(select(Genero).order_by(Genero.id))
             all_db_genres = res_genres.scalars().all()
+            if not all_db_genres:
+                logger.info("Catálogo de géneros vacío en base de datos. Sincronizando desde TMDB...")
+                await self.sync_genres()
+                res_genres = await self.db.execute(select(Genero).order_by(Genero.id))
+                all_db_genres = res_genres.scalars().all()
 
-        # 2. Filtrar géneros objetivo
-        target_genres: List[Genero] = []
-        if genre is not None:
             genre_str = str(genre).strip()
             if genre_str.isdigit():
                 gid = int(genre_str)
@@ -1703,49 +1741,74 @@ class TMDBSyncService:
             if not target_genres:
                 raise ValueError(f"No se encontró ningún género que coincida con '{genre}'.")
         else:
-            target_genres = all_db_genres
+            if upcoming:
+                # En modo upcoming sin género, procesamos directamente a nivel global (with_genres=None)
+                target_genres = [None]
+            else:
+                res_genres = await self.db.execute(select(Genero).order_by(Genero.id))
+                all_db_genres = res_genres.scalars().all()
+                if not all_db_genres:
+                    await self.sync_genres()
+                    res_genres = await self.db.execute(select(Genero).order_by(Genero.id))
+                    all_db_genres = res_genres.scalars().all()
+                target_genres = all_db_genres
 
-        # 3. Determinar media_types a procesar
+        # 2. Determinar media_types a procesar
         if media_type in ("movie", "tv"):
             media_types_to_process = [media_type]
         else:
             media_types_to_process = ["movie", "tv"]
 
+        target_desc = f"{target} títulos" if target is not None else "SIN LÍMITE (todos los que califiquen)"
+        days_desc = f"{release_date_gte} a {release_date_lte}" if release_date_lte else f"a partir de {release_date_gte} (sin fecha tope)"
         logger.info(
-            f"Iniciando expansión por géneros: {len(target_genres)} géneros, "
-            f"tipos: {media_types_to_process}, target por género: {target}, "
-            f"min_votes: {min_votes}, min_rating: {min_avg}"
+            f"Iniciando expansión {'[UPCOMING] ' if upcoming else ''}por géneros: "
+            f"{len(target_genres) if target_genres != [None] else 'TODOS (global)'} géneros, "
+            f"tipos: {media_types_to_process}, target: {target_desc}, "
+            f"fechas: [{days_desc}], pop_min: {pop_threshold}"
         )
 
         total_movies_added = 0
         total_series_added = 0
 
         for g in target_genres:
-            logger.info(f"--- Procesando Género: {g.nombre} (ID: {g.id}) ---")
+            genre_name = g.nombre if g else "Cualquier Género"
+            genre_id_str = str(g.id) if g else None
+            logger.info(f"--- Procesando: {genre_name} ---")
 
             for mtype in media_types_to_process:
-                # Cargar IDs existentes para evitar llamadas get_details redundantes
+                if upcoming and genre is None and target is not None and (total_movies_added + total_series_added) >= target:
+                    break
+
                 res_existing = await self.db.execute(select(Titulo.tmdb_id).where(Titulo.tipo == mtype))
                 existing_ids: Set[int] = set(res_existing.scalars().all())
 
                 genre_added = 0
                 page = 1
-                # Permitir explorar suficientes páginas según el target (hasta 50 páginas o más si el target es alto)
-                max_pages = min(500, max(50, (target // 20) * 4 + 10))
+                max_pages = min(500, max(50, (target // 20) * 4 + 10)) if target is not None else 25
 
-                while genre_added < target and page <= max_pages:
+                while page <= max_pages:
+                    if upcoming and genre is None and target is not None and (total_movies_added + total_series_added) >= target:
+                        break
+                    if genre is not None and target is not None and genre_added >= target:
+                        break
+
                     try:
-                        data = await self.client.discover(
-                            media_type=mtype,
-                            sort_by="popularity.desc",
-                            page=page,
-                            vote_count_gte=min_votes,
-                            vote_average_gte=min_avg,
-                            with_genres=str(g.id),
-                            release_date_lte=release_date_lte,
-                        )
+                        discover_kwargs = {
+                            "media_type": mtype,
+                            "sort_by": "popularity.desc",
+                            "page": page,
+                            "vote_count_gte": min_votes,
+                            "vote_average_gte": min_avg,
+                            "with_genres": genre_id_str,
+                            "release_date_lte": release_date_lte,
+                        }
+                        if release_date_gte is not None:
+                            discover_kwargs["release_date_gte"] = release_date_gte
+
+                        data = await self.client.discover(**discover_kwargs)
                     except Exception as e:
-                        logger.error(f"Error consultando discover ({mtype}, genero: {g.nombre}, pag: {page}): {e}")
+                        logger.error(f"Error consultando discover ({mtype}, genero: {genre_name}, pag: {page}): {e}")
                         break
 
                     results = data.get("results", [])
@@ -1753,9 +1816,17 @@ class TMDBSyncService:
                     if not results:
                         break
 
+                    stop_mtype = False
                     for item in results:
-                        if genre_added >= target:
+                        if upcoming and genre is None and target is not None and (total_movies_added + total_series_added) >= target:
                             break
+                        if genre is not None and target is not None and genre_added >= target:
+                            break
+
+                        if upcoming and pop_threshold > 0:
+                            if item.get("popularity", 0.0) < pop_threshold:
+                                stop_mtype = True
+                                break
 
                         tmdb_id = item.get("id")
                         if not tmdb_id or tmdb_id in existing_ids:
@@ -1777,14 +1848,14 @@ class TMDBSyncService:
 
                                 await self.db.commit()
                                 logger.info(
-                                    f"[EXPAND] [{g.nombre}] {mtype.upper()} ({genre_added}/{target}): "
-                                    f"'{t.nombre}' (TMDB ID: {tmdb_id}, Rating: {t.rating_unificado})"
+                                    f"[EXPAND{' UPCOMING' if upcoming else ''}] [{genre_name}] {mtype.upper()} "
+                                    f"(+{genre_added}): '{t.nombre}' (TMDB ID: {tmdb_id}, Estreno: {t.fecha_estreno})"
                                 )
                         except Exception as e:
-                            logger.error(f"Error upserting {mtype} id {tmdb_id} en género {g.nombre}: {e}")
+                            logger.error(f"Error upserting {mtype} id {tmdb_id} en {genre_name}: {e}")
                             await self.db.rollback()
 
-                    if page >= total_pages or genre_added >= target:
+                    if stop_mtype or page >= total_pages:
                         break
 
                     page += 1
@@ -1796,7 +1867,7 @@ class TMDBSyncService:
             await self.recalculate_unified_ratings()
 
         summary = {
-            "genres_processed": len(target_genres),
+            "genres_processed": len(target_genres) if target_genres != [None] else 1,
             "movies_added": total_movies_added,
             "series_added": total_series_added,
             "total_added": total_movies_added + total_series_added,

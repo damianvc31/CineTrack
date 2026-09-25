@@ -564,4 +564,107 @@ async def test_cached_catalog_user_state_hydration(async_client: AsyncClient, db
     assert item_auth["user_favorito"] is True
 
 
+@pytest.mark.asyncio
+async def test_catalog_upcoming_releases_filter_and_sorting(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica el filtro excluyente de próximos estrenos y su ordenamiento por defecto."""
+    today = date.today()
+    t_released = Titulo(
+        id=801, tmdb_id=8001, tipo="movie", nombre="Released Movie",
+        fecha_estreno=today - timedelta(days=30), status_tmdb="Released", popularidad=80.0
+    )
+    t_future_near = Titulo(
+        id=802, tmdb_id=8002, tipo="movie", nombre="Near Future Movie",
+        fecha_estreno=today + timedelta(days=20), status_tmdb="In Production", popularidad=40.0
+    )
+    t_future_far = Titulo(
+        id=803, tmdb_id=8003, tipo="movie", nombre="Far Future Movie",
+        fecha_estreno=today + timedelta(days=120), status_tmdb="Planned", popularidad=95.0
+    )
+    db_session.add_all([t_released, t_future_near, t_future_far])
+    await db_session.commit()
+
+    # 1. Catálogo regular (upcoming=False): solo muestra el estrenado
+    res_regular = await async_client.get("/api/v1/titles?q=Movie")
+    assert res_regular.status_code == 200
+    ids_reg = [it["id"] for it in res_regular.json()["items"]]
+    assert 801 in ids_reg
+    assert 802 not in ids_reg
+    assert 803 not in ids_reg
+
+    # 2. Catálogo Próximos Estrenos (upcoming=True): solo muestra los futuros
+    res_upc = await async_client.get("/api/v1/titles?upcoming=true&q=Movie")
+    assert res_upc.status_code == 200
+    items_upc = res_upc.json()["items"]
+    ids_upc = [it["id"] for it in items_upc]
+    assert 801 not in ids_upc
+    assert 802 in ids_upc
+    assert 803 in ids_upc
+
+    # Orden por defecto: del más próximo al más lejano (802 antes que 803)
+    pos_802 = ids_upc.index(802)
+    pos_803 = ids_upc.index(803)
+    assert pos_802 < pos_803
+
+    # 3. Próximos Estrenos con ordenamiento personalizado por popularidad desc
+    res_pop = await async_client.get("/api/v1/titles?upcoming=true&sort_by=popularity&order=desc&q=Movie")
+    assert res_pop.status_code == 200
+    ids_pop = [it["id"] for it in res_pop.json()["items"]]
+    assert ids_pop.index(803) < ids_pop.index(802)
+
+
+@pytest.mark.asyncio
+async def test_catalog_same_day_premiere_tv_series_upcoming_vs_released(async_client: AsyncClient, db_session: AsyncSession):
+    """
+    Verifica que series que estrenan episodio el día de hoy califiquen como Upcoming
+    y queden excluidas de New Releases y catálogo regular hasta que el episodio sea emitido.
+    """
+    from app.services.catalog_service import clear_catalog_cache
+    clear_catalog_cache()
+
+    today = date.today()
+    s_pending = Titulo(
+        id=810, tmdb_id=8100, tipo="tv", nombre="SWAT Exiles Pending",
+        fecha_estreno=today, status_tmdb="Returning Series",
+        proximo_episodio_fecha=today, popularidad=90.0
+    )
+    s_aired = Titulo(
+        id=811, tmdb_id=8101, tipo="tv", nombre="SWAT Exiles Aired",
+        fecha_estreno=today, status_tmdb="Returning Series",
+        proximo_episodio_fecha=today - timedelta(days=1), popularidad=85.0
+    )
+    db_session.add_all([s_pending, s_aired])
+    await db_session.commit()
+
+    # 1. Catálogo regular: s_pending debe quedar excluida, s_aired debe aparecer
+    res_reg = await async_client.get("/api/v1/titles?q=SWAT")
+    assert res_reg.status_code == 200
+    ids_reg = [it["id"] for it in res_reg.json()["items"]]
+    assert 810 not in ids_reg
+    assert 811 in ids_reg
+
+    # 2. Próximos Estrenos: s_pending debe aparecer como upcoming, s_aired no
+    res_upc = await async_client.get("/api/v1/titles?upcoming=true&q=SWAT")
+    assert res_upc.status_code == 200
+    ids_upc = [it["id"] for it in res_upc.json()["items"]]
+    assert 810 in ids_upc
+    assert 811 not in ids_upc
+
+    # 3. New Releases en catálogo: s_pending no debe figurar
+    res_nr = await async_client.get("/api/v1/titles?section=new_releases&q=SWAT")
+    assert res_nr.status_code == 200
+    ids_nr = [it["id"] for it in res_nr.json()["items"]]
+    assert 810 not in ids_nr
+    assert 811 in ids_nr
+
+    # 4. Home New Releases: s_pending no debe figurar en el carrusel de novedades
+    clear_catalog_cache()
+    res_home = await async_client.get("/api/v1/home")
+    assert res_home.status_code == 200
+    home_nr_ids = [it["id"] for it in res_home.json()["new_releases"]]
+    assert 810 not in home_nr_ids
+    assert 811 in home_nr_ids
+
+
+
+
 

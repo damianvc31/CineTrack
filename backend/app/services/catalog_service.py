@@ -2,7 +2,7 @@ import random
 import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
-from sqlalchemy import and_, delete, desc, extract, func, or_, select, text, union
+from sqlalchemy import and_, delete, desc, extract, func, not_, or_, select, text, union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -63,6 +63,53 @@ def expand_genre_names(genre_name: str) -> list[str]:
     if key in GENRE_EXPANSIONS:
         return GENRE_EXPANSIONS[key]
     return [genre_name.strip()]
+
+
+UPCOMING_STATUSES = ["In Production", "Planned", "Post Production", "Upcoming"]
+
+
+def get_upcoming_filter_condition(today: date):
+    """
+    Retorna la condición SQL que define si un título califica como próximo estreno (upcoming / coming soon):
+    1. Obras con fecha de estreno posterior a hoy.
+    2. Obras con estado explícito de producción o planificación en TMDB.
+    3. Series de TV cuyo estreno es hoy pero cuyo primer episodio aún no fue emitido
+       (proximo_episodio_fecha >= today o pendiente de avance en la sync diaria).
+    """
+    return or_(
+        and_(Titulo.fecha_estreno.isnot(None), Titulo.fecha_estreno > today),
+        and_(Titulo.status_tmdb.isnot(None), Titulo.status_tmdb.in_(UPCOMING_STATUSES)),
+        and_(
+            Titulo.tipo == "tv",
+            Titulo.fecha_estreno == today,
+            or_(
+                Titulo.proximo_episodio_fecha.is_(None),
+                Titulo.proximo_episodio_fecha >= today
+            )
+        )
+    )
+
+
+def get_released_filter_condition(today: date):
+    """
+    Retorna la condición SQL recíproca que define títulos ya estrenados y válidos para catálogo regular y secciones:
+    Excluye estrictamente todo título que califique como upcoming.
+    """
+    return and_(
+        or_(Titulo.fecha_estreno.is_(None), Titulo.fecha_estreno <= today),
+        or_(Titulo.status_tmdb.is_(None), Titulo.status_tmdb.notin_(UPCOMING_STATUSES)),
+        not_(
+            and_(
+                func.coalesce(Titulo.tipo, "") == "tv",
+                Titulo.fecha_estreno.isnot(None),
+                Titulo.fecha_estreno == today,
+                or_(
+                    Titulo.proximo_episodio_fecha.is_(None),
+                    Titulo.proximo_episodio_fecha >= today
+                )
+            )
+        )
+    )
 
 
 def _build_title_card(
@@ -142,12 +189,13 @@ async def get_titles(
     idiomas: Optional[str | list[str]] = None,
     section: Optional[str] = None,
     q: Optional[str] = None,
-    sort_by: str = "popularity",  # 'popularity', 'rating', 'release_date' (o 'newest'), 'title'
-    order: str = "desc",          # 'desc' (default) o 'asc'
+    sort_by: Optional[str] = None,  # 'popularity', 'rating', 'release_date' (o 'newest'), 'title'
+    order: Optional[str] = None,    # 'desc' (default) o 'asc'
     page: int = 1,
     page_size: int = 20,
     usuario_id: Optional[int] = None,
-    exclude_watched: bool = False
+    exclude_watched: bool = False,
+    upcoming: bool = False
 ) -> TitleListResponse:
     # -------------------------------------------------------------------------
     # Caché en memoria para exploración de catálogo sin filtro dinámico de vistos
@@ -157,10 +205,12 @@ async def get_titles(
         p_generos = ",".join(generos) if isinstance(generos, list) else (generos or "")
         p_paises = ",".join(paises) if isinstance(paises, list) else (paises or "")
         p_idiomas = ",".join(idiomas) if isinstance(idiomas, list) else (idiomas or "")
+        eff_sort = sort_by or ("release_date" if upcoming else "popularity")
+        eff_ord = order or ("asc" if (upcoming and not sort_by) else "desc")
         cache_key = (
             f"cat:{tipo or ''}:{genero_id or ''}:{genero or ''}:{p_generos}:{genre_op}:"
             f"{actor_id or ''}:{actor or ''}:{pais or ''}:{p_paises}:{idioma or ''}:{p_idiomas}:{section or ''}:"
-            f"{q or ''}:{sort_by}:{order}:{page}:{page_size}"
+            f"{q or ''}:{upcoming}:{eff_sort}:{eff_ord}:{page}:{page_size}"
         )
         cached_data = cache.get(cache_key)
         if cached_data is not None:
@@ -342,84 +392,91 @@ async def get_titles(
         )
         query = query.where(Titulo.id.not_in(watched_subq))
 
-    # 1. Filtro por sección curada (collection / section)
-    # Soporta tanto el nuevo parámetro 'section' como valores legacy pasados en 'sort_by'
-    active_section = section
-    effective_sort = sort_by
-    if not active_section and sort_by in ("classics", "top_rated", "others", "new_releases", "trending"):
-        active_section = sort_by
-        if sort_by == "top_rated":
-            effective_sort = "rating"
-        elif sort_by == "new_releases":
-            effective_sort = "newest"
-        else:
-            effective_sort = "popularity"
-
-    # Si no se especificó orden, aplicar el default natural de cada sección
-    if not effective_sort:
-        if active_section == "top_rated":
-            effective_sort = "rating"
-        elif active_section == "new_releases":
-            effective_sort = "newest"
-        else:
-            effective_sort = "popularity"
-
     today = date.today()
-    if active_section == "new_releases":
-        nr_cutoff = today - timedelta(days=settings.HOME_NEW_RELEASES_DAYS)
-        query = query.where(
-            Titulo.fecha_estreno.isnot(None),
-            Titulo.fecha_estreno >= nr_cutoff,
-            Titulo.fecha_estreno <= today
-        )
-    elif active_section == "trending":
-        tr_cutoff = today - timedelta(days=settings.HOME_TRENDING_DAYS)
-        latest_ep_subq = (
-            select(func.max(Episodio.fecha_estreno))
-            .join(Temporada, Episodio.temporada_id == Temporada.id)
-            .where(Temporada.titulo_id == Titulo.id)
-            .scalar_subquery()
-        )
-        tv_date_expr = func.coalesce(latest_ep_subq, Titulo.fecha_estreno)
-        trending_base_cond = or_(
-            and_(Titulo.tipo == "movie", Titulo.fecha_estreno >= tr_cutoff, Titulo.fecha_estreno <= today),
-            and_(Titulo.tipo == "tv", tv_date_expr >= tr_cutoff, tv_date_expr <= today)
-        )
-        top10_subq = (
-            select(Titulo.id)
-            .where(trending_base_cond)
-            .order_by(desc(Titulo.popularidad), desc(Titulo.id))
-            .limit(settings.HOME_SECTION_SAMPLE_SIZE)
-            .scalar_subquery()
-        )
-        query = query.where(
-            trending_base_cond,
-            or_(
-                Titulo.popularidad_percentil >= settings.HOME_TRENDING_MIN_POPULARITY_PERCENTILE,
-                Titulo.id.in_(top10_subq)
+
+    if upcoming:
+        # Modo Próximos Estrenos: excluyente, sin mezclar con secciones curadas
+        active_section = None
+        query = query.where(get_upcoming_filter_condition(today))
+        effective_sort = sort_by or "release_date"
+        order = order or ("asc" if not sort_by else "desc")
+    else:
+        # 1. Filtro por sección curada (collection / section)
+        # Soporta tanto el nuevo parámetro 'section' como valores legacy pasados en 'sort_by'
+        active_section = section
+        effective_sort = sort_by
+        if not active_section and sort_by in ("classics", "top_rated", "others", "new_releases", "trending"):
+            active_section = sort_by
+            if sort_by == "top_rated":
+                effective_sort = "rating"
+            elif sort_by == "new_releases":
+                effective_sort = "newest"
+            else:
+                effective_sort = "popularity"
+
+        # Si no se especificó orden, aplicar el default natural de cada sección
+        if not effective_sort:
+            if active_section == "top_rated":
+                effective_sort = "rating"
+            elif active_section == "new_releases":
+                effective_sort = "newest"
+            else:
+                effective_sort = "popularity"
+        order = order or "desc"
+
+        # Catálogo regular: excluyente, no se muestran títulos futuros o en producción
+        query = query.where(get_released_filter_condition(today))
+
+        if active_section == "new_releases":
+            nr_cutoff = today - timedelta(days=settings.HOME_NEW_RELEASES_DAYS)
+            query = query.where(Titulo.fecha_estreno >= nr_cutoff)
+        elif active_section == "trending":
+            tr_cutoff = today - timedelta(days=settings.HOME_TRENDING_DAYS)
+            latest_ep_subq = (
+                select(func.max(Episodio.fecha_estreno))
+                .join(Temporada, Episodio.temporada_id == Temporada.id)
+                .where(Temporada.titulo_id == Titulo.id)
+                .scalar_subquery()
             )
-        )
-    elif active_section == "classics":
-        current_year = today.year
-        cutoff_date = date(current_year - settings.HOME_CLASSICS_MIN_YEARS, 12, 31)
-        query = query.where(
-            Titulo.tipo == "movie",
-            Titulo.fecha_estreno.isnot(None),
-            Titulo.fecha_estreno <= cutoff_date,
-            Titulo.rating_unificado >= settings.HOME_CLASSICS_MIN_RATING,
-            Titulo.vote_count_tmdb >= settings.HOME_CLASSICS_MIN_VOTES
-        )
-    elif active_section == "top_rated":
-        # Pool estricto de los 100 títulos con mejor calificación unificada
-        top_100_subq = (
-            query
-            .with_only_columns(Titulo.id)
-            .where(Titulo.vote_count_tmdb >= settings.HOME_TOP_RATED_MIN_VOTES)
-            .order_by(desc(Titulo.rating_unificado), desc(Titulo.vote_count_tmdb))
-            .limit(settings.HOME_TOP_RATED_POOL_SIZE)
-            .scalar_subquery()
-        )
-        query = query.where(Titulo.id.in_(top_100_subq))
+            tv_date_expr = func.coalesce(latest_ep_subq, Titulo.fecha_estreno)
+            trending_base_cond = or_(
+                and_(Titulo.tipo == "movie", Titulo.fecha_estreno >= tr_cutoff, Titulo.fecha_estreno <= today),
+                and_(Titulo.tipo == "tv", tv_date_expr >= tr_cutoff, tv_date_expr <= today)
+            )
+            top10_subq = (
+                select(Titulo.id)
+                .where(trending_base_cond)
+                .order_by(desc(Titulo.popularidad), desc(Titulo.id))
+                .limit(settings.HOME_SECTION_SAMPLE_SIZE)
+                .scalar_subquery()
+            )
+            query = query.where(
+                trending_base_cond,
+                or_(
+                    Titulo.popularidad_percentil >= settings.HOME_TRENDING_MIN_POPULARITY_PERCENTILE,
+                    Titulo.id.in_(top10_subq)
+                )
+            )
+        elif active_section == "classics":
+            current_year = today.year
+            cutoff_date = date(current_year - settings.HOME_CLASSICS_MIN_YEARS, 12, 31)
+            query = query.where(
+                Titulo.tipo == "movie",
+                Titulo.fecha_estreno <= cutoff_date,
+                Titulo.rating_unificado >= settings.HOME_CLASSICS_MIN_RATING,
+                Titulo.vote_count_tmdb >= settings.HOME_CLASSICS_MIN_VOTES
+            )
+        elif active_section == "top_rated":
+            # Pool estricto de los 100 títulos con mejor calificación unificada
+            top_100_subq = (
+                query
+                .with_only_columns(Titulo.id)
+                .where(Titulo.vote_count_tmdb >= settings.HOME_TOP_RATED_MIN_VOTES)
+                .order_by(desc(Titulo.rating_unificado), desc(Titulo.vote_count_tmdb))
+                .limit(settings.HOME_TOP_RATED_POOL_SIZE)
+                .scalar_subquery()
+            )
+            query = query.where(Titulo.id.in_(top_100_subq))
 
     # 2. Ordenamiento puro (criterio + dirección)
     is_asc = order.lower() == "asc"
@@ -438,9 +495,9 @@ async def get_titles(
             query = query.order_by(desc(Titulo.rating_unificado), desc(Titulo.vote_count_tmdb))
     elif norm_sort in ("release_date", "date"):
         if is_asc:
-            query = query.order_by(Titulo.fecha_estreno.asc(), Titulo.popularidad.asc())
+            query = query.order_by(Titulo.fecha_estreno.asc().nulls_last(), desc(Titulo.popularidad))
         else:
-            query = query.order_by(desc(Titulo.fecha_estreno), desc(Titulo.popularidad))
+            query = query.order_by(Titulo.fecha_estreno.desc().nulls_last(), desc(Titulo.popularidad))
     elif norm_sort == "title":
         if is_asc:
             query = query.order_by(Titulo.nombre.asc())
@@ -544,7 +601,7 @@ async def _fetch_and_cache_home_pools(
     sample_size = settings.HOME_SECTION_SAMPLE_SIZE
 
     def _apply_base_filters(query):
-        return query
+        return query.where(get_released_filter_condition(today))
 
     # 1. New Releases (pool de hasta sample_size * 3)
     nr_cutoff = today - timedelta(days=settings.HOME_NEW_RELEASES_DAYS)

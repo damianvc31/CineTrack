@@ -144,6 +144,11 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
       - Día 1 del mes a las 05:00 UTC: `monthly_reviews_sync.yml`.
       - Cero colisiones de escritura concurrente en PostgreSQL y separación temporal garantizada.
 
+16. **Expansión de Próximos Estrenos y Desbloqueo de Ingesta Manual (`v1.5.0`):**
+    - **Modo Upcoming en Expansión (`--expand --upcoming`):** Expansión selectiva orientada estrictamente a obras no estrenadas (`primary_release_date.gte = hoy`), con ventana temporal configurable (`--upcoming-days`, default 365 días / `TMDB_EXPAND_UPCOMING_DAYS`), sin filtros de votos y con umbral de popularidad mínima ligado a `TMDB_DAILY_SYNC_POP_THRESHOLD` (10.0). Soporta búsqueda dirigida por género o global (`with_genres=None`) con tope total de 10 títulos (`TMDB_EXPAND_UPCOMING_TARGET`).
+    - **Desbloqueo de `--allow-unreleased` en Ingesta Manual:** Los comandos `--import-tmdb-id` e `--import-json`, junto con el endpoint administrativo `POST /api/v1/admin/sync/import-tmdb`, admiten `--allow-unreleased` para importar proyectos futuros arbitrarios sin alterar la variable de entorno global `TMDB_ALLOW_UNRELEASED=false`.
+    - **Desambiguación de Badges en Frontend:** Badge 'Renewed TBA' preservado en púrpura (`purple-950`), badge 'En Producción' en tono Teal (`teal-950/80`), y nuevo badge 'Estrenada' (`Released`) en verde esmeralda para películas.
+
 ---
 
 ## 4. Arquitectura de Frontend (React 19 + Vite 8 + Tailwind CSS v4)
@@ -366,4 +371,19 @@ Para mitigar la latencia de red entre servicios de nube en tiers gratuitos (Fast
   - Acciones rápidas de usuario (alternar favorito, marcar watchlist o visto) aplican un parche inmediato a la caché en memoria del navegador antes de emitir la petición HTTP.
   - **Manejo de Errores y Rollback Amigable:** Ante fallas de conexión o errores 500, el estado se revierte instantáneamente al snapshot previo y se dispara una notificación flotante amigable (`ToastContext.tsx`) detallando el motivo sin romper la interfaz.
   - **Invalidación Automática en Background (`onSettled`):** Tras completar la mutación, se revalidan en segundo plano las consultas vinculadas (`homeSections`, `catalog`, `titleDetail`, `userLibrary`, `userStats`).
+
+---
+
+## 9. Arquitectura de Ingesta y Modos de Expansión de Catálogo (v1.5.0)
+
+### 9.1. Segregación Estricta de Catálogo Regular vs. Próximos Estrenos
+- **Condición SQL `NULL-Safe`:** `get_released_filter_condition(today)` aísla el catálogo general y los carruseles de la Home (`_apply_base_filters`), garantizando que obras en producción, planificadas, con fecha posterior a hoy o series con su primer episodio pendiente no se filtren a la experiencia regular.
+- **Detección de Series Debutantes:** Las series que estrenan en el día en curso (`fecha_estreno == today`) pero cuyo primer episodio aún no fue emitido (`proximo_episodio_fecha >= today`) se clasifican como `upcoming=true` y se reservan para Próximos Estrenos hasta su emisión efectiva.
+
+### 9.2. Expansión Upcoming Desacoplada (`--expand --upcoming`)
+- **Búsqueda Proactiva en TMDB:** Configura `/discover` con `primary_release_date.gte = hoy`, desactivando restricciones de votos y calificación promedio (que en obras futuras son 0), pero exigiendo popularidad mínima $\ge 10.0$ (`TMDB_DAILY_SYNC_POP_THRESHOLD`).
+- **Desacoplamiento de Límites:**
+  - `upcoming_days = 0`: Desactiva la fecha tope (`release_date_lte = None`), permitiendo capturar los títulos más esperados del horizonte infinito futuro hasta completar el cupo.
+  - `limit = 0` (o `target_per_genre = 0`): Desactiva el tope de cantidad (`target = None`), procesando todos los títulos que califiquen en la ventana temporal hasta que la popularidad decreciente caiga por debajo de 10.0.
+  - Operación por defecto: 10 títulos globales dentro de una ventana de 365 días.
 

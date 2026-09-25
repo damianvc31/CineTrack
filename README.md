@@ -105,54 +105,103 @@ alembic downgrade -1
 Todos los comandos se ejecutan desde el entorno virtual del backend mediante el módulo `app.jobs.sync_tmdb`:
 
 ```powershell
-# 1. Sincronizar catálogo de géneros desde TMDB
+# 1. Sincronizar catálogo maestro de géneros desde TMDB
 python -m app.jobs.sync_tmdb --genres
 
-# 2. Ingesta inicial de catálogo
+# 2. Ingesta inicial masiva de catálogo
 #    --priority: 'popular_first' o 'toprated_first'
 #    --movies-target: cantidad de películas a ingerir
 #    --series-target: cantidad de series a ingerir
 #    --allow-unreleased: permitir obras no estrenadas (default: False)
 python -m app.jobs.sync_tmdb --initial --priority popular_first --movies-target 1000 --series-target 1000
 
-# 3. Sincronización diaria estándar (cambios en catálogo y cartelera)
+# 3. Sincronización diaria liviana (cambios en catálogo y cartelera reciente)
 #    --changes-hours: ventana en horas para /changes de TMDB (default config: 48 hs, ej. 120 para 5 días)
 #    --releases-days: ventana en días para nuevos estrenos en cartelera (default config: 15 días)
 #    --allow-unreleased: permitir títulos no estrenados (default: False)
-python -m app.jobs.sync_tmdb --daily --changes-hours 120 --releases-days 15
+python -m app.jobs.sync_tmdb --daily --changes-hours 48 --releases-days 15
 
-# 4. Expansión de catálogo por géneros (Criterio 1: /discover con filtros de calidad)
-#    --genre: nombre o ID de TMDB (ej. "Ciencia ficción", "Crime", 80). Si se omite, procesa todos los géneros
+# 4. Sincronización profunda semanal (ventana amplia de cambios e ingesta exhaustiva)
+#    --changes-days: ventana en días para /changes de TMDB (default: 7 días)
+#    --releases-days: ventana en días para nuevos estrenos (default: 15 días)
+#    --allow-unreleased: permitir títulos no estrenados (default: False)
+python -m app.jobs.sync_tmdb --deep --changes-days 7 --releases-days 15
+
+# 5. Expansión de catálogo por géneros / Próximos estrenos
+#    --genre: nombre o ID de TMDB (ej. "Ciencia ficción", "Animation", 80). Si se omite:
+#             - En modo regular: itera sobre todos los géneros del sistema.
+#             - En modo --upcoming: realiza búsqueda global unificada entre todos los géneros.
 #    --media-type: 'both' (default), 'movie' o 'tv'
 #    --min-vote-count: umbral mínimo de votos en TMDB (default config: 300)
 #    --min-vote-average: calificación promedio mínima en TMDB (default config: 7.0)
-#    --target-per-genre: cantidad objetivo de títulos por género (default config: 50)
-#    --allow-unreleased: permitir títulos no estrenados (default: False; por defecto filtra solo estrenados)
+#    --target-per-genre, --limit, --target: cantidad objetivo de títulos (aliases equivalentes):
+#             - Con --genre: cantidad de títulos para ese género (default: 50 en regular, 10 en upcoming).
+#             - Sin --genre en --upcoming: límite total global de títulos a ingerir (default: 10).
+#    --allow-unreleased: permiso para permitir títulos no estrenados en modo regular (default: False).
+#    --upcoming: activa el modo de búsqueda exclusivo de próximos estrenos (unreleased).
+#                - Filtra estrictamente fechas futuras (>= hoy).
+#                - Omite requisitos de votos y promedio (las obras no estrenadas tienen 0 votos).
+#                - Requiere popularidad mínima >= 10.0 (TMDB_DAILY_SYNC_POP_THRESHOLD).
+#                - Habilita internamente --allow-unreleased de forma automática.
+#    --upcoming-days: horizonte temporal futuro en días para --upcoming (default config: 365 días; usar 0 para sin fecha tope).
+#
+# Desacoplamiento de límites (uso de 0 para desactivar restricciones):
+#   - `--upcoming-days 0`: elimina la fecha tope futura (busca en el horizonte infinito hasta encontrar la cantidad indicada en --limit).
+#   - `--limit 0`: elimina el tope de títulos (ingesta todos los títulos populares que califiquen dentro de la ventana de --upcoming-days).
+#
+# Comportamiento por defecto sin parámetros adicionales:
+#   `python -m app.jobs.sync_tmdb --expand --upcoming`
+#   -> Busca hasta 10 títulos globales (--limit 10) en los próximos 365 días (--upcoming-days 365).
 #
 # Ejemplos:
-# Para todos los géneros con configuración por defecto:
+# Para todos los géneros con configuración por defecto (títulos de alta calidad ya estrenados):
 python -m app.jobs.sync_tmdb --expand
 # Para un género puntual (por nombre) solo películas:
-python -m app.jobs.sync_tmdb --expand --genre "Crime" --media-type movie --target-per-genre 15
+python -m app.jobs.sync_tmdb --expand --genre "Crime" --media-type movie --limit 15
 # Para un género por ID con umbrales personalizados:
-python -m app.jobs.sync_tmdb --expand --genre 878 --min-vote-count 250 --min-vote-average 7.2 --target-per-genre 30
+python -m app.jobs.sync_tmdb --expand --genre 878 --min-vote-count 250 --min-vote-average 7.2 --limit 30
+# Próximos estrenos globales (10 títulos por defecto, horizonte 365 días):
+python -m app.jobs.sync_tmdb --expand --upcoming
+# Próximos estrenos globales con límite de 5 títulos:
+python -m app.jobs.sync_tmdb --expand --upcoming --limit 5
+# Próximos estrenos sin límite de días (los 15 títulos futuros más esperados sin importar cuándo estrenan):
+python -m app.jobs.sync_tmdb --expand --upcoming --limit 15 --upcoming-days 0
+# Próximos estrenos sin tope de títulos (todos los títulos calificados de los próximos 60 días):
+python -m app.jobs.sync_tmdb --expand --upcoming --upcoming-days 60 --limit 0
+# Próximos estrenos para un género puntual con ventana de 180 días y target específico:
+python -m app.jobs.sync_tmdb --expand --upcoming --genre Animation --upcoming-days 180 --limit 10
 
-# 5. Saneamiento de títulos no estrenados (elimina películas futuras y series sin temporadas emitidas)
+# 6. Saneamiento de títulos no estrenados (elimina películas futuras y series sin temporadas emitidas)
 python -m app.jobs.sync_tmdb --cleanup-unreleased
 
-# 6. Recalcular percentiles de popularidad y ratings unificados
+# 7. Purga selectiva de títulos incompletos o con caracteres no legibles
+#    Elimina registros sin país, sin fecha de estreno o sin idioma original, y títulos en alfabetos no latinos.
+python -m app.jobs.sync_tmdb --purge-incomplete
+
+# 8. Backfill masivo de países consolidados (país de origen + países de producción de TMDB)
+python -m app.jobs.sync_tmdb --backfill-countries
+
+# 9. Refresco masivo de métricas desde TMDB (votos, promedios y popularidad de todo el catálogo)
+python -m app.jobs.sync_tmdb --refresh-metrics
+
+# 10. Recalcular percentiles de popularidad y ratings unificados ponderados
 python -m app.jobs.sync_tmdb --percentiles
 
-# 7. Sincronizar reseñas externas de TMDB para todos los títulos (hasta el tope configurable de 20)
+# 11. Recalcular exclusivamente ratings unificados ponderados (TMDB + comunidad)
+python -m app.jobs.sync_tmdb --ratings
+
+# 12. Sincronizar reseñas externas de TMDB para todos los títulos (hasta el tope configurable de 20 por título)
 python -m app.jobs.sync_tmdb --reviews
 
-# 8. Carga manual mediante archivo JSON estructurado (ver docs/templates/ para formato)
-python -m app.jobs.sync_tmdb --import-json docs/templates/template_pelicula.json
+# 13. Carga manual mediante archivo JSON estructurado (ver docs/templates/, admite --allow-unreleased)
+python -m app.jobs.sync_tmdb --import-json docs/templates/template_pelicula.json --allow-unreleased
 
-# 9. Importar título individual por ID de TMDB
-python -m app.jobs.sync_tmdb --import-tmdb-id 157336 --type movie
+# 14. Importar títulos individuales o en lote por ID de TMDB (admite proyectos futuros con --allow-unreleased)
+#     Acepta un ID único o lista de IDs separados por comas:
+python -m app.jobs.sync_tmdb --import-tmdb-id 1003596 --type movie --allow-unreleased
+python -m app.jobs.sync_tmdb --import-tmdb-id 288673,213375 --type tv --allow-unreleased
 
-# 10. Vaciar completamente el catálogo (títulos, temporadas, episodios, reseñas y relaciones; preserva usuarios)
+# 15. Vaciar completamente el catálogo (títulos, temporadas, episodios, reseñas y relaciones; preserva usuarios)
 python -m app.jobs.sync_tmdb --clear
 ```
 
@@ -173,7 +222,7 @@ Todos los jobs de sincronización pueden dispararse también vía HTTP (`HTTP 20
 
 *Autenticación requerida:* Enviar cabecera `Authorization: Bearer <token_admin>` (usuario con `es_admin=True`) o cabecera `X-Admin-Key: <ADMIN_API_KEY>`.
 
-- **`POST /api/v1/admin/sync/expand`** (Expansión selectiva por géneros — Criterio 1):
+- **`POST /api/v1/admin/sync/expand`** (Expansión selectiva por géneros / Próximos estrenos):
   ```json
   {
     "genre": "Crime",
@@ -181,36 +230,55 @@ Todos los jobs de sincronización pueden dispararse también vía HTTP (`HTTP 20
     "min_vote_count": 300,
     "min_vote_average": 7.0,
     "target_per_genre": 15,
-    "allow_unreleased": false
+    "allow_unreleased": false,
+    "upcoming": false,
+    "upcoming_days": 365
   }
   ```
-  - `genre` (*string | null*, opcional): Nombre o ID del género. Si es `null` o se omite, procesa todos los géneros.
+  - `genre` (*string | null*, opcional): Nombre o ID del género. Si es `null` o se omite en modo regular procesa todos los géneros; en modo `upcoming` realiza búsqueda global.
   - `media_type` (*string*, opcional): `"both"` (default), `"movie"` o `"tv"`.
-  - `min_vote_count` (*integer*, opcional): Umbral mínimo de votos en TMDB (default: valor de `TMDB_EXPAND_MIN_VOTE_COUNT`).
-  - `min_vote_average` (*float*, opcional): Calificación promedio mínima (default: valor de `TMDB_EXPAND_MIN_VOTE_AVERAGE`).
-  - `target_per_genre` (*integer*, opcional): Cantidad objetivo de títulos por género (default: valor de `TMDB_EXPAND_TITLES_PER_GENRE`).
+  - `min_vote_count` (*integer*, opcional): Umbral mínimo de votos en TMDB (default: `TMDB_EXPAND_MIN_VOTE_COUNT`).
+  - `min_vote_average` (*float*, opcional): Calificación promedio mínima (default: `TMDB_EXPAND_MIN_VOTE_AVERAGE`).
+  - `target_per_genre` (*integer*, opcional): Cantidad objetivo de títulos por género (default: `TMDB_EXPAND_TITLES_PER_GENRE`).
   - `allow_unreleased` (*boolean*, opcional): Permitir obras no estrenadas (default: `false`).
+  - `upcoming` (*boolean*, opcional): Activa el modo de próximos estrenos (default: `false`).
+  - `upcoming_days` (*integer*, opcional): Ventana temporal futura en días para `--upcoming` (default: `365`).
 
 - **`POST /api/v1/admin/sync/initial`** (Ingesta inicial masiva):
   - Body: `{"priority": "popular_first" | "toprated_first", "movies_target": 1000, "series_target": 1000, "allow_unreleased": false}`
 
-- **`POST /api/v1/admin/sync/daily`** (Sincronización diaria periódica):
-  - Body: `{"changes_hours_window": 48, "releases_days_window": 15, "allow_unreleased": false}`
+- **`POST /api/v1/admin/sync/daily`** (Sincronización diaria liviana):
+  - Body: `{"releases_days_window": 15, "allow_unreleased": false, "changes_hours_window": null}` (usa `TMDB_RELEASES_DAYS_WINDOW=15` por defecto).
+
+- **`POST /api/v1/admin/sync/deep`** (Sincronización profunda semanal):
+  - Body: `{"changes_days_window": 7, "releases_days_window": 15, "allow_unreleased": false}` (usa `TMDB_CHANGES_DAYS_WINDOW=7` y `TMDB_RELEASES_DAYS_WINDOW=15` por defecto).
 
 - **`POST /api/v1/admin/sync/genres`** (Sincronización del catálogo de géneros):
   - Dispara la actualización de géneros desde TMDB en background.
 
 - **`POST /api/v1/admin/sync/cleanup-unreleased`** (Saneamiento de catálogo):
-  - Ejecuta de forma síncrona la eliminación de títulos no estrenados y recalcula métricas.
+  - Ejecuta la eliminación de títulos no estrenados y recalcula métricas.
+
+- **`POST /api/v1/admin/sync/purge-incomplete`** (Purga de incompletos y no legibles):
+  - Elimina títulos sin país, sin fecha o en alfabetos no latinos.
+
+- **`POST /api/v1/admin/sync/backfill-countries`** (Consolidación de países):
+  - Actualiza el campo país consolidando país de origen y países de producción.
+
+- **`POST /api/v1/admin/sync/refresh-metrics`** (Refresco de votos y popularidad):
+  - Actualiza las estadísticas de TMDB para todo el catálogo local existente.
 
 - **`POST /api/v1/admin/sync/percentiles`** (Recálculo de popularidad y ratings):
   - Recalcula percentiles y ratings unificados en background.
 
+- **`POST /api/v1/admin/sync/ratings`** (Recálculo exclusivo de ratings unificados):
+  - Recalcula ponderaciones de ratings para todos los títulos.
+
 - **`POST /api/v1/admin/sync/reviews`** (Sincronización masiva de reseñas):
   - Body: `{"limit_per_title": 20}`
 
-- **`POST /api/v1/admin/sync/import-tmdb`** (Importación puntual por ID TMDB):
-  - Body: `{"tmdb_id": 157336, "type": "movie"}`
+- **`POST /api/v1/admin/sync/import-tmdb`** (Importación puntual o por lista de IDs TMDB):
+  - Body: `{"tmdb_id": 1003596, "type": "movie", "allow_unreleased": true}` o lista `items: [{"tmdb_id": 1003596, "type": "movie"}]`.
 
 - **`POST /api/v1/admin/sync/import-json`** (Ingesta por lista JSON estructurada):
   - Body: arreglo de objetos según plantillas de `docs/templates/`.

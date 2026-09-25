@@ -92,6 +92,9 @@ class ImportTMDBRequest(BaseModel):
     tmdb_id: Optional[int] = Field(default=None, ge=1, description="ID individual en TMDB")
     type: Literal["movie", "tv"] = Field(default="movie", description="Tipo de contenido individual ('movie' o 'tv')")
     items: Optional[List[ImportTMDBItem]] = Field(default=None, description="Lista opcional de títulos para importar en lote")
+    allow_unreleased: Optional[bool] = Field(
+        default=True, description="Permitir títulos no estrenados en importación explícita (default: True)"
+    )
 
 
 class RefreshMetricsRequest(BaseModel):
@@ -112,10 +115,19 @@ class ExpandCatalogRequest(BaseModel):
         default=None, ge=0.0, le=10.0, description="Calificación promedio mínima en TMDB (default: config)"
     )
     target_per_genre: Optional[int] = Field(
-        default=None, ge=1, le=500, description="Cantidad objetivo de títulos por género (default: config)"
+        default=None, ge=0, le=500, description="Cantidad objetivo de títulos por género o límite global (0 para sin límite, default: config)"
+    )
+    limit: Optional[int] = Field(
+        default=None, ge=0, le=500, description="Alias de target_per_genre (0 para sin límite)"
     )
     allow_unreleased: Optional[bool] = Field(
         default=False, description="Permitir títulos no estrenados (default: False)"
+    )
+    upcoming: Optional[bool] = Field(
+        default=False, description="Activar modo de próximos estrenos (unreleased)"
+    )
+    upcoming_days: Optional[int] = Field(
+        default=None, ge=0, le=1825, description="Ventana máxima en días hacia el futuro para upcoming (0 para sin fecha tope, default config: 365)"
     )
 
 
@@ -292,6 +304,7 @@ async def _run_job_import_tmdb(
     items: Optional[List[tuple[int, str]]] = None,
     tmdb_id: Optional[int] = None,
     media_type: Optional[str] = "movie",
+    allow_unreleased: Optional[bool] = True,
 ):
     _update_job_status("import_tmdb", "running")
     if items is None:
@@ -307,9 +320,9 @@ async def _run_job_import_tmdb(
             for tmdb_id, media_type in items:
                 try:
                     if media_type == "movie":
-                        await service.upsert_movie(tmdb_id, fetch_reviews=True)
+                        await service.upsert_movie(tmdb_id, allow_unreleased=allow_unreleased, fetch_reviews=True)
                     else:
-                        await service.upsert_series(tmdb_id, fetch_episodes=True, fetch_reviews=True)
+                        await service.upsert_series(tmdb_id, fetch_episodes=True, allow_unreleased=allow_unreleased, fetch_reviews=True)
                     await db.commit()
                     imported_count += 1
                 except Exception as item_err:
@@ -412,6 +425,8 @@ async def _run_job_expand(
     min_vote_count: Optional[int],
     min_vote_average: Optional[float],
     allow_unreleased: Optional[bool],
+    upcoming: bool = False,
+    upcoming_days: Optional[int] = None,
 ):
     _update_job_status("expand_catalog", "running")
     client = TMDBClient()
@@ -425,6 +440,8 @@ async def _run_job_expand(
                 min_vote_count=min_vote_count,
                 min_vote_average=min_vote_average,
                 allow_unreleased=allow_unreleased,
+                upcoming=upcoming,
+                upcoming_days=upcoming_days,
             )
             _update_job_status("expand_catalog", "completed", result=res)
     except Exception as e:
@@ -600,7 +617,11 @@ async def trigger_import_tmdb_id(
             detail="Debe proporcionar tmdb_id individual o una lista en items."
         )
 
-    background_tasks.add_task(_run_job_import_tmdb, items=items_to_process)
+    background_tasks.add_task(
+        _run_job_import_tmdb,
+        items=items_to_process,
+        allow_unreleased=payload.allow_unreleased,
+    )
     count = len(items_to_process)
     desc = f"{count} títulos" if count > 1 else f"{items_to_process[0][1]} con TMDB ID {items_to_process[0][0]}"
     return JobResponse(
@@ -676,19 +697,23 @@ async def trigger_expand_catalog(
     _: Any = Depends(get_current_admin)
 ) -> JobResponse:
     """Ejecuta la expansión selectiva de catálogo por géneros (Criterio 1) en background."""
+    target_val = payload.target_per_genre if payload.target_per_genre is not None else payload.limit
     background_tasks.add_task(
         _run_job_expand,
         genre=payload.genre,
         media_type=payload.media_type,
-        target_per_genre=payload.target_per_genre,
+        target_per_genre=target_val,
         min_vote_count=payload.min_vote_count,
         min_vote_average=payload.min_vote_average,
         allow_unreleased=payload.allow_unreleased,
+        upcoming=payload.upcoming or False,
+        upcoming_days=payload.upcoming_days,
     )
-    genre_desc = payload.genre or "todos los géneros"
+    mode_desc = "[UPCOMING] " if payload.upcoming else ""
+    genre_desc = payload.genre or ("cualquier género (global)" if payload.upcoming else "todos los géneros")
     return JobResponse(
         job="expand_catalog",
-        message=f"Expansión de catálogo iniciada en segundo plano para {genre_desc} (tipo: {payload.media_type})."
+        message=f"Expansión de catálogo {mode_desc}iniciada en segundo plano para {genre_desc} (tipo: {payload.media_type})."
     )
 
 

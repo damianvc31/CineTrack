@@ -48,10 +48,11 @@ async def list_titles(
     idiomas: Optional[str] = Query(default=None, description="Filtrar por uno o más idiomas originales separados por coma (ej: 'en,ja,es')"),
     section: Optional[str] = Query(default=None, description="Filtrar por sección curada: 'new_releases', 'trending', 'classics', 'top_rated'"),
     q: Optional[str] = Query(default=None, description="Buscar por nombre, director, guionista o actor del elenco"),
-    sort_by: str = Query(default="popularity", description="Criterio de orden: 'popularity', 'rating', 'release_date', 'title'"),
-    order: str = Query(default="desc", pattern="^(asc|desc)$", description="Dirección del orden: 'desc' o 'asc'"),
+    sort_by: Optional[str] = Query(default=None, description="Criterio de orden: 'popularity', 'rating', 'release_date', 'title'"),
+    order: Optional[str] = Query(default=None, pattern="^(asc|desc)$", description="Dirección del orden: 'desc' o 'asc'"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    upcoming: bool = Query(default=False, description="Filtrar exclusivamente próximos estrenos (unreleased)"),
     user_id: Optional[int] = Depends(get_optional_user_id),
     db: AsyncSession = Depends(get_db)
 ) -> TitleListResponse:
@@ -75,7 +76,8 @@ async def list_titles(
         order=order,
         page=page,
         page_size=page_size,
-        usuario_id=user_id
+        usuario_id=user_id,
+        upcoming=upcoming
     )
 
 
