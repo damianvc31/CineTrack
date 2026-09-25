@@ -212,7 +212,9 @@ python -m app.jobs.sync_tmdb --clear
 #### Calificación Unificada y Política de Reseñas
 CineTrack no divide de forma confusa el puntaje entre "TMDB" y "CineTrack", sino que presenta un **puntaje promedio ponderado unificado**:
 
-$$\text{Rating} = \frac{(\text{vote\_average\_tmdb} \times \text{vote\_count\_tmdb}) + \sum_{i=1}^{N} \text{puntaje\_usuario}_i}{\text{vote\_count\_tmdb} + N}$$
+```text
+Rating = [(votos_tmdb × puntaje_tmdb) + suma(puntajes_usuarios)] / (votos_tmdb + total_usuarios)
+```
 
 - **Reseñas de TMDB:** Se sincronizan hasta un tope configurable (`TMDB_REVIEWS_PER_TITLE_LIMIT = 20`) exclusivamente para dar contexto enriquecido y opiniones al catálogo inicial. No alteran el cálculo ponderado porque los votos de TMDB ya están reflejados en `vote_average_tmdb`.
 - **Reseñas de CineTrack:** 
@@ -221,76 +223,29 @@ $$\text{Rating} = \frac{(\text{vote\_average\_tmdb} \times \text{vote\_count\_tm
   - **Puntaje opcional:** Si el usuario no marca la opción de calificar, la reseña se guarda como texto de opinión y no impacta ni desvirtúa la media ponderada del `rating_unificado`.
   - **Pantalla `/reviews`:** Interfaz dedicada con pestañas "My Reviews" (gestión de reseñas propias) y "Pending Reviews" (títulos vistos sin reseñar con redactor rápido in-place).
 
-#### Endpoints Administrativos (API HTTP)
-Todos los jobs de sincronización pueden dispararse también vía HTTP (`HTTP 202 Accepted` con ejecución asíncrona en segundo plano mediante `BackgroundTasks`).
+#### Endpoints Administrativos y Jobs de Sincronización (API HTTP)
+Todos los jobs de sincronización pueden dispararse de forma remota vía HTTP (`HTTP 202 Accepted` con ejecución asíncrona en segundo plano mediante `BackgroundTasks`) o monitorearse en tiempo real.
 
 *Autenticación requerida:* Enviar cabecera `Authorization: Bearer <token_admin>` (usuario con `es_admin=True`) o cabecera `X-Admin-Key: <ADMIN_API_KEY>`.
 
-- **`POST /api/v1/admin/sync/expand`** (Expansión selectiva por géneros / Próximos estrenos):
-  ```json
-  {
-    "genre": "Crime",
-    "media_type": "movie",
-    "min_vote_count": 300,
-    "min_vote_average": 7.0,
-    "target_per_genre": 15,
-    "allow_unreleased": false,
-    "upcoming": false,
-    "upcoming_days": 365
-  }
-  ```
-  - `genre` (*string | null*, opcional): Nombre o ID del género. Si es `null` o se omite en modo regular procesa todos los géneros; en modo `upcoming` realiza búsqueda global.
-  - `media_type` (*string*, opcional): `"both"` (default), `"movie"` o `"tv"`.
-  - `min_vote_count` (*integer*, opcional): Umbral mínimo de votos en TMDB (default: `TMDB_EXPAND_MIN_VOTE_COUNT`).
-  - `min_vote_average` (*float*, opcional): Calificación promedio mínima (default: `TMDB_EXPAND_MIN_VOTE_AVERAGE`).
-  - `target_per_genre` (*integer*, opcional): Cantidad objetivo de títulos por género (default: `TMDB_EXPAND_TITLES_PER_GENRE`).
-  - `allow_unreleased` (*boolean*, opcional): Permitir obras no estrenadas (default: `false`).
-  - `upcoming` (*boolean*, opcional): Activa el modo de próximos estrenos (default: `false`).
-  - `upcoming_days` (*integer*, opcional): Ventana temporal futura en días para `--upcoming` (default: `365`).
+> [!TIP]
+> **Colección Oficial de Postman:**
+> Para disparar, configurar o monitorear todos los jobs sin escribir llamadas HTTP a mano, utilizá la suite oficial en [`docs/postman/`](docs/postman/README.md). Incluye entornos para **Local / Dev** y **Producción (Render)** con ejemplos completos de payloads para ingesta individual/masiva, modos de expansión, limpiezas y telemetría.
 
-- **`POST /api/v1/admin/sync/initial`** (Ingesta inicial masiva):
-  - Body: `{"priority": "popular_first" | "toprated_first", "movies_target": 1000, "series_target": 1000, "allow_unreleased": false}`
-
-- **`POST /api/v1/admin/sync/daily`** (Sincronización diaria liviana):
-  - Body: `{"releases_days_window": 15, "allow_unreleased": false, "changes_hours_window": null}` (usa `TMDB_RELEASES_DAYS_WINDOW=15` por defecto).
-
-- **`POST /api/v1/admin/sync/deep`** (Sincronización profunda semanal):
-  - Body: `{"changes_days_window": 7, "releases_days_window": 15, "allow_unreleased": false}` (usa `TMDB_CHANGES_DAYS_WINDOW=7` y `TMDB_RELEASES_DAYS_WINDOW=15` por defecto).
-
-- **`POST /api/v1/admin/sync/genres`** (Sincronización del catálogo de géneros):
-  - Dispara la actualización de géneros desde TMDB en background.
-
-- **`POST /api/v1/admin/sync/cleanup-unreleased`** (Saneamiento de catálogo):
-  - Ejecuta la eliminación de títulos no estrenados y recalcula métricas.
-
-- **`POST /api/v1/admin/sync/purge-incomplete`** (Purga de incompletos y no legibles):
-  - Elimina títulos sin país, sin fecha o en alfabetos no latinos.
-
-- **`POST /api/v1/admin/sync/backfill-countries`** (Consolidación de países):
-  - Actualiza el campo país consolidando país de origen y países de producción.
-
-- **`POST /api/v1/admin/sync/refresh-metrics`** (Refresco de votos y popularidad):
-  - Actualiza las estadísticas de TMDB para todo el catálogo local existente.
-
-- **`POST /api/v1/admin/sync/percentiles`** (Recálculo de popularidad y ratings):
-  - Recalcula percentiles y ratings unificados en background.
-
-- **`POST /api/v1/admin/sync/ratings`** (Recálculo exclusivo de ratings unificados):
-  - Recalcula ponderaciones de ratings para todos los títulos.
-
-- **`POST /api/v1/admin/sync/reviews`** (Sincronización masiva de reseñas):
-  - Body: `{"limit_per_title": 20}`
-
-- **`POST /api/v1/admin/sync/import-tmdb`** (Importación puntual o por lista de IDs TMDB):
-  - Body: `{"tmdb_id": 1003596, "type": "movie", "allow_unreleased": true}` o lista `items: [{"tmdb_id": 1003596, "type": "movie"}]`.
-
-- **`POST /api/v1/admin/sync/import-json`** (Ingesta por lista JSON estructurada):
-  - Body: arreglo de objetos según plantillas de `docs/templates/`.
-
-- **`DELETE /api/v1/admin/catalog?confirm=true`** (Vaciado de catálogo):
-  - Elimina títulos y datos asociados, preservando usuarios y géneros. Requiere `confirm=true`.
-
-*Autenticación requerida:* Enviar cabecera `Authorization: Bearer <token_admin>` (usuario con `es_admin=True`) o cabecera `X-Admin-Key: <ADMIN_API_KEY>`.
+| Endpoint | Método | Acción principal |
+|---|---|---|
+| `/api/v1/admin/sync/expand` | `POST` | Expansión selectiva por género o próximos estrenos (`upcoming`). |
+| `/api/v1/admin/sync/initial` | `POST` | Ingesta masiva inicial (hasta 10.000 películas y series). |
+| `/api/v1/admin/sync/daily` | `POST` | Sincronización diaria liviana (cambios en 48h y cartelera). |
+| `/api/v1/admin/sync/deep` | `POST` | Sincronización semanal profunda (auditoría integral). |
+| `/api/v1/admin/sync/purge-incomplete` | `POST` | Purga títulos sin póster, incompletos o con caracteres no legibles. |
+| `/api/v1/admin/sync/cleanup-unreleased` | `POST` | Saneamiento de no estrenados y activación de embeddings para estrenos. |
+| `/api/v1/admin/sync/refresh-metrics` | `POST` | Refresco masivo de votos, popularidad, `status_tmdb` y duración. |
+| `/api/v1/admin/sync/percentiles` | `POST` | Recálculo general de percentiles y calificaciones bayesianas. |
+| `/api/v1/admin/sync/import-tmdb` | `POST` | Ingesta individual o por lote de IDs de TMDB. |
+| `/api/v1/admin/sync/actor-photos` | `POST` | Sincronización en lote de fotos de actores faltantes. |
+| `/api/v1/admin/sync/jobs/status` | `GET` | Consulta en tiempo real del estado de todos los jobs (`idle`, `running`, `completed`, `failed`). |
+| `/api/v1/admin/catalog` | `DELETE` | Vaciado controlado del catálogo (requiere `?confirm=true`). |
 
 #### Endpoints Principales de la Aplicación (API HTTP)
 - **Autenticación (JWT):**

@@ -1,0 +1,5 @@
+$kind: http-request
+description: Audita y elimina en cascada títulos con caracteres no latinos, sin fecha, sin idioma, sin país o sin póster oficial.
+url: "{{base_url}}/api/v1/admin/sync/purge-incomplete"
+method: POST
+order: 1000

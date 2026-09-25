@@ -10,6 +10,12 @@
 .env.*
 !.env.example
 
+# --- Postman — Secretos y configuraciones locales de entorno (YAML) ---
+docs/postman/*.environment.yaml
+!docs/postman/*.environment.example.yaml
+docs/postman/.postman/
+docs/postman/postman/
+
 # --- Python / FastAPI / Entornos virtuales ---
 __pycache__/
 *.py[cod]

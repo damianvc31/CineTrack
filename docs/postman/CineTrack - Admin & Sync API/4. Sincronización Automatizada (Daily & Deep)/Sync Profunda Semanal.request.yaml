@@ -1,0 +1,14 @@
+$kind: http-request
+description: Ejecuta la sincronización profunda de cambios semanales (/movie/changes y /tv/changes).
+url: "{{base_url}}/api/v1/admin/sync/deep"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "changes_days_window": 7,
+      "allow_unreleased": false
+    }
+order: 2000

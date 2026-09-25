@@ -1,0 +1,19 @@
+$kind: http-request
+name: "Expansión por Género Específico (Estrenados)"
+description: Expande un único género puntual (ej. Terror, Ciencia ficción) con umbrales específicos de votos y puntaje.
+url: "{{base_url}}/api/v1/admin/sync/expand"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "genre": "Terror",
+      "media_type": "movie",
+      "target_per_genre": 30,
+      "min_vote_count": 150,
+      "min_vote_average": 6.0,
+      "allow_unreleased": false
+    }
+order: 4500

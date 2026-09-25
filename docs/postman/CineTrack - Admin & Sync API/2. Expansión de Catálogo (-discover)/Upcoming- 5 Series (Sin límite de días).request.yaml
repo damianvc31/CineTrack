@@ -1,0 +1,18 @@
+$kind: http-request
+name: "Upcoming: 5 Series (Sin límite de días)"
+description: Ingesta 5 series próximas a nivel global sin ventana de tiempo límite.
+url: "{{base_url}}/api/v1/admin/sync/expand"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "media_type": "tv",
+      "upcoming": true,
+      "upcoming_days": 0,
+      "limit": 5,
+      "genre": null
+    }
+order: 1000

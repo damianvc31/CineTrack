@@ -1,0 +1,5 @@
+$kind: http-request
+description: Consulta el estado en memoria de todos los jobs de background.
+url: "{{base_url}}/api/v1/admin/sync/jobs/status"
+method: GET
+order: 2000

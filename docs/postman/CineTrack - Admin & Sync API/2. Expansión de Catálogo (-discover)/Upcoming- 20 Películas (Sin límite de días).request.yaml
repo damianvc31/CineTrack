@@ -1,0 +1,18 @@
+$kind: http-request
+name: "Upcoming: 20 Películas (Sin límite de días)"
+description: Ingesta 20 películas próximas a nivel global sin ventana de tiempo límite.
+url: "{{base_url}}/api/v1/admin/sync/expand"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "media_type": "movie",
+      "upcoming": true,
+      "upcoming_days": 0,
+      "limit": 20,
+      "genre": null
+    }
+order: 2000

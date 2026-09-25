@@ -1,0 +1,5 @@
+$kind: http-request
+description: Descarga reseñas de TMDB para todos los títulos hasta el tope configurado (20).
+url: "{{base_url}}/api/v1/admin/sync/reviews"
+method: POST
+order: 5000

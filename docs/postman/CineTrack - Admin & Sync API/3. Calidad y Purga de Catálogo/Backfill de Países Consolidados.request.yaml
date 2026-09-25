@@ -1,0 +1,5 @@
+$kind: http-request
+description: Actualiza la columna 'pais' con origen y producción consolidados para todo el catálogo existente.
+url: "{{base_url}}/api/v1/admin/sync/backfill-countries"
+method: POST
+order: 5000

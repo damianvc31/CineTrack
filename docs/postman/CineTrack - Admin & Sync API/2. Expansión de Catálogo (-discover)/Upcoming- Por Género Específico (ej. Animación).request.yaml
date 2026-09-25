@@ -1,0 +1,18 @@
+$kind: http-request
+name: "Upcoming: Por Género Específico (ej. Animación)"
+description: Ingesta títulos futuros de un género específico en los próximos 180 días.
+url: "{{base_url}}/api/v1/admin/sync/expand"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "genre": "Animación",
+      "media_type": "both",
+      "upcoming": true,
+      "upcoming_days": 180,
+      "limit": 10
+    }
+order: 3000

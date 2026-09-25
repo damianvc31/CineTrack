@@ -1,0 +1,7 @@
+$kind: http-request
+description: Elimina en cascada todos los títulos y tablas dependientes. Requiere confirm=true.
+url: "{{base_url}}/api/v1/admin/catalog?confirm=true"
+method: DELETE
+queryParams:
+  confirm: "true"
+order: 3000

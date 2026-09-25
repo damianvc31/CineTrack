@@ -1,0 +1,5 @@
+$kind: http-request
+description: Recalcula los percentiles PERCENT_RANK de popularidad y ratings unificados en base de datos.
+url: "{{base_url}}/api/v1/admin/sync/percentiles"
+method: POST
+order: 4000

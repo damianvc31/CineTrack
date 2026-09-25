@@ -1,0 +1,7 @@
+$kind: http-request
+description: Verifica que la API esté viva y despierta la instancia de Render si está en cold start.
+url: "{{base_url}}/health"
+method: GET
+auth:
+  type: noauth
+order: 1000

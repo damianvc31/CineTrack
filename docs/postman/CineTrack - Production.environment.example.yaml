@@ -1,0 +1,8 @@
+name: CineTrack - Production
+values:
+  - key: base_url
+    value: 'https://cinetrack-api-zsen.onrender.com'
+  - key: admin_key
+    value: ''
+  - key: job_name
+    value: purge_incomplete

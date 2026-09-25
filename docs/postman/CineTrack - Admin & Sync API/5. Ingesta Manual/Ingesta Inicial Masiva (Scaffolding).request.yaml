@@ -1,0 +1,15 @@
+$kind: http-request
+description: Puebla el catálogo de cero a partir de los títulos más populares de TMDB.
+url: "{{base_url}}/api/v1/admin/sync/initial"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "priority": "popular_first",
+      "movies_target": 1000,
+      "series_target": 1000
+    }
+order: 2000

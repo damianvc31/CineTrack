@@ -1,0 +1,5 @@
+$kind: http-request
+description: Consulta el estado detallado de un job ('expand_catalog', 'daily_sync', 'deep_sync', 'purge_incomplete', 'actor_photos', etc.).
+url: "{{base_url}}/api/v1/admin/sync/jobs/{{job_name}}/status"
+method: GET
+order: 3000

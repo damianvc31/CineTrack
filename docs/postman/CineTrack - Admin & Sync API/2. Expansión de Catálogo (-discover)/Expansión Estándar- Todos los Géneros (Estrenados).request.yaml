@@ -1,0 +1,18 @@
+$kind: http-request
+name: "Expansión Estándar: Todos los Géneros (Estrenados)"
+description: Recorre los 19 géneros del catálogo e ingesta obras estrenadas aclamadas, sincronizando sus embeddings al terminar.
+url: "{{base_url}}/api/v1/admin/sync/expand"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "media_type": "both",
+      "target_per_genre": 25,
+      "min_vote_count": 300,
+      "min_vote_average": 7.0,
+      "allow_unreleased": false
+    }
+order: 4000

@@ -1,0 +1,13 @@
+$kind: http-request
+description: "Ejecuta la sincronización diaria: series vivas, estrenos en cartelera, refresh de métricas y embeddings de nuevos estrenos."
+url: "{{base_url}}/api/v1/admin/sync/daily"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "allow_unreleased": false
+    }
+order: 1000

@@ -1,0 +1,5 @@
+$kind: http-request
+description: Elimina todos los títulos con fecha futura o series sin temporadas emitidas (útil si se desea limpiar títulos unreleased por completo).
+url: "{{base_url}}/api/v1/admin/sync/cleanup-unreleased"
+method: POST
+order: 2000

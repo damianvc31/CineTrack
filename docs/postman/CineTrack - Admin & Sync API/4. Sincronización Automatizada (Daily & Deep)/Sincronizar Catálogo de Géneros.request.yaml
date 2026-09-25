@@ -1,0 +1,5 @@
+$kind: http-request
+description: Descarga y actualiza la lista oficial de géneros cinematográficos y televisivos desde TMDB.
+url: "{{base_url}}/api/v1/admin/sync/genres"
+method: POST
+order: 3000

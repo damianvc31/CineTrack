@@ -1,0 +1,17 @@
+$kind: http-request
+name: "Upcoming: Próximos 90 Días (Películas y Series)"
+description: Ingesta producciones con fecha de estreno programada en los próximos 90 días (unreleased).
+url: "{{base_url}}/api/v1/admin/sync/expand"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "media_type": "both",
+      "upcoming": true,
+      "limit": 30,
+      "upcoming_days": 90
+    }
+order: 3500

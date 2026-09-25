@@ -1,0 +1,13 @@
+$kind: http-request
+description: Descarga fotos oficiales de actores sin foto, priorizando títulos más populares.
+url: "{{base_url}}/api/v1/admin/sync/actor-photos"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "limit": 500
+    }
+order: 4000

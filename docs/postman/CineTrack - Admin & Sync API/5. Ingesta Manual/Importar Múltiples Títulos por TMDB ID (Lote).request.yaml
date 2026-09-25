@@ -1,0 +1,20 @@
+$kind: http-request
+name: "Importar Múltiples Títulos por TMDB ID (Lote)"
+description: Ingesta en lote múltiples películas y series por su lista de IDs de TMDB.
+url: "{{base_url}}/api/v1/admin/sync/import-tmdb"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "items": [
+        {"tmdb_id": 157336, "type": "movie"},
+        {"tmdb_id": 27205, "type": "movie"},
+        {"tmdb_id": 1399, "type": "tv"},
+        {"tmdb_id": 94605, "type": "tv"}
+      ],
+      "allow_unreleased": true
+    }
+order: 1500

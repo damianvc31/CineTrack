@@ -1,0 +1,5 @@
+$kind: http-request
+description: Actualiza popularidad, votos, status_tmdb y duración de todo el catálogo desde TMDB y recalcula percentiles y ratings.
+url: "{{base_url}}/api/v1/admin/sync/refresh-metrics"
+method: POST
+order: 3000

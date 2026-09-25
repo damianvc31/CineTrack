@@ -1,0 +1,10 @@
+$kind: collection
+description: Colección completa para monitorear y ejecutar jobs administrativos y sincronizaciones TMDB en CineTrack (Local / Dev / Producción).
+auth:
+  - id: 43cc14ab-b8d8-4cd2-999e-c6e02b023a7b
+    type: apikey
+    name: apikey auth
+    credentials:
+      key: X-Admin-Key
+      value: "{{admin_key}}"
+      in: header

@@ -1,0 +1,8 @@
+name: CineTrack - Local / Dev
+values:
+  - key: base_url
+    value: 'http://localhost:8000'
+  - key: admin_key
+    value: ''
+  - key: job_name
+    value: expand_catalog

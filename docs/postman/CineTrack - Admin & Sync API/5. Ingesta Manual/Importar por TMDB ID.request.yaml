@@ -1,0 +1,15 @@
+$kind: http-request
+description: Ingesta o actualiza un título puntual (o múltiples IDs separados por coma) desde TMDB.
+url: "{{base_url}}/api/v1/admin/sync/import-tmdb"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "tmdb_id": 157336,
+      "type": "movie",
+      "allow_unreleased": true
+    }
+order: 1000
