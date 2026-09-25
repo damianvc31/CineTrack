@@ -121,10 +121,12 @@ class TMDBClient:
         self,
         media_type: str,
         tmdb_id: int,
-        append_to_response: str = "credits,keywords",
+        append_to_response: str = "credits",
     ) -> Dict[str, Any]:
         endpoint = f"/{media_type}/{tmdb_id}"
-        params = {"append_to_response": append_to_response}
+        params = {}
+        if append_to_response:
+            params["append_to_response"] = append_to_response
         return await self._request("GET", endpoint, params=params)
 
     async def get_season_details(self, series_id: int, season_number: int) -> Dict[str, Any]:

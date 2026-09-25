@@ -1,0 +1,50 @@
+name: CineTrack Monthly TMDB Reviews Sync
+
+on:
+  schedule:
+    # 05:00 UTC el día 1 de cada mes (1 hora después de fotos de actores y 2 horas después de daily sync)
+    - cron: '0 5 1 * *'
+  workflow_dispatch:
+    inputs:
+      limit_per_title:
+        description: 'Límite máximo de reseñas TMDB por título'
+        required: false
+        default: '20'
+        type: string
+
+jobs:
+  monthly-reviews-sync:
+    name: Sync TMDB Reviews
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Reviews Sync Request to Production Backend
+        env:
+          PROD_API_URL: ${{ secrets.PROD_API_URL }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          LIMIT: ${{ inputs.limit_per_title || '20' }}
+        run: |
+          if [ -z "$PROD_API_URL" ] || [ -z "$ADMIN_API_KEY" ]; then
+            echo "Error: PROD_API_URL o ADMIN_API_KEY secret no está configurado en GitHub Secrets."
+            exit 1
+          fi
+
+          API_URL="${PROD_API_URL%/}"
+
+          echo "Disparando sincronización mensual de reseñas TMDB en $API_URL/api/v1/admin/sync/reviews (límite: $LIMIT)..."
+
+          HTTP_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$API_URL/api/v1/admin/sync/reviews" \
+            -H "X-Admin-Key: $ADMIN_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"limit_per_title\": $LIMIT}")
+
+          echo "Código HTTP recibido: $HTTP_CODE"
+          echo "Respuesta del servidor:"
+          cat response.txt || true
+          echo ""
+
+          if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 202 ]; then
+            echo "Sincronización de reseñas TMDB disparada exitosamente."
+          else
+            echo "Error: El servidor respondió con código HTTP $HTTP_CODE"
+            exit 1
+          fi

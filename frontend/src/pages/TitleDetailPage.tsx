@@ -380,7 +380,10 @@ export const TitleDetailPage: React.FC = () => {
         if (s.numero !== seasonNum) return s
         const updatedEpisodes =
           s.episodios?.map((e) => {
-            const isUnreleased = !!(e.fecha_estreno && e.fecha_estreno > todayStr)
+            const isUnreleased = !!(
+              (e.fecha_estreno && e.fecha_estreno > todayStr) ||
+              (title?.proximo_episodio_fecha && e.fecha_estreno && e.fecha_estreno >= title.proximo_episodio_fecha)
+            )
             if (targetWatched && isUnreleased) return e
             return { ...e, visto: targetWatched }
           }) || []
@@ -616,10 +619,18 @@ export const TitleDetailPage: React.FC = () => {
       for (const season of sortedSeasons) {
         const eps = season.episodios || []
         const airedEpisodes = eps.filter(
-          (ep) => ep.fecha_estreno && ep.fecha_estreno <= todayStr
+          (ep) =>
+            ep.fecha_estreno &&
+            (title.proximo_episodio_fecha
+              ? ep.fecha_estreno < title.proximo_episodio_fecha && ep.fecha_estreno <= todayStr
+              : ep.fecha_estreno <= todayStr)
         )
         const unreleasedEpisodes = eps
-          .filter((ep) => ep.fecha_estreno && ep.fecha_estreno > todayStr)
+          .filter(
+            (ep) =>
+              (ep.fecha_estreno && ep.fecha_estreno > todayStr) ||
+              (title.proximo_episodio_fecha && ep.fecha_estreno && ep.fecha_estreno >= title.proximo_episodio_fecha)
+          )
           .sort((a, b) => (a.fecha_estreno! > b.fecha_estreno! ? 1 : -1))
 
         if (airedEpisodes.length > 0 && unreleasedEpisodes.length > 0) {
@@ -1279,7 +1290,10 @@ export const TitleDetailPage: React.FC = () => {
                   {currentSeasonData.episodios.map((ep) => {
                     const isEpWatched = !!ep.visto
                     const todayStr = new Date().toISOString().split('T')[0]
-                    const isUnreleased = !!(ep.fecha_estreno && ep.fecha_estreno > todayStr)
+                    const isUnreleased = !!(
+                      (ep.fecha_estreno && ep.fecha_estreno > todayStr) ||
+                      (title?.proximo_episodio_fecha && ep.fecha_estreno && ep.fecha_estreno >= title.proximo_episodio_fecha)
+                    )
 
                     return (
                       <div

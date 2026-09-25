@@ -61,9 +61,19 @@ class ReviewsSyncRequest(BaseModel):
     )
 
 
-class ImportTMDBRequest(BaseModel):
+class ImportTMDBItem(BaseModel):
     tmdb_id: int = Field(..., ge=1, description="ID del título en TMDB")
     type: Literal["movie", "tv"] = Field(default="movie", description="Tipo de contenido ('movie' o 'tv')")
+
+
+class ImportTMDBRequest(BaseModel):
+    tmdb_id: Optional[int] = Field(default=None, ge=1, description="ID individual en TMDB")
+    type: Literal["movie", "tv"] = Field(default="movie", description="Tipo de contenido individual ('movie' o 'tv')")
+    items: Optional[List[ImportTMDBItem]] = Field(default=None, description="Lista opcional de títulos para importar en lote")
+
+
+class RefreshMetricsRequest(BaseModel):
+    batch_size: Optional[int] = Field(default=50, ge=1, le=200, description="Tamaño de lote para consultas concurrentes a TMDB")
 
 
 class ExpandCatalogRequest(BaseModel):
@@ -180,20 +190,61 @@ async def _run_job_reviews(limit_per_title: Optional[int]):
         await client.close()
 
 
-async def _run_job_import_tmdb(tmdb_id: int, media_type: str):
+async def _run_job_import_tmdb(
+    items: Optional[List[tuple[int, str]]] = None,
+    tmdb_id: Optional[int] = None,
+    media_type: Optional[str] = "movie",
+):
+    if items is None:
+        if tmdb_id is not None:
+            items = [(tmdb_id, media_type or "movie")]
+        else:
+            items = []
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
-            if media_type == "movie":
-                await service.upsert_movie(tmdb_id)
-            else:
-                await service.upsert_series(tmdb_id, fetch_episodes=True)
-            await db.commit()
+            for tmdb_id, media_type in items:
+                try:
+                    if media_type == "movie":
+                        await service.upsert_movie(tmdb_id, fetch_reviews=True)
+                    else:
+                        await service.upsert_series(tmdb_id, fetch_episodes=True, fetch_reviews=True)
+                    await db.commit()
+                except Exception as item_err:
+                    logger.error(f"[Job Background] Error importando {media_type} id {tmdb_id}: {item_err}")
+                    await db.rollback()
+
             await service.recalculate_percentiles()
             await service.recalculate_unified_ratings()
+            try:
+                await service.sync_pending_embeddings()
+            except Exception as e:
+                logger.warning(f"No se pudieron sincronizar embeddings tras import-tmdb: {e}")
+            try:
+                from app.services.catalog_service import clear_catalog_cache
+                clear_catalog_cache()
+            except Exception:
+                pass
     except Exception as e:
-        logger.error(f"[Job Background] Error importando título {tmdb_id} ({media_type}): {e}")
+        logger.error(f"[Job Background] Error general en importación TMDB: {e}")
+    finally:
+        await client.close()
+
+
+async def _run_job_refresh_metrics(batch_size: int):
+    client = TMDBClient()
+    try:
+        async with AsyncSessionLocal() as db:
+            service = TMDBSyncService(db, client)
+            await service.refresh_catalog_metrics(batch_size=batch_size)
+            try:
+                from app.services.catalog_service import clear_catalog_cache
+                clear_catalog_cache()
+            except Exception:
+                pass
+    except Exception as e:
+        logger.error(f"[Job Background] Error en refresco de métricas: {e}")
     finally:
         await client.close()
 
@@ -367,11 +418,40 @@ async def trigger_import_tmdb_id(
     background_tasks: BackgroundTasks,
     _: Any = Depends(get_current_admin)
 ) -> JobResponse:
-    """Importa un título específico de TMDB por su identificador en background."""
-    background_tasks.add_task(_run_job_import_tmdb, tmdb_id=payload.tmdb_id, media_type=payload.type)
+    """Importa o actualiza uno o varios títulos específicos de TMDB por su identificador en background."""
+    items_to_process: List[tuple[int, str]] = []
+    if payload.items:
+        for it in payload.items:
+            items_to_process.append((it.tmdb_id, it.type))
+    elif payload.tmdb_id is not None:
+        items_to_process.append((payload.tmdb_id, payload.type))
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe proporcionar tmdb_id individual o una lista en items."
+        )
+
+    background_tasks.add_task(_run_job_import_tmdb, items=items_to_process)
+    count = len(items_to_process)
+    desc = f"{count} títulos" if count > 1 else f"{items_to_process[0][1]} con TMDB ID {items_to_process[0][0]}"
     return JobResponse(
         job="import_tmdb",
-        message=f"Importación de {payload.type} con TMDB ID {payload.tmdb_id} iniciada en segundo plano."
+        message=f"Importación/actualización de {desc} iniciada en segundo plano."
+    )
+
+
+@router.post("/sync/refresh-metrics", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def trigger_refresh_metrics(
+    payload: Optional[RefreshMetricsRequest] = None,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    _: Any = Depends(get_current_admin)
+) -> JobResponse:
+    """Refresca popularidad y votos para todo el catálogo y recalcula percentiles y ratings en background."""
+    bs = payload.batch_size if payload and payload.batch_size else 50
+    background_tasks.add_task(_run_job_refresh_metrics, batch_size=bs)
+    return JobResponse(
+        job="refresh_metrics",
+        message=f"Refresco de métricas de catálogo (popularidad y votos) iniciado en segundo plano (lote: {bs})."
     )
 
 

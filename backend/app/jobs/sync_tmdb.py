@@ -31,9 +31,10 @@ async def main():
     parser.add_argument("--cleanup-unreleased", action="store_true", help="Eliminar títulos no estrenados existentes de la base de datos y recalcular métricas")
     parser.add_argument("--percentiles", action="store_true", help="Recalcular percentiles de popularidad")
     parser.add_argument("--ratings", action="store_true", help="Recalcular rating unificado para todos los títulos")
+    parser.add_argument("--refresh-metrics", action="store_true", help="Refrescar popularidad y votos para todo el catálogo desde TMDB")
     parser.add_argument("--reviews", action="store_true", help="Sincronizar reseñas de TMDB para todos los títulos hasta el tope (20)")
     parser.add_argument("--import-json", type=str, help="Ruta al archivo JSON con títulos a importar")
-    parser.add_argument("--import-tmdb-id", type=int, help="Importar un título específico por su ID de TMDB")
+    parser.add_argument("--import-tmdb-id", type=str, help="Importar o actualizar títulos por ID(s) de TMDB (ej. 319562 o separados por coma: 319562,550)")
     parser.add_argument("--type", choices=["movie", "tv"], default="movie", help="Tipo de título para --import-tmdb-id")
     parser.add_argument("--expand", action="store_true", help="Expande el catálogo por géneros vía /discover con filtros de calidad (Criterio 1)")
     parser.add_argument("--genre", type=str, default=None, help="Género específico para --expand (nombre o ID). Si se omite, procesa todos los géneros")
@@ -98,6 +99,11 @@ async def main():
                 total = await service.recalculate_unified_ratings()
                 logger.info(f"Rating unificado recalculado para {total} títulos.")
 
+            elif args.refresh_metrics:
+                logger.info("-> Refrescando métricas (popularidad y votos) para todo el catálogo...")
+                res = await service.refresh_catalog_metrics()
+                logger.info(f"Métricas refrescadas exitosamente: {res}")
+
             elif args.reviews:
                 logger.info("-> Sincronizando reseñas de TMDB para todos los títulos...")
                 res = await service.sync_all_missing_reviews()
@@ -120,17 +126,44 @@ async def main():
                         logger.warning(f"  - {err}")
 
             elif args.import_tmdb_id:
-                logger.info(f"-> Importando {args.type} TMDB ID: {args.import_tmdb_id}...")
-                if args.type == "movie":
-                    titulo = await service.upsert_movie(args.import_tmdb_id)
-                else:
-                    titulo = await service.upsert_series(args.import_tmdb_id, fetch_episodes=True)
-                if titulo:
-                    await db.commit()
+                # Soportar un ID o varios separados por comas
+                raw_ids = [s.strip() for s in str(args.import_tmdb_id).split(",") if s.strip().isdigit()]
+                if not raw_ids:
+                    logger.error(f"Valor inválido para --import-tmdb-id: {args.import_tmdb_id}")
+                    sys.exit(1)
+
+                logger.info(f"-> Importando/actualizando {len(raw_ids)} títulos ({args.type}): {raw_ids}...")
+                success_count = 0
+                for r_id_str in raw_ids:
+                    t_id = int(r_id_str)
+                    try:
+                        if args.type == "movie":
+                            titulo = await service.upsert_movie(t_id, fetch_reviews=True)
+                        else:
+                            titulo = await service.upsert_series(t_id, fetch_episodes=True, fetch_reviews=True)
+                        if titulo:
+                            await db.commit()
+                            success_count += 1
+                            logger.info(f"  [OK] '{titulo.nombre}' (TMDB ID: {t_id}, ID local: {titulo.id})")
+                        else:
+                            logger.error(f"  [FAIL] No se pudo obtener/guardar título con ID {t_id}")
+                    except Exception as e:
+                        logger.error(f"  [ERROR] Fallo al procesar ID {t_id}: {e}")
+                        await db.rollback()
+
+                if success_count > 0:
                     await service.recalculate_percentiles()
-                    logger.info(f"Título importado con éxito: {titulo.nombre} (ID local: {titulo.id})")
-                else:
-                    logger.error(f"No se pudo importar el título con ID {args.import_tmdb_id}")
+                    await service.recalculate_unified_ratings()
+                    try:
+                        await service.sync_pending_embeddings()
+                    except Exception as e:
+                        logger.warning(f"No se pudieron sincronizar embeddings: {e}")
+                    try:
+                        from app.services.catalog_service import clear_catalog_cache
+                        clear_catalog_cache()
+                    except Exception:
+                        pass
+                logger.info(f"Importación de IDs completada: {success_count}/{len(raw_ids)} procesados con éxito.")
 
             elif args.expand:
                 genre_desc = args.genre or "TODOS los géneros"

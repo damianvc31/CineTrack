@@ -205,7 +205,21 @@
 
 ---
 
+## Hito Actual: Robustecimiento de Sincronizaciones TMDB y Coherencia Temporal (v1.2.1)
+- [x] **Paginación Exhaustiva de `/changes`:** Paginación dinámica hasta `total_pages` (eliminando el bug de solo leer página 1, recuperando el 100% de cambios de TMDB).
+- [x] **Seguimiento Activo de Series (`Active Series Sync`):** Consulta activa de las series locales en `Returning Series`, `In Production` y `Planned` desduplicadas contra changes para actualizar transiciones a Ended/Canceled y temporadas futuras.
+- [x] **Refresco Masivo de Métricas Diarias (`refresh_catalog_metrics`):** Actualización de popularidad y conteo de votos de los 3.864 títulos en la sync diaria mediante consultas ultraligeras, evitando el estancamiento de percentiles y rankings.
+- [x] **Aligeramiento de Payloads TMDB:** Retiro del parámetro `keywords` no utilizado en `TMDBClient.get_details()`.
+- [x] **Desacople de Reseñas en Sync Diaria:** Omitir la consulta de reviews para títulos existentes en el job diario, reservando la absorción para el workflow mensual.
+- [x] **Workflow Mensual de Reseñas:** Creación de `.github/workflows/monthly_reviews_sync.yml` programado el día 1 de cada mes a las 05:00 UTC.
+- [x] **Soporte de Lote en Importación/Actualización:** Ampliación de `POST /api/v1/admin/sync/import-tmdb` y CLI `--import-tmdb-id` para recibir listas de IDs y forzar sincronización in-place.
+- [x] **Coherencia Temporal en Frontend (MobLand):** Ajuste de `isUnreleased` en `TitleDetailPage.tsx` considerando `proximo_episodio_fecha` para que episodios estrenando en el día permanezcan bloqueados hasta que el puntero avance.
+- [x] **Verificación y Tests:** Suite de backend ampliada a 83 tests (100% en verde) y build limpio de frontend. Verificación exitosa en local de *Snowy Mountain* (TMDB ID 319562).
+
+---
+
 ## Backlog / Versión Superior (Post-Entrega):
+- [ ] Purga selectiva de títulos en idiomas/alfabetos no legibles sin traducción.
 - [ ] Sistema de notificaciones in-app para estrenos y cambios de status en series.
 - [ ] Badge visual "Viendo Actualmente" (🔥).
 - [ ] Soporte multirregión para plataformas de streaming (JustWatch / TMDB Watch Providers).

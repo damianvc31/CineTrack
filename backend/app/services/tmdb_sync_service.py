@@ -253,6 +253,7 @@ class TMDBSyncService:
         tmdb_id: int,
         details: Optional[Dict[str, Any]] = None,
         allow_unreleased: Optional[bool] = None,
+        fetch_reviews: bool = True,
     ) -> Optional[Titulo]:
         if not details:
             try:
@@ -334,7 +335,8 @@ class TMDBSyncService:
         await self._attach_cast(titulo, elenco_list)
 
         # Reseñas de TMDB (hasta 20)
-        await self.sync_reviews_for_title(titulo)
+        if fetch_reviews:
+            await self.sync_reviews_for_title(titulo)
 
         return titulo
 
@@ -347,6 +349,7 @@ class TMDBSyncService:
         details: Optional[Dict[str, Any]] = None,
         fetch_episodes: bool = True,
         allow_unreleased: Optional[bool] = None,
+        fetch_reviews: bool = True,
     ) -> Optional[Titulo]:
         if not details:
             try:
@@ -554,7 +557,8 @@ class TMDBSyncService:
                         episodio.duracion = ep_data.get("runtime", episodio.duracion)
 
         # Reseñas de TMDB (hasta 20)
-        await self.sync_reviews_for_title(titulo)
+        if fetch_reviews:
+            await self.sync_reviews_for_title(titulo)
 
         return titulo
 
@@ -703,32 +707,75 @@ class TMDBSyncService:
         )
 
         updated_series_count = 0
+        updated_movies_count = 0
         if h_changes > 0:
             changes_days_back = max(1, (h_changes + 23) // 24)
             changes_start_date = (today - timedelta(days=changes_days_back)).strftime("%Y-%m-%d")
             changes_end_date = today.strftime("%Y-%m-%d")
 
+            async def get_all_changes(media_type: str) -> Set[int]:
+                """Recorre exhaustivamente todas las páginas de /changes en TMDB."""
+                ids: Set[int] = set()
+                page = 1
+                while True:
+                    data = await self.client.get_changes(
+                        media_type,
+                        start_date=changes_start_date,
+                        end_date=changes_end_date,
+                        page=page
+                    )
+                    results = data.get("results", [])
+                    if not results:
+                        break
+                    for item in results:
+                        if "id" in item:
+                            ids.add(item["id"])
+                    total_pages = data.get("total_pages", 1)
+                    if page >= total_pages or page >= 1000:
+                        break
+                    page += 1
+                return ids
+
             # 1. Obtener IDs cambiados en TMDB para TV
             changed_tv_ids: Set[int] = set()
             try:
-                tv_changes = await self.client.get_changes("tv", start_date=changes_start_date, end_date=changes_end_date)
-                for item in tv_changes.get("results", []):
-                    changed_tv_ids.add(item["id"])
+                changed_tv_ids = await get_all_changes("tv")
+                logger.info(f"TMDB /tv/changes devolvió {len(changed_tv_ids)} series con modificaciones en la ventana.")
             except Exception as e:
                 logger.warning(f"No se pudo consultar TMDB /tv/changes: {e}")
 
-            # 2. Obtener series de nuestra BD local que tuvieron cambios reportados por TMDB
+            # 2. Obtener series de nuestra BD local
             local_tv_q = select(Titulo.tmdb_id).where(Titulo.tipo == "tv")
             res_local_tv = await self.db.execute(local_tv_q)
             local_tv_ids = set(res_local_tv.scalars().all())
 
             # Series locales que tuvieron cambios en TMDB durante la ventana
-            tv_to_update = local_tv_ids.intersection(changed_tv_ids)
+            tv_from_changes = local_tv_ids.intersection(changed_tv_ids)
 
-            for tmdb_id in tv_to_update:
+            # 3. Seguimiento Activo de Series en Emisión / Producción
+            active_tv_q = select(Titulo.tmdb_id).where(
+                Titulo.tipo == "tv",
+                Titulo.status_tmdb.in_(["Returning Series", "In Production", "Planned"])
+            )
+            res_active_tv = await self.db.execute(active_tv_q)
+            active_tv_ids = set(res_active_tv.scalars().all())
+            active_tv_remaining = active_tv_ids - tv_from_changes
+
+            all_tv_to_update = tv_from_changes.union(active_tv_remaining)
+            logger.info(
+                f"Series a sincronizar hoy: {len(all_tv_to_update)} "
+                f"({len(tv_from_changes)} por changes, {len(active_tv_remaining)} por seguimiento activo)."
+            )
+
+            for tmdb_id in all_tv_to_update:
                 if tmdb_id:
                     try:
-                        t = await self.upsert_series(tmdb_id, fetch_episodes=True, allow_unreleased=allow_unrel)
+                        t = await self.upsert_series(
+                            tmdb_id,
+                            fetch_episodes=True,
+                            allow_unreleased=allow_unrel,
+                            fetch_reviews=False
+                        )
                         if t is not None:
                             updated_series_count += 1
                             await self.db.commit()
@@ -736,18 +783,20 @@ class TMDBSyncService:
                         logger.error(f"Error actualizando serie id {tmdb_id}: {e}")
                         await self.db.rollback()
 
-            # 3. Consultar /movie/changes y refrescar películas locales modificadas
+            # 4. Consultar /movie/changes y refrescar películas locales modificadas
             try:
-                movie_changes = await self.client.get_changes("movie", start_date=changes_start_date, end_date=changes_end_date)
-                changed_movie_ids = {item["id"] for item in movie_changes.get("results", [])}
+                changed_movie_ids = await get_all_changes("movie")
+                logger.info(f"TMDB /movie/changes devolvió {len(changed_movie_ids)} películas con modificaciones en la ventana.")
                 local_movie_q = select(Titulo.tmdb_id).where(Titulo.tipo == "movie")
                 res_local_movies = await self.db.execute(local_movie_q)
                 local_movie_ids = set(res_local_movies.scalars().all())
                 movies_to_update = local_movie_ids.intersection(changed_movie_ids)
+                logger.info(f"Películas locales a sincronizar por changes: {len(movies_to_update)}.")
                 for m_id in movies_to_update:
                     try:
-                        t = await self.upsert_movie(m_id, allow_unreleased=allow_unrel)
+                        t = await self.upsert_movie(m_id, allow_unreleased=allow_unrel, fetch_reviews=False)
                         if t is not None:
+                            updated_movies_count += 1
                             await self.db.commit()
                     except Exception as e:
                         logger.error(f"Error actualizando película cambiada id {m_id}: {e}")
@@ -757,7 +806,7 @@ class TMDBSyncService:
         else:
             logger.info("Ventana de cambios es 0 hs: omitiendo consulta de /changes (solo nuevos estrenos).")
 
-        # 4. Ingestar nuevos estrenos calificados (películas y series)
+        # 5. Ingestar nuevos estrenos calificados (películas y series)
         new_movies_count = 0
         page = 1
         while page <= 5:
@@ -777,7 +826,7 @@ class TMDBSyncService:
                     res = await self.db.execute(select(Titulo.id).where(Titulo.tmdb_id == tmdb_id, Titulo.tipo == "movie"))
                     if not res.scalar_one_or_none():
                         try:
-                            t = await self.upsert_movie(tmdb_id, allow_unreleased=allow_unrel)
+                            t = await self.upsert_movie(tmdb_id, allow_unreleased=allow_unrel, fetch_reviews=True)
                             if t is not None:
                                 new_movies_count += 1
                                 await self.db.commit()
@@ -806,7 +855,7 @@ class TMDBSyncService:
                     res = await self.db.execute(select(Titulo.id).where(Titulo.tmdb_id == tmdb_id, Titulo.tipo == "tv"))
                     if not res.scalar_one_or_none():
                         try:
-                            t = await self.upsert_series(tmdb_id, fetch_episodes=True, allow_unreleased=allow_unrel)
+                            t = await self.upsert_series(tmdb_id, fetch_episodes=True, allow_unreleased=allow_unrel, fetch_reviews=True)
                             if t is not None:
                                 new_series_count += 1
                                 await self.db.commit()
@@ -815,17 +864,21 @@ class TMDBSyncService:
                             await self.db.rollback()
             page += 1
 
-        # 5. Recalcular percentiles y ratings unificados con los nuevos títulos
-        await self.recalculate_percentiles()
-        await self.recalculate_unified_ratings()
+        # 6. Refrescar métricas (popularidad y votos) para todo el catálogo y recalcular percentiles y ratings
+        try:
+            await self.refresh_catalog_metrics()
+        except Exception as e:
+            logger.error(f"Error en refresh_catalog_metrics durante sync diaria: {e}")
+            await self.recalculate_percentiles()
+            await self.recalculate_unified_ratings()
 
-        # 6. Sincronizar embeddings pendientes para nuevos títulos
+        # 7. Sincronizar embeddings pendientes para nuevos títulos
         try:
             await self.sync_pending_embeddings()
         except Exception as e:
             logger.warning(f"No se pudieron sincronizar embeddings tras sync diaria: {e}")
 
-        # 7. Invalidar caché del catálogo y Home en memoria
+        # 8. Invalidar caché del catálogo y Home en memoria
         try:
             from app.services.catalog_service import clear_catalog_cache
             clear_catalog_cache()
@@ -833,11 +886,12 @@ class TMDBSyncService:
             logger.warning(f"No se pudo limpiar la caché tras sync diaria: {e}")
 
         logger.info(
-            f"Sincronización diaria terminada: {updated_series_count} series actualizadas, "
+            f"Sincronización diaria terminada: {updated_series_count} series y {updated_movies_count} películas actualizadas, "
             f"{new_movies_count} nuevos estrenos de películas, {new_series_count} nuevas series."
         )
         return {
             "updated_series": updated_series_count,
+            "updated_movies": updated_movies_count,
             "new_movies": new_movies_count,
             "new_series": new_series_count,
         }
@@ -947,6 +1001,62 @@ class TMDBSyncService:
             await self.recalculate_percentiles()
             await self.recalculate_unified_ratings()
         return {"imported": imported_count, "errors": errors}
+
+    # -------------------------------------------------------------------------
+    # REFRESCO DE MÉTRICAS (POPULARIDAD Y VOTOS)
+    # -------------------------------------------------------------------------
+    async def refresh_catalog_metrics(self, batch_size: int = 50) -> Dict[str, int]:
+        """
+        Refresca popularidad, vote_average_tmdb y vote_count_tmdb para todos los títulos
+        del catálogo haciendo consultas ultraligeras a TMDB sin traer elenco ni temporadas.
+        Luego recalcula los percentiles de popularidad y ratings unificados en base de datos.
+        """
+        logger.info("Iniciando refresco de métricas de catálogo (popularidad y votos)...")
+        res = await self.db.execute(
+            select(Titulo.id, Titulo.tmdb_id, Titulo.tipo).where(Titulo.tmdb_id.isnot(None))
+        )
+        titles_info = res.all()
+        total_titles = len(titles_info)
+        updated_count = 0
+
+        async def fetch_metric(tit_id: int, tmdb_id: int, tipo: str):
+            try:
+                # append_to_response="" para traer solo los campos básicos del título (muy ligero)
+                details = await self.client.get_details(tipo, tmdb_id, append_to_response="")
+                pop = details.get("popularity", 0.0)
+                v_avg = details.get("vote_average", 0.0)
+                v_cnt = details.get("vote_count", 0)
+                return tit_id, pop, v_avg, v_cnt
+            except Exception as e:
+                logger.debug(f"Error obteniendo métricas de {tipo} {tmdb_id}: {e}")
+                return None
+
+        # Procesar en lotes concurrentes respetando el semáforo del cliente
+        for i in range(0, total_titles, batch_size):
+            chunk = titles_info[i:i + batch_size]
+            tasks = [fetch_metric(tid, tmid, mtype) for tid, tmid, mtype in chunk]
+            results = await asyncio.gather(*tasks)
+
+            for res_item in results:
+                if res_item:
+                    tid, pop, v_avg, v_cnt = res_item
+                    await self.db.execute(
+                        update(Titulo)
+                        .where(Titulo.id == tid)
+                        .values(
+                            popularidad=pop,
+                            vote_average_tmdb=v_avg,
+                            vote_count_tmdb=v_cnt
+                        )
+                    )
+                    updated_count += 1
+
+            await self.db.commit()
+
+        logger.info(f"Métricas actualizadas para {updated_count}/{total_titles} títulos. Recalculando percentiles y ratings...")
+        await self.recalculate_percentiles()
+        await self.recalculate_unified_ratings()
+        return {"total_titles": total_titles, "updated": updated_count}
 
     # -------------------------------------------------------------------------
     # RECÁLCULO DE PERCENTILES

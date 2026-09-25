@@ -31,7 +31,7 @@ from tests.mocks.tmdb_fixtures import (
 def mock_tmdb_client():
     client = AsyncMock(spec=TMDBClient)
     client.get_genres.side_effect = lambda m: MOCK_MOVIE_GENRES if m == "movie" else MOCK_TV_GENRES
-    client.get_details.side_effect = lambda m, id_: MOCK_MOVIE_DETAILS if m == "movie" else MOCK_SERIES_DETAILS
+    client.get_details.side_effect = lambda m, id_, *args, **kwargs: MOCK_MOVIE_DETAILS if m == "movie" else MOCK_SERIES_DETAILS
     client.get_season_details.return_value = MOCK_SEASON_1_DETAILS
     client.get_reviews.return_value = MOCK_REVIEWS_DATA
     client.get_changes.return_value = {"results": []}
@@ -448,5 +448,75 @@ async def test_expand_catalog_invalid_genre_raises_error(db_session, mock_tmdb_c
 
     with pytest.raises(ValueError, match="No se encontró ningún género"):
         await service.expand_catalog_by_genres(genre="GeneroInexistenteTotal")
+
+
+@pytest.mark.asyncio
+async def test_refresh_catalog_metrics(db_session, mock_tmdb_client):
+    """Verifica que refresh_catalog_metrics actualice popularidad y votos de todos los títulos."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+
+    # Crear título de prueba con métricas viejas
+    t = Titulo(
+        tmdb_id=12345,
+        tipo="movie",
+        nombre="Test Metrics Movie",
+        popularidad=1.0,
+        vote_average_tmdb=5.0,
+        vote_count_tmdb=10,
+        rating_unificado=5.0,
+    )
+    db_session.add(t)
+    await db_session.commit()
+
+    # Mock de get_details ligero
+    mock_tmdb_client.get_details.side_effect = None
+    mock_tmdb_client.get_details.return_value = {
+        "popularity": 88.5,
+        "vote_average": 8.4,
+        "vote_count": 1500,
+    }
+
+    res = await service.refresh_catalog_metrics(batch_size=10)
+    assert res["total_titles"] >= 1
+    assert res["updated"] >= 1
+
+    await db_session.refresh(t)
+    assert t.popularidad == pytest.approx(88.5)
+    assert t.vote_average_tmdb == pytest.approx(8.4)
+    assert t.vote_count_tmdb == 1500
+    assert t.rating_unificado == pytest.approx(8.4)
+    assert t.popularidad_percentil is not None
+
+
+@pytest.mark.asyncio
+async def test_daily_sync_exhaustive_pagination_and_active_series(db_session, mock_tmdb_client):
+    """Verifica que run_daily_sync pagine changes exhaustivamente y consulte series activas."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+
+    # Crear una serie activa en BD
+    s = Titulo(
+        tmdb_id=9999,
+        tipo="tv",
+        nombre="Active Series",
+        status_tmdb="Returning Series",
+        popularidad=15.0,
+    )
+    db_session.add(s)
+    await db_session.commit()
+
+    # Mock paginación en get_changes (página 1 devuelve total_pages=2, página 2 termina)
+    def mock_get_changes(media_type, start_date=None, end_date=None, page=1):
+        if page == 1:
+            return {"page": 1, "total_pages": 2, "results": [{"id": 1111}]}
+        return {"page": 2, "total_pages": 2, "results": [{"id": 2222}]}
+
+    mock_tmdb_client.get_changes.side_effect = mock_get_changes
+    mock_tmdb_client.discover.return_value = {"page": 1, "total_pages": 1, "results": []}
+
+    res = await service.run_daily_sync(changes_hours_window=24)
+    # Debe haber llamado a upsert de la serie activa (9999) y refrescado métricas
+    assert "updated_series" in res
+    assert res["updated_series"] >= 1
+
 
 

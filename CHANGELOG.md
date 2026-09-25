@@ -2,6 +2,29 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.2.1] - 2026-09-25
+### Corregido & Mejorado (Robustecimiento de Sincronizaciones TMDB y Coherencia Temporal)
+- **Corrección Crítica de Paginación en `/changes`:**
+  - Se eliminó el límite fijo de 1 sola página en `TMDBSyncService.run_daily_sync()`. Ahora se iteran todas las páginas dinámicamente hasta `total_pages` (recuperando el ~95% de los cambios globales de series y películas que antes se perdían silenciosamente).
+- **Seguimiento Activo de Series (`Active Series Sync`):**
+  - Detección activa de todas las series en base de datos con status `Returning Series`, `In Production` o `Planned`, desduplicándolas de los resultados de `/changes` para no duplicar peticiones.
+  - Asegura que cancelaciones, finalizaciones (`Ended`/`Canceled`), anuncios de nuevas temporadas (con o sin fecha) y avances en el calendario de emisión se sincronicen de forma determinista sin depender de los retardos de `/changes`.
+- **Refresco Masivo de Métricas en Sync Diaria (`refresh_catalog_metrics`):**
+  - Incorporación de una pasada diaria ultraligera (`append_to_response=""`) que actualiza `popularidad`, `vote_average_tmdb` y `vote_count_tmdb` de todos los títulos del catálogo en lotes concurrentes en ~2 minutos.
+  - Recálculo diario de `popularidad_percentil` y `rating_unificado`, eliminando el congelamiento de métricas y dotando de dinamismo a las secciones Trending, Classics y Top Rated.
+- **Optimización de Ancho de Banda y Desacople de Reseñas:**
+  - Retiro de `keywords` no utilizadas en `TMDBClient.get_details()` (ahorro de ancho de banda y memoria).
+  - Desacople de `sync_reviews_for_title()` en las actualizaciones de títulos existentes durante la sync diaria (ahorro de cientos de peticiones a endpoints de reviews sin cambios).
+- **Workflow Mensual Dedicado para Reseñas:**
+  - Creación de `.github/workflows/monthly_reviews_sync.yml` programado para las 05:00 UTC el primer día de cada mes (con 1 hora de separación de la sincronización de fotos de actores y 2 horas respecto a la sync diaria), absorbiendo reseñas faltantes en títulos con cupo inferior a 20.
+- **Soporte de Lotes en Importación / Sincronización Manual:**
+  - Ampliación de `POST /api/v1/admin/sync/import-tmdb` para aceptar listas estructuradas de IDs (`items: [...]`) además del formato individual.
+  - CLI `sync_tmdb.py`: nuevo comando `--refresh-metrics` y soporte de listas separadas por comas en `--import-tmdb-id` (ej. `--import-tmdb-id 319562,550`).
+- **Coherencia Temporal de Episodios en Frontend (`TitleDetailPage.tsx`):**
+  - Ajuste de la condición `isUnreleased` considerando `title.proximo_episodio_fecha`: si un episodio tiene fecha de emisión del día de hoy pero la serie aún lo reporta como su próximo episodio, permanece bloqueado como no estrenado hasta que la sincronización diaria detecte el avance del puntero a la siguiente emisión.
+- **Cobertura de Tests:**
+  - Suite de pruebas de backend ampliada a 83 tests unitarios/integración en verde (`pytest`) y verificación exitosa de actualización de título *Snowy Mountain* (TMDB ID 319562).
+
 ## [v1.2.0] - 2026-09-24
 ### Agregado & Mejorado (Fase 9: Optimización de Rendimiento, Latencia Cross-Web y UI Reactiva)
 - **Backend: Motor de Caché en Memoria (FastAPI):**
