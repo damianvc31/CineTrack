@@ -1,0 +1,101 @@
+stateDiagram-v2
+    %% =========================================================================
+    %% CINETRACK — MÁQUINA DE ESTADOS DE USUARIO (BIBLIOTECA & SEGUIMIENTO)
+    %% Gestión de interacciones del usuario: Watchlist, Siguiendo, Vista, Abandonada
+    %% y flag ortogonal de Favoritos.
+    %% (Diferente e independiente del ciclo de vida y badges de catálogo de TMDB)
+    %% =========================================================================
+
+    [*] --> SinEstado
+
+    %% =========================================================================
+    %% SECCIÓN 1: PELÍCULAS (tipo == 'movie')
+    %% =========================================================================
+    state "Flujo de Películas (tipo == 'movie')" as User_Peliculas {
+        state "Sin Estado (Película)" as M_SinEstado
+        note right of M_SinEstado
+            Iconos inactivos (outline).
+            No hay estado intermedio "Siguiendo"
+            (la película se ve completa).
+        end note
+
+        state "En Watchlist" as M_Watchlist
+        note right of M_Watchlist
+            Icono: Bookmark lleno.
+            Aparece en pestaña 'Watchlist'.
+        end note
+
+        state "Vista" as M_Vista
+        note right of M_Vista
+            Icono: Ojo lleno.
+            Bookmark bloqueado/oculto.
+            Aparece en 'Watched' / Reseñas pendientes.
+        end note
+
+        M_SinEstado --> M_Watchlist: Agregar a Watchlist (Bookmark)
+        M_Watchlist --> M_SinEstado: Quitar de Watchlist
+        M_SinEstado --> M_Vista: Marcar como Vista (Ojo)
+        M_Watchlist --> M_Vista: Marcar como Vista (Ojo)
+        M_Vista --> M_SinEstado: Desmarcar Vista (Ojo tachado)
+    }
+
+    %% =========================================================================
+    %% SECCIÓN 2: SERIES (tipo == 'tv')
+    %% =========================================================================
+    state "Flujo de Series (tipo == 'tv')" as User_Series {
+        state "Sin Estado (Serie)" as S_SinEstado
+
+        state "En Watchlist (Serie)" as S_Watchlist
+        note right of S_Watchlist
+            Icono: Bookmark lleno.
+            Episodios vistos: 0.
+        end note
+
+        state "Siguiendo (In Progress)" as S_Siguiendo
+        note right of S_Siguiendo
+            Icono: Play / Barra segmentada.
+            Episodios vistos > 0 y < Total emitidos.
+            Bookmark bloqueado mientras se sigue.
+        end note
+
+        state "Abandonada (Paused)" as S_Abandonada
+        note right of S_Abandonada
+            Estado computado / derivado:
+            estado == null en BD y episodios_vistos > 0.
+            Icono distintivo de abandono + Botón Reanudar (POST /follow).
+        end note
+
+        state "Vista (Completada)" as S_Vista
+        note right of S_Vista
+            Icono: Ojo lleno.
+            Todos los episodios disponibles completados.
+            Bookmark bloqueado.
+        end note
+
+        S_SinEstado --> S_Watchlist: Agregar a Watchlist
+        S_Watchlist --> S_SinEstado: Quitar de Watchlist
+        
+        S_SinEstado --> S_Siguiendo: Marca 1er episodio visto (o botón Follow)
+        S_Watchlist --> S_Siguiendo: Marca 1er episodio visto (o botón Follow)
+        
+        S_SinEstado --> S_Vista: Marca serie entera como vista (Ojo)
+        S_Watchlist --> S_Vista: Marca serie entera como vista (Ojo)
+
+        S_Siguiendo --> S_Vista: Completa el 100% de episodios emitidos
+        S_Siguiendo --> S_Abandonada: Clic en Dejar de Seguir (X) conservando episodios
+        S_Siguiendo --> S_SinEstado: Desmarca el único episodio visto (caso borde)
+
+        S_Abandonada --> S_Siguiendo: Reanudar / Follow (POST /follow) o marcar nuevo episodio
+        S_Abandonada --> S_Vista: Completa los episodios restantes
+        S_Abandonada --> S_Watchlist: Usuario re-agrega a watchlist
+        S_Abandonada --> S_SinEstado: Desmarca todos los episodios vistos (progreso en 0)
+
+        S_Vista --> S_Siguiendo: Se emite nueva temporada en TMDB (automático)
+        S_Vista --> S_Siguiendo: Desmarca un episodio (deshacer error)
+        S_Vista --> S_SinEstado: Desmarca serie entera (ojo tachado / reset total)
+    }
+
+    %% =========================================================================
+    %% FLAG ORTOGONAL: FAVORITOS (Corazón)
+    %% =========================================================================
+    note "DIMENSIÓN ORTOGONAL — FAVORITOS:\nCualquier película o serie (en cualquier estado o sin estado)\npuede marcarse como Favorita con el ícono de Corazón.\nSe gestiona de forma paralela en la pestaña 'Favorites'." as Nota_Favoritos

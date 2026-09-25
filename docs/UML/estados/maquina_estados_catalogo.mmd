@@ -1,0 +1,174 @@
+stateDiagram-v2
+    %% =========================================================================
+    %% CINETRACK — MÁQUINA DE ESTADOS DEL CATÁLOGO (PELÍCULAS & SERIES)
+    %% Ciclo de vida objetivo según TMDB, fechas de estreno y emisión de episodios
+    %% (Diferente e independiente de los estados de usuario en biblioteca)
+    %% =========================================================================
+
+    [*] --> Ingesta_TMDB: Discover / Ingesta manual
+
+    state "Ingesta en CineTrack" as Ingesta_TMDB {
+        [*] --> Verificar_Tipo
+        Verificar_Tipo --> Rama_Peliculas: tipo == 'movie'
+        Verificar_Tipo --> Rama_Series: tipo == 'tv'
+    }
+
+    %% =========================================================================
+    %% RAMA 1: PELÍCULAS (MOVIES)
+    %% =========================================================================
+    state "Ciclo de Vida de Películas (tipo == 'movie')" as Rama_Peliculas {
+        state "Planificada" as MOV_PLANNED
+        note right of MOV_PLANNED
+            TMDB: 'Planned'
+            Badge: Slate [Planificada / Planned]
+            Embeddings: NO (Ahorro cuota IA)
+            Recomendador: Excluida
+        end note
+
+        state "En Producción" as MOV_PROD
+        note right of MOV_PROD
+            TMDB: 'In Production'
+            Badge: Teal [En Producción / In Production]
+            Embeddings: NO
+            Recomendador: Excluida
+        end note
+
+        state "Postproducción" as MOV_POST
+        note right of MOV_POST
+            TMDB: 'Post Production'
+            Badge: Índigo [Postproducción / Post-Production]
+            Embeddings: NO
+            Recomendador: Excluida
+        end note
+
+        state "Próximo Estreno (Horizonte Lejano)" as MOV_UPCOMING
+        note right of MOV_UPCOMING
+            Condición: fecha_estreno > hoy + 15 días
+            Badge: Ámbar [Próximo Estreno / Upcoming Release]
+            Embeddings: NO (Bloqueado)
+            Recomendador: Excluida
+        end note
+
+        state "Muy Pronto (Recta Final)" as MOV_SOON
+        note right of MOV_SOON
+            Condición: fecha_estreno <= hoy + 15 días y fecha_estreno > hoy
+            Badge: Cian [Muy Pronto / Coming Soon]
+            Embeddings: NO
+            Recomendador: Excluida
+        end note
+
+        state "Estrenada (Catálogo Activo)" as MOV_RELEASED
+        note right of MOV_RELEASED
+            Condición: fecha_estreno <= hoy (o TMDB 'Released' con fecha cumplida)
+            Badge: Verde Esmeralda [Estrenada / Released]
+            Embeddings: SÍ (Generados en Sync Diaria)
+            Recomendador: Elegible (Ventana 30d sin piso de votos)
+        end note
+
+        MOV_PLANNED --> MOV_PROD: Inicio de rodaje
+        MOV_PROD --> MOV_POST: Fin de rodaje
+        MOV_POST --> MOV_UPCOMING: Fecha de estreno fijada (> 15d)
+        MOV_UPCOMING --> MOV_SOON: Faltan <= 15 días
+        MOV_SOON --> MOV_RELEASED: Llega fecha_estreno (Release Day)
+        
+        %% Caso Festival / Pre-estreno: TMDB status pasa a 'Released' pero fecha de estreno comercial es futura
+        MOV_POST --> MOV_UPCOMING: TMDB Released pero fecha_estreno > hoy + 15d
+        MOV_UPCOMING --> MOV_SOON: TMDB Released pero fecha_estreno <= hoy + 15d
+    }
+
+    %% =========================================================================
+    %% RAMA 2: SERIES (TV SHOWS)
+    %% =========================================================================
+    state "Ciclo de Vida de Series (tipo == 'tv')" as Rama_Series {
+        state "Planificada (S1)" as TV_PLANNED
+        note right of TV_PLANNED
+            TMDB: 'Planned' (Temporada 1)
+            Badge: Slate [Planificada / Planned]
+            Embeddings: NO
+        end note
+
+        state "En Producción (S1)" as TV_PROD
+        note right of TV_PROD
+            TMDB: 'In Production' (Temporada 1)
+            Badge: Teal [En Producción / In Production]
+            Embeddings: NO
+        end note
+
+        state "Próximo Estreno (Serie Nueva)" as TV_UPCOMING
+        note right of TV_UPCOMING
+            Condición: S1 con fecha_estreno > hoy + 15 días
+            Badge: Ámbar [Próximo Estreno / Upcoming Premiere]
+            Embeddings: NO
+        end note
+
+        state "Muy Pronto (Serie Nueva)" as TV_SOON
+        note right of TV_SOON
+            Condición: S1 fecha_estreno <= hoy + 15 días y fecha_estreno > hoy
+            Badge: Cian [Muy Pronto / Coming Soon]
+            Embeddings: NO
+        end note
+
+        state "En Emisión Activa" as TV_AIRING
+        note right of TV_AIRING
+            Condición: Episodios emitidos > 0 y episodios futuros en curso
+            Badge: Pulso Verde [En Emisión / Currently Airing]
+            Embeddings: SÍ
+            Recomendador: Elegible
+        end note
+
+        state "Entre Temporadas / Pendiente Renovación" as TV_BETWEEN
+        note right of TV_BETWEEN
+            Condición: Temporada concluida sin nueva temporada confirmada
+            Badge: Ámbar [Pendiente de Renovación / Pending Renewal]
+            Embeddings: SÍ
+            Recomendador: Elegible
+        end note
+
+        state "Renovada (Fecha Confirmada)" as TV_RENEWED_DATE
+        note right of TV_RENEWED_DATE
+            Condición: Temporada > 1 con fecha fijada en calendario
+            Badge: Azul [Renovada — Temporada N (Fecha)]
+            Embeddings: SÍ
+            Recomendador: Elegible
+        end note
+
+        state "Renovada (TBA / En Producción)" as TV_RENEWED_TBA
+        note right of TV_RENEWED_TBA
+            Condición: Temporada > 1 confirmada sin fecha o en producción
+            Badge: Púrpura [Renovada — Temporada N (TBA)]
+            Embeddings: SÍ
+            Recomendador: Elegible
+        end note
+
+        state "Finalizada" as TV_ENDED
+        note right of TV_ENDED
+            TMDB: 'Ended'
+            Badge: Gris Carbón [Finalizada / Ended]
+            Embeddings: SÍ
+            Recomendador: Elegible (Catálogo Histórico)
+        end note
+
+        state "Cancelada" as TV_CANCELED
+        note right of TV_CANCELED
+            TMDB: 'Canceled'
+            Badge: Rojo Rubí [Cancelada / Canceled]
+            Embeddings: SÍ
+            Recomendador: Elegible (Catálogo Histórico)
+        end note
+
+        TV_PLANNED --> TV_PROD: Inicio de producción
+        TV_PROD --> TV_UPCOMING: Fecha fijada (> 15d)
+        TV_UPCOMING --> TV_SOON: Faltan <= 15 días
+        TV_SOON --> TV_AIRING: Emisión del Episodio 1
+        
+        TV_AIRING --> TV_BETWEEN: Concluye emisión de temporada
+        TV_BETWEEN --> TV_RENEWED_TBA: Anuncio oficial de renovación
+        TV_BETWEEN --> TV_ENDED: TMDB 'Ended' (Fin de la serie)
+        TV_BETWEEN --> TV_CANCELED: TMDB 'Canceled' (Cancelación)
+        
+        TV_RENEWED_TBA --> TV_RENEWED_DATE: TMDB fija fecha de estreno de S(N)
+        TV_RENEWED_DATE --> TV_AIRING: Emisión del primer episodio de S(N)
+    }
+
+    Rama_Peliculas --> [*]: Película en Catálogo Activo
+    Rama_Series --> [*]: Serie en Catálogo Activo

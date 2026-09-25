@@ -1,0 +1,263 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1380" width="1200" height="1380" style="background-color: #090d16; font-family: system-ui, -apple-system, sans-serif;">
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b" />
+    </marker>
+    <marker id="arrow-gold" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b" />
+    </marker>
+    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#06b6d4" />
+    </marker>
+    <marker id="arrow-emerald" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
+    </marker>
+  </defs>
+
+  <!-- ENCABEZADO PRINCIPAL -->
+  <text x="600" y="38" font-size="22" font-weight="bold" fill="#f59e0b" text-anchor="middle" letter-spacing="1">CINETRACK — MÁQUINA DE ESTADOS DEL CATÁLOGO</text>
+  <text x="600" y="65" font-size="13" fill="#94a3b8" text-anchor="middle">Ciclo de vida objetivo según TMDB, fechas de estreno y emisión de episodios (Independiente de los estados de usuario)</text>
+
+  <!-- ========================================================================= -->
+  <!-- SECCIÓN 1: PELÍCULAS (tipo == 'movie') -->
+  <!-- ========================================================================= -->
+  <g transform="translate(40, 90)">
+    <rect width="1120" height="490" rx="16" fill="#0f172a" stroke="#334155" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="1120" height="38" rx="16" fill="#1e293b"/>
+    <rect x="0" y="20" width="1120" height="18" fill="#1e293b"/>
+    <text x="30" y="25" font-size="15" font-weight="bold" fill="#38bdf8">🎬 1. CICLO DE VIDA DE PELÍCULAS (MOVIES)</text>
+    <text x="1090" y="25" font-size="12" fill="#94a3b8" text-anchor="end">Evaluación reactiva: TMDB status + fecha_estreno vs. hoy</text>
+
+    <!-- Flechas del flujo lineal -->
+    <path d="M 180 120 L 230 120" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 390 120 L 440 120" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 600 120 L 650 120" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 810 120 L 860 120" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrow-cyan)" fill="none"/>
+    
+    <!-- Flecha hacia Released (Paso al día de estreno) -->
+    <path d="M 940 170 L 940 230 L 620 230" stroke="#10b981" stroke-width="2.5" marker-end="url(#arrow-emerald)" fill="none"/>
+
+    <!-- Flecha caso especial: Festivales / Pre-estrenos -->
+    <path d="M 520 170 L 520 200 L 730 200 L 730 170" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,4" fill="none" marker-end="url(#arrow-gold)"/>
+    <text x="625" y="215" font-size="11" fill="#f59e0b" text-anchor="middle">TMDB 'Released' pero estreno comercial > hoy (Pre-estreno / Festivales)</text>
+
+    <!-- 1. PLANNED -->
+    <g transform="translate(30, 70)">
+      <rect width="150" height="100" rx="10" fill="#090d16" stroke="#475569" stroke-width="1.5"/>
+      <rect x="15" y="15" width="120" height="24" rx="12" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+      <circle cx="27" cy="27" r="4" fill="#94a3b8"/>
+      <text x="75" y="31" font-size="11" font-weight="bold" fill="#cbd5e1" text-anchor="middle">Planificada</text>
+      <text x="75" y="58" font-size="11" fill="#64748b" text-anchor="middle">TMDB: Planned</text>
+      <text x="75" y="75" font-size="10" fill="#94a3b8" text-anchor="middle">Sin fecha fijada</text>
+      <text x="75" y="90" font-size="10" fill="#ef4444" text-anchor="middle">🚫 Sin Embeddings</text>
+    </g>
+
+    <!-- 2. IN PRODUCTION -->
+    <g transform="translate(240, 70)">
+      <rect width="150" height="100" rx="10" fill="#090d16" stroke="#0d9488" stroke-width="1.5"/>
+      <rect x="15" y="15" width="120" height="24" rx="12" fill="#134e4a" stroke="#14b8a6" stroke-width="1"/>
+      <circle cx="27" cy="27" r="4" fill="#2dd4bf"/>
+      <text x="75" y="31" font-size="11" font-weight="bold" fill="#ccfbf1" text-anchor="middle">En Producción</text>
+      <text x="75" y="58" font-size="11" fill="#0d9488" text-anchor="middle">In Production</text>
+      <text x="75" y="75" font-size="10" fill="#94a3b8" text-anchor="middle">Rodaje en curso</text>
+      <text x="75" y="90" font-size="10" fill="#ef4444" text-anchor="middle">🚫 Sin Embeddings</text>
+    </g>
+
+    <!-- 3. POST-PRODUCTION -->
+    <g transform="translate(450, 70)">
+      <rect width="150" height="100" rx="10" fill="#090d16" stroke="#6366f1" stroke-width="1.5"/>
+      <rect x="15" y="15" width="120" height="24" rx="12" fill="#312e81" stroke="#818cf8" stroke-width="1"/>
+      <circle cx="27" cy="27" r="4" fill="#a5b4fc"/>
+      <text x="75" y="31" font-size="10.5" font-weight="bold" fill="#e0e7ff" text-anchor="middle">Postproducción</text>
+      <text x="75" y="58" font-size="11" fill="#818cf8" text-anchor="middle">Post Production</text>
+      <text x="75" y="75" font-size="10" fill="#94a3b8" text-anchor="middle">Edición / Montaje</text>
+      <text x="75" y="90" font-size="10" fill="#ef4444" text-anchor="middle">🚫 Sin Embeddings</text>
+    </g>
+
+    <!-- 4. UPCOMING (>15d) -->
+    <g transform="translate(660, 70)">
+      <rect width="150" height="100" rx="10" fill="#090d16" stroke="#f59e0b" stroke-width="1.5"/>
+      <rect x="15" y="15" width="120" height="24" rx="12" fill="#451a03" stroke="#f59e0b" stroke-width="1"/>
+      <circle cx="27" cy="27" r="4" fill="#fbbf24"/>
+      <text x="75" y="31" font-size="10.5" font-weight="bold" fill="#fef3c7" text-anchor="middle">Próximo Estreno</text>
+      <text x="75" y="58" font-size="11" fill="#f59e0b" text-anchor="middle">Fecha &gt; hoy + 15d</text>
+      <text x="75" y="75" font-size="10" fill="#94a3b8" text-anchor="middle">Badge Ámbar / Fecha</text>
+      <text x="75" y="90" font-size="10" fill="#ef4444" text-anchor="middle">🚫 Sin Embeddings</text>
+    </g>
+
+    <!-- 5. COMING SOON (<=15d) -->
+    <g transform="translate(870, 70)">
+      <rect width="150" height="100" rx="10" fill="#090d16" stroke="#06b6d4" stroke-width="1.8"/>
+      <rect x="15" y="15" width="120" height="24" rx="12" fill="#164e63" stroke="#22d3ee" stroke-width="1"/>
+      <circle cx="27" cy="27" r="4" fill="#67e8f9"/>
+      <text x="75" y="31" font-size="11" font-weight="bold" fill="#cffafe" text-anchor="middle">Muy Pronto</text>
+      <text x="75" y="58" font-size="11" fill="#22d3ee" text-anchor="middle">Faltan ≤ 15 días</text>
+      <text x="75" y="75" font-size="10" fill="#94a3b8" text-anchor="middle">Recta final (Cian)</text>
+      <text x="75" y="90" font-size="10" fill="#ef4444" text-anchor="middle">🚫 Sin Embeddings</text>
+    </g>
+
+    <!-- 6. RELEASED (Estrenada) -->
+    <g transform="translate(260, 255)">
+      <rect width="600" height="110" rx="14" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
+      <rect x="20" y="18" width="130" height="26" rx="13" fill="#022c22" stroke="#34d399" stroke-width="1"/>
+      <circle cx="35" cy="31" r="5" fill="#34d399"/>
+      <text x="85" y="35" font-size="12" font-weight="bold" fill="#a7f3d0" text-anchor="middle">Estrenada</text>
+
+      <text x="170" y="35" font-size="14" font-weight="bold" fill="#ffffff">Condición: fecha_estreno ≤ hoy (Release Day alcanzado)</text>
+      <text x="25" y="65" font-size="12" fill="#ecfdf5">✓ Badge Verde Esmeralda [Released / Estrenada] en Detalle y Ficha.</text>
+      <text x="25" y="85" font-size="12" fill="#a7f3d0">✓ Se generan automáticamente sus embeddings vectoriales (768 dim) en la Sync Diaria.</text>
+      <text x="25" y="103" font-size="12" fill="#fef08a">✓ Elegible para Recomendador IA (con beneficio de 30 días de estreno sin piso de votos).</text>
+    </g>
+
+    <!-- Resumen de Regla de Negocio para Películas -->
+    <g transform="translate(30, 390)">
+      <rect width="1060" height="75" rx="10" fill="#090d16" stroke="#475569" stroke-dasharray="4,4"/>
+      <text x="20" y="24" font-size="12" font-weight="bold" fill="#f8fafc">💡 Regla Anti-Fugas en Festivales:</text>
+      <text x="20" y="44" font-size="11.5" fill="#cbd5e1">Si TMDB reporta 'Released' por una proyección exclusiva en festival, pero la fecha comercial es futura (fecha_estreno &gt; hoy), el sistema la mantiene en Upcoming (Ámbar o Cian).</text>
+      <text x="20" y="62" font-size="11.5" fill="#fde047">Resultado: Ni se gastan tokens de IA ni entra prematuramente en recomendaciones de usuarios.</text>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- SECCIÓN 2: SERIES (tipo == 'tv') -->
+  <!-- ========================================================================= -->
+  <g transform="translate(40, 610)">
+    <rect width="1120" height="720" rx="16" fill="#0f172a" stroke="#334155" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="1120" height="38" rx="16" fill="#1e293b"/>
+    <rect x="0" y="20" width="1120" height="18" fill="#1e293b"/>
+    <text x="30" y="25" font-size="15" font-weight="bold" fill="#a855f7">📺 2. CICLO DE VIDA DE SERIES (TV SHOWS)</text>
+    <text x="1090" y="25" font-size="12" fill="#94a3b8" text-anchor="end">Evaluación: Progreso de episodios emitidos, temporadas futuras y TMDB status</text>
+
+    <!-- FASE 1: SERIE NUEVA (Aún no estrena ningún episodio) -->
+    <g transform="translate(30, 60)">
+      <rect width="1060" height="135" rx="12" fill="#090d16" stroke="#64748b" stroke-width="1.5"/>
+      <text x="20" y="24" font-size="12" font-weight="bold" fill="#38bdf8">FASE A: SERIE INÉDITA (Temporada 1 no estrenada / 0 episodios emitidos)</text>
+
+      <!-- Planned S1 -->
+      <g transform="translate(20, 35)">
+        <rect width="180" height="80" rx="8" fill="#1e293b" stroke="#475569"/>
+        <text x="90" y="25" font-size="11" font-weight="bold" fill="#e2e8f0" text-anchor="middle">Planificada (S1)</text>
+        <text x="90" y="45" font-size="10.5" fill="#94a3b8" text-anchor="middle">Planned • Sin fecha</text>
+        <text x="90" y="65" font-size="10" fill="#ef4444" text-anchor="middle">🚫 Sin Embeddings</text>
+      </g>
+      <path d="M 200 75 L 240 75" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+      <!-- In Production S1 -->
+      <g transform="translate(240, 35)">
+        <rect width="180" height="80" rx="8" fill="#134e4a" stroke="#14b8a6"/>
+        <text x="90" y="25" font-size="11" font-weight="bold" fill="#ccfbf1" text-anchor="middle">En Producción (S1)</text>
+        <text x="90" y="45" font-size="10.5" fill="#5eead4" text-anchor="middle">In Production</text>
+        <text x="90" y="65" font-size="10" fill="#ef4444" text-anchor="middle">🚫 Sin Embeddings</text>
+      </g>
+      <path d="M 420 75 L 460 75" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+      <!-- Upcoming Premiere (>15d) -->
+      <g transform="translate(460, 35)">
+        <rect width="240" height="80" rx="8" fill="#451a03" stroke="#f59e0b"/>
+        <text x="120" y="25" font-size="11" font-weight="bold" fill="#fef3c7" text-anchor="middle">Próximo Estreno (S1)</text>
+        <text x="120" y="45" font-size="10.5" fill="#fde68a" text-anchor="middle">Fecha fijada &gt; 15 días</text>
+        <text x="120" y="65" font-size="10" fill="#ef4444" text-anchor="middle">Badge Ámbar • Sin Embeddings</text>
+      </g>
+      <path d="M 700 75 L 740 75" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrow-cyan)" fill="none"/>
+
+      <!-- Coming Soon S1 (<=15d) -->
+      <g transform="translate(740, 35)">
+        <rect width="280" height="80" rx="8" fill="#164e63" stroke="#06b6d4"/>
+        <text x="140" y="25" font-size="11" font-weight="bold" fill="#cffafe" text-anchor="middle">Muy Pronto (Series Premiere)</text>
+        <text x="140" y="45" font-size="10.5" fill="#a5f3fc" text-anchor="middle">Faltan ≤ 15 días para Ep. 1</text>
+        <text x="140" y="65" font-size="10" fill="#ef4444" text-anchor="middle">Badge Cian • Recta final</text>
+      </g>
+    </g>
+
+    <!-- Flecha hacia Emisión -->
+    <path d="M 910 200 L 910 225 L 560 225 L 560 250" stroke="#10b981" stroke-width="2.5" marker-end="url(#arrow-emerald)" fill="none"/>
+    <text x="730" y="220" font-size="11" fill="#10b981" text-anchor="middle">Se estrena el Episodio 1 (Primer episodio emitido)</text>
+
+    <!-- FASE 2: EMISIÓN ACTIVA -->
+    <g transform="translate(280, 250)">
+      <rect width="560" height="85" rx="12" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
+      <rect x="20" y="15" width="160" height="26" rx="13" fill="#022c22" stroke="#34d399" stroke-width="1"/>
+      <circle cx="35" cy="28" r="5" fill="#34d399"/>
+      <text x="100" y="32" font-size="12" font-weight="bold" fill="#a7f3d0" text-anchor="middle">En Emisión (Airing)</text>
+      <text x="200" y="32" font-size="13" font-weight="bold" fill="#ffffff">Episodios emitidos &gt; 0 y temporada en curso</text>
+      <text x="25" y="58" font-size="11.5" fill="#ecfdf5">✓ Pulso Verde Esmeralda intermitente [Currently Airing — Próximo ep: DD/MM/AAAA].</text>
+      <text x="25" y="75" font-size="11.5" fill="#a7f3d0">✓ Embeddings generados • Elegible para recomendaciones y seguimiento de episodios.</text>
+    </g>
+
+    <!-- Flecha hacia Entre Temporadas -->
+    <path d="M 560 335 L 560 375" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow-gold)" fill="none"/>
+    <text x="575" y="358" font-size="11" fill="#cbd5e1">Concluye el último episodio de la temporada</text>
+
+    <!-- FASE 3: ENTRE TEMPORADAS (PENDIENTE DE RENOVACIÓN) -->
+    <g transform="translate(300, 380)">
+      <rect width="520" height="75" rx="10" fill="#451a03" stroke="#f59e0b" stroke-width="1.8"/>
+      <rect x="15" y="12" width="220" height="24" rx="12" fill="#78350f" stroke="#fbbf24" stroke-width="1"/>
+      <circle cx="28" cy="24" r="4" fill="#fbbf24"/>
+      <text x="125" y="28" font-size="10.5" font-weight="bold" fill="#fef3c7" text-anchor="middle">Pendiente de Renovación</text>
+      <text x="250" y="28" font-size="12" font-weight="bold" fill="#ffffff">Show activo entre temporadas</text>
+      <text x="20" y="55" font-size="11" fill="#fef08a">Temporada finalizada sin fecha futura confirmada. Badge Ámbar (Pending Renewal).</text>
+    </g>
+
+    <!-- BIFURCACIÓN DE DESTINOS DESDE PENDIENTE DE RENOVACIÓN -->
+    <!-- 1. Hacia Renovada TBA (Izquierda) -->
+    <path d="M 330 455 L 330 500 L 220 500 L 220 535" stroke="#a855f7" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    
+    <!-- 2. Hacia Renovada con Fecha (Centro-Izquierda) -->
+    <path d="M 450 455 L 450 535" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <!-- 3. Hacia Finalizada (Centro-Derecha) -->
+    <path d="M 670 455 L 670 535" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <!-- 4. Hacia Cancelada (Derecha) -->
+    <path d="M 790 455 L 790 500 L 980 500 L 980 535" stroke="#ef4444" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <!-- ESTADO: RENOVADA TBA / EN PRODUCCIÓN -->
+    <g transform="translate(100, 540)">
+      <rect width="240" height="90" rx="10" fill="#3b0764" stroke="#a855f7" stroke-width="1.5"/>
+      <text x="120" y="25" font-size="11.5" font-weight="bold" fill="#f3e8ff" text-anchor="middle">Renovada (TBA / Prod)</text>
+      <text x="120" y="45" font-size="10.5" fill="#d8b4fe" text-anchor="middle">Temporada N confirmada</text>
+      <text x="120" y="62" font-size="10" fill="#cbd5e1" text-anchor="middle">Badge Púrpura [Renewed]</text>
+      <text x="120" y="78" font-size="10" fill="#c084fc" text-anchor="middle">Fecha por anunciar (TBA)</text>
+    </g>
+
+    <!-- Transición de TBA a Fecha fijada -->
+    <path d="M 340 585 L 380 585" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+
+    <!-- ESTADO: RENOVADA CON FECHA -->
+    <g transform="translate(390, 540)">
+      <rect width="250" height="90" rx="10" fill="#172554" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="125" y="25" font-size="11.5" font-weight="bold" fill="#dbeafe" text-anchor="middle">Renovada con Fecha</text>
+      <text x="125" y="45" font-size="10.5" fill="#93c5fd" text-anchor="middle">S(N) con fecha en calendario</text>
+      <text x="125" y="62" font-size="10" fill="#cbd5e1" text-anchor="middle">Badge Azul [Renewed — S(N)]</text>
+      <text x="125" y="78" font-size="10" fill="#60a5fa" text-anchor="middle">Cuenta regresiva activa</text>
+    </g>
+
+    <!-- Retorno de Renovada con fecha al aire (Airing) -->
+    <path d="M 515 540 L 515 480 L 15 480 L 15 292 L 275 292" stroke="#10b981" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrow-emerald)" fill="none"/>
+    <text x="260" y="473" font-size="10.5" fill="#34d399">Llega la fecha de la nueva temporada y estrena el primer episodio</text>
+
+    <!-- ESTADO: FINALIZADA -->
+    <g transform="translate(680, 540)">
+      <rect width="200" height="90" rx="10" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+      <text x="100" y="25" font-size="11.5" font-weight="bold" fill="#e2e8f0" text-anchor="middle">Finalizada (Ended)</text>
+      <text x="100" y="45" font-size="10.5" fill="#94a3b8" text-anchor="middle">TMDB: Ended</text>
+      <text x="100" y="62" font-size="10" fill="#cbd5e1" text-anchor="middle">Badge Gris Carbón</text>
+      <text x="100" y="78" font-size="10" fill="#94a3b8" text-anchor="middle">Catálogo Histórico Completo</text>
+    </g>
+
+    <!-- ESTADO: CANCELADA -->
+    <g transform="translate(900, 540)">
+      <rect width="190" height="90" rx="10" fill="#450a0a" stroke="#ef4444" stroke-width="1.5"/>
+      <text x="95" y="25" font-size="11.5" font-weight="bold" fill="#fee2e2" text-anchor="middle">Cancelada (Canceled)</text>
+      <text x="95" y="45" font-size="10.5" fill="#fca5a5" text-anchor="middle">TMDB: Canceled</text>
+      <text x="95" y="62" font-size="10" fill="#cbd5e1" text-anchor="middle">Badge Rojo Rubí</text>
+      <text x="95" y="78" font-size="10" fill="#f87171" text-anchor="middle">Emisión Interrumpida</text>
+    </g>
+
+    <!-- Pie de resumen -->
+    <text x="560" y="695" font-size="11.5" fill="#94a3b8" text-anchor="middle">Todas las series con al menos 1 episodio emitido conservan sus embeddings y son elegibles para recomendación y biblioteca.</text>
+  </g>
+</svg>
