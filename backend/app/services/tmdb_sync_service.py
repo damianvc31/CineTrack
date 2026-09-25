@@ -1098,34 +1098,70 @@ class TMDBSyncService:
         Recalcula el Rating Unificado ponderado:
         [(vote_average_tmdb * vote_count_tmdb) + sum(puntajes_usuarios)] / [vote_count_tmdb + N]
         donde N es el total de reseñas locales de usuarios con puntaje.
+        Optimizado: actualiza en lote a vote_average_tmdb y solo itera sobre los títulos que
+        efectivamente tienen reseñas locales de usuarios.
         """
         logger.info("Recalculando rating unificado...")
-        query = select(Titulo)
         if titulo_id:
-            query = query.where(Titulo.id == titulo_id)
-        res = await self.db.execute(query)
-        titulos = res.scalars().all()
-
-        for tit in titulos:
+            # Caso individual
             q_res = select(
                 func.coalesce(func.sum(Resena.puntaje), 0.0),
                 func.count(Resena.id)
             ).where(
-                Resena.titulo_id == tit.id,
+                Resena.titulo_id == titulo_id,
                 Resena.usuario_id.isnot(None),
                 Resena.puntaje.isnot(None)
             )
             r = await self.db.execute(q_res)
             sum_users, count_users = r.one()
-            total_votes = tit.vote_count_tmdb + count_users
-            if total_votes > 0:
-                tit.rating_unificado = round(((tit.vote_average_tmdb * tit.vote_count_tmdb) + float(sum_users)) / total_votes, 2)
-            else:
-                tit.rating_unificado = 0.0
+            tit_res = await self.db.execute(select(Titulo).where(Titulo.id == titulo_id))
+            tit = tit_res.scalar_one_or_none()
+            if tit:
+                total_votes = tit.vote_count_tmdb + count_users
+                if total_votes > 0:
+                    tit.rating_unificado = round(((tit.vote_average_tmdb * tit.vote_count_tmdb) + float(sum_users)) / total_votes, 2)
+                else:
+                    tit.rating_unificado = 0.0
+                await self.db.commit()
+            return 1
+
+        # Caso masivo:
+        # 1. Establecer rating base de TMDB para todos los títulos
+        await self.db.execute(
+            update(Titulo)
+            .values(rating_unificado=Titulo.vote_average_tmdb)
+            .where(Titulo.vote_count_tmdb > 0)
+        )
+        await self.db.execute(
+            update(Titulo)
+            .values(rating_unificado=0.0)
+            .where(Titulo.vote_count_tmdb == 0)
+        )
+
+        # 2. Consultar solo los títulos que TIENEN reseñas de usuarios locales
+        user_reviews_q = select(
+            Resena.titulo_id,
+            func.coalesce(func.sum(Resena.puntaje), 0.0).label("sum_puntaje"),
+            func.count(Resena.id).label("count_reviews")
+        ).where(
+            Resena.usuario_id.isnot(None),
+            Resena.puntaje.isnot(None)
+        ).group_by(Resena.titulo_id)
+
+        res_user_revs = await self.db.execute(user_reviews_q)
+        reviewed_titles = res_user_revs.all()
+
+        for tid, sum_users, count_users in reviewed_titles:
+            tit_res = await self.db.execute(select(Titulo).where(Titulo.id == tid))
+            tit = tit_res.scalar_one_or_none()
+            if tit:
+                total_votes = tit.vote_count_tmdb + count_users
+                if total_votes > 0:
+                    tit.rating_unificado = round(((tit.vote_average_tmdb * tit.vote_count_tmdb) + float(sum_users)) / total_votes, 2)
 
         await self.db.commit()
-        logger.info(f"Rating unificado recalculado para {len(titulos)} títulos.")
-        return len(titulos)
+        logger.info(f"Rating unificado recalculado con éxito ({len(reviewed_titles)} títulos con reseñas de usuarios).")
+        return len(reviewed_titles)
 
     # -------------------------------------------------------------------------
     # EXPANSIÓN DE CATÁLOGO POR GÉNEROS (CRITERIO 1)
