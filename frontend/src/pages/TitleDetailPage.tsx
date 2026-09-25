@@ -800,16 +800,6 @@ export const TitleDetailPage: React.FC = () => {
         ? (language === 'es' ? `Temporada ${upcomingSeasonWithDate.seasonNum}` : `Season ${upcomingSeasonWithDate.seasonNum}`)
         : (language === 'es' ? 'Nueva Temporada' : 'New Season')
 
-      const isSoon = isWithin15Days(dateStr, todayStr)
-      if (isSoon && dateStr) {
-        return (
-          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/60 text-cyan-300 text-xs font-bold shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-cyan-400" />
-            <span>{language === 'es' ? 'Muy Pronto' : 'Coming Soon'} — {label} {language === 'es' ? `el ${dateStr}` : `on ${dateStr}`}</span>
-          </span>
-        )
-      }
-
       return (
         <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-950/80 border border-blue-500/60 text-blue-300 text-xs font-bold shadow-sm">
           <span className="w-2 h-2 rounded-full bg-blue-400" />

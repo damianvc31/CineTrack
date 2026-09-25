@@ -2,6 +2,12 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.4.1] - 2026-09-25
+### Corregido (Detalle de Título)
+- **Preservación del Badge "Renovada" en Nuevas Temporadas:**
+  - Se restringe el badge cian "Muy Pronto" (`Coming Soon`) exclusivamente a obras que aún no han estrenado ningún contenido (Temporada 1 de series no emitidas y películas no estrenadas con fecha $\le 15$ días).
+  - Las nuevas temporadas confirmadas de series activas con temporadas previas (Temporada $\ge 2$) preservan el badge azul "Renovada" (`Renewed — Season X on <fecha>`).
+
 ## [v1.4.0] - 2026-09-25
 ### Agregado & Optimizado (Desacople de Sincronización Diaria Liviana y Sincronización Profunda Semanal)
 - **Sincronización Diaria Liviana ("Heartbeat Vivo"):**
@@ -19,6 +25,9 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
   - `daily_sync.yml`: Ajustado para ejecutarse de **Lunes a Sábado a las 03:00 UTC** (`0 3 * * 1-6`).
   - `weekly_deep_sync.yml`: Nuevo workflow programado los **Domingos a las 02:00 UTC** (`0 2 * * 0`) con monitoreo Keep-Alive cada 15 segundos.
   - Se eliminan por completo los solapamientos de escritura en base de datos y se mantiene una separación de 2 horas respecto a los jobs mensuales de fotos de elenco (04:00 UTC) y reseñas (05:00 UTC).
+- **Badge Semántico "Muy Pronto" y Estados de Producción en Detalle:**
+  - Badge cian "Muy Pronto" (`Coming Soon`) para series y películas sin emitir con fecha confirmada $\le 15$ días.
+  - Títulos con fecha $> 15$ días o sin fecha fijada reflejan con precisión su estado TMDB (`Postproducción`, `En Producción`, `Planificada`, `Próximo Estreno`).
 - **Cobertura de Tests:**
   - Nuevas pruebas automatizadas para sincronización profunda semanal (`test_deep_sync_changes_and_active_series`) y ventana simétrica liviana (`test_daily_sync_lightweight_symmetric_window`). Suite ampliada a 95 tests unitarios e integración en verde (100%).
 
