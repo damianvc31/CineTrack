@@ -243,7 +243,7 @@ Para la puesta en producción y entrega final del proyecto, se adopta una **Arqu
                       ┌─────────────────────────────────────────────────────────┐
                       │ BACKEND: Render.com (Web Service)                       │
                       │ • FastAPI + Uvicorn (Python 3.11+)                      │
-                      │ • URL: https://cinetrack-api.onrender.com               │
+                      │ • URL: https://cinetrack-api-zsen.onrender.com          │
                       │ • Auto-Deploy continuo en cada push a rama de release   │
                       └─────────────────────┬─────────────────┬─────────────────┘
                                             │                 │
@@ -285,7 +285,7 @@ Para la puesta en producción y entrega final del proyecto, se adopta una **Arqu
    - Reglas de rewrite en `frontend/vercel.json` para garantizar enrutamiento SPA client-side sin 404 al recargar.
    - **Build Command:** `npm run build` (Framework preset: Vite).
    - **Output Directory:** `dist`.
-   - **Variable de Entorno:** `VITE_API_URL=https://cinetrack-api.onrender.com/api/v1`.
+   - **Variable de Entorno:** `VITE_API_URL=https://cinetrack-api-zsen.onrender.com/api/v1`.
 
 4. **Sincronización Diaria Periódica (GitHub Actions Workflow):**
    - Workflow desacoplado en `.github/workflows/daily_sync.yml` programado a las 03:00 UTC (00:00 hora de Argentina) y con soporte manual `workflow_dispatch`.

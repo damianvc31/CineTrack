@@ -312,6 +312,12 @@
   - [x] Paso 5: Suite de tests automatizados unitarios y de integración para validar candidatos y embeddings selectivos.
   - [x] Paso 6: Exigencia de póster oficial en ingesta (`upsert_movie`/`upsert_series`) e inclusión de "sin póster" en purga (`purge_invalid_or_incomplete_titles`) con suite ampliada a 105 tests en verde.
   - [x] Paso 7: Actualización de documentación viva (`ARCHITECTURE.md`, `README.md`, `CHANGELOG.md`, `ROADMAP.md`).
+- [x] **Suite de Postman y Documentación de Operaciones Administrativas:**
+  - [x] Estructuración modular en formato YAML (`docs/postman/CineTrack - Admin & Sync API/`) con 5 carpetas y 20 requests completas.
+  - [x] Protección de secretos: `.gitignore` para entornos reales locales (`*.environment.yaml`, `.postman/`) y plantillas públicas sanitizadas (`.example.yaml`).
+  - [x] Documentación exhaustiva en `docs/postman/README.md` y simplificación de endpoints administrativos y fórmulas en `README.md` de raíz.
+  - [x] Verificación de conectividad en producción contra Render (`https://cinetrack-api-zsen.onrender.com`).
+  - [x] Commit `52c3327` y push a `origin/main`.
 
 ---
 

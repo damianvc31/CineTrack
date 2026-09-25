@@ -275,14 +275,25 @@ Todos los jobs de sincronización pueden dispararse de forma remota vía HTTP (`
 - **Recomendador Asistido por IA (Motor Híbrido Resiliente):**
   - `POST /api/v1/recommendations`: Búsqueda y recomendación inteligente con grounding estricto sobre el catálogo local. Procesa prompts libres en lenguaje natural con soporte para usuarios invitados y autenticados (personalizado según historial de vistos y favoritos), cascada de reintentos resiliente (Gemini -> Groq -> Heurístico local) y explicación contextual (`why_recommended`).
 
-#### Tareas Programadas en Producción (Cron)
-Para mantener actualizado el catálogo automáticamente en un servidor o contenedor, se programa la ejecución diaria del comando `--daily` mediante cron (o invocando el endpoint `/daily` con curl y la API Key):
+#### Tareas Programadas y Automatización (Cron Jobs)
+Para mantener actualizado el catálogo continuamente en producción sin intervención manual, CineTrack cuenta con flujos automatizados en **GitHub Actions** con sondeo activo (`keep-alive`) contra Render:
+
+- **Sincronización Diaria Liviana (`.github/workflows/daily_sync.yml`):**
+  Lunes a Sábado a las 03:00 UTC (00:00 hora de Argentina). Procesa cambios recientes (`/changes`), actualiza cartelera y activa embeddings de títulos que alcanzaron su fecha de estreno.
+- **Sincronización Semanal Profunda (`.github/workflows/weekly_deep_sync.yml`):**
+  Domingos a las 02:00 UTC (23:00 Sábado hora de Argentina). Auditoría integral con ventana amplia de cambios y actualización masiva de métricas.
+- **Sincronización Mensual de Fotos de Actores (`.github/workflows/monthly_actor_photos.yml`):**
+  Día 1 de cada mes a las 04:00 UTC (01:00 hora de Argentina). Descarga fotos en alta calidad para actores de obras populares que carezcan de imagen.
+- **Sincronización Mensual de Reseñas TMDB (`.github/workflows/monthly_reviews_sync.yml`):**
+  Día 1 de cada mes a las 05:00 UTC (02:00 hora de Argentina). Rellena reseñas oficiales de la comunidad de TMDB para enriquecer el catálogo.
+
+Para entornos autohospedados (Linux VPS o contenedores Docker), se puede configurar el crontab tradicional invocando el CLI o los endpoints HTTP con la cabecera `X-Admin-Key`:
 ```bash
-# Ejemplo CLI: ejecutar todos los días a las 03:00 AM
+# Ejemplo CLI: ejecutar sincronización diaria a las 03:00 AM
 0 3 * * * cd /app/backend && /app/backend/.venv/bin/python -m app.jobs.sync_tmdb --daily >> /var/log/cinetrack_sync.log 2>&1
 
 # Ejemplo HTTP: invocar endpoint administrativo con curl
-0 3 * * * curl -X POST http://localhost:8000/api/v1/admin/sync/daily -H "X-Admin-Key: cinetrack-dev-admin-secret-key" -H "Content-Type: application/json" -d "{}"
+0 3 * * * curl -X POST http://localhost:8000/api/v1/admin/sync/daily -H "X-Admin-Key: <ADMIN_API_KEY>" -H "Content-Type: application/json" -d "{}"
 ```
 
 ### Frontend (SPA React 19 + TypeScript + Vite 8 + Tailwind CSS v4)
@@ -329,7 +340,7 @@ CineTrack está preparado para desplegarse en una infraestructura serverless/Paa
 flowchart TD
     User["👤 Usuario Final (Navegador / Móvil PWA)"] -->|HTTPS| Vercel["⚡ Vercel (Frontend React SPA)"]
     Vercel -->|REST API / HTTPS| Render["🚀 Render.com (Backend FastAPI)"]
-    Cron["⏱️ GitHub Actions (Cron 03:00 UTC)"] -->|POST /api/v1/admin/sync/daily| Render
+    Cron["⏱️ GitHub Actions (Cron Jobs)"] -->|Daily, Weekly & Monthly Syncs| Render
     Render -->|asyncpg / SSL / pooler| Neon["🐘 Neon.tech (PostgreSQL Serverless)"]
     Render -->|HTTP Requests| TMDB["🎬 TMDB API"]
     Render -->|SDK / REST| AI["🤖 Google Gemini / Groq API"]
@@ -362,8 +373,8 @@ flowchart TD
    - `TMDB_API_KEY`: tu Read Access Token de TMDB
    - `GEMINI_API_KEY`: tu API Key de Google AI Studio
    - `GROQ_API_KEY`: tu API Key de Groq Cloud
-4. Desplegar el servicio y copiar la URL pública asignada (ej. `https://cinetrack-api.onrender.com`).
-   *Verificar salud en `https://cinetrack-api.onrender.com/health` $\rightarrow$ `{"status": "ok", "version": "1.0.0"}`.*
+4. Desplegar el servicio y copiar la URL pública asignada (ej. `https://cinetrack-api-zsen.onrender.com`).
+   *Verificar salud en `https://cinetrack-api-zsen.onrender.com/health` $\rightarrow$ `{"status": "ok", "version": "1.6.0"}`.*
 
 ### Paso 3: Frontend en Vercel (SPA React 19)
 1. Crear una cuenta en [Vercel](https://vercel.com) e importar el repositorio.
@@ -371,16 +382,20 @@ flowchart TD
    - **Root Directory:** `frontend`
    - **Framework Preset:** `Vite`
 3. En **Environment Variables** de Vercel:
-   - `VITE_API_URL`: URL del backend en Render (ej. `https://cinetrack-api.onrender.com/api/v1`)
+   - `VITE_API_URL`: URL del backend en Render (ej. `https://cinetrack-api-zsen.onrender.com/api/v1`)
 4. Desplegar. El archivo `frontend/vercel.json` gestiona automáticamente los rewrites para que la navegación cliente no devuelva 404 al recargar páginas.
 
-### Paso 4: Automatización de Sincronización Diaria (GitHub Actions)
+### Paso 4: Automatización de Tareas Programadas (GitHub Actions)
 1. En el repositorio de GitHub, ir a **Settings $\rightarrow$ Secrets and variables $\rightarrow$ Actions**.
 2. Agregar los siguientes **Repository Secrets**:
-   - `PROD_API_URL`: URL raíz de tu backend en Render (ej. `https://cinetrack-api.onrender.com`)
+   - `PROD_API_URL`: URL raíz de tu backend en Render (`https://cinetrack-api-zsen.onrender.com`)
    - `ADMIN_API_KEY`: el mismo valor de `ADMIN_API_KEY` configurado en Render.
-3. El workflow `.github/workflows/daily_sync.yml` se disparará automáticamente todos los días a las **03:00 UTC (00:00 hora de Argentina)** para actualizar el catálogo vía `/changes` de TMDB y recalcular percentiles y ratings.
-4. También puede dispararse manualmente en cualquier momento desde la pestaña **Actions $\rightarrow$ CineTrack Daily TMDB Sync $\rightarrow$ Run workflow**.
+3. Se encuentran activos 4 workflows programados que ejecutan las rutinas automáticamente y realizan sondeo keep-alive periódico hasta la finalización del job:
+   - **`daily_sync.yml`:** Lunes a Sábado a las 03:00 UTC (00:00 ARG) $\rightarrow$ `POST /api/v1/admin/sync/daily`.
+   - **`weekly_deep_sync.yml`:** Domingos a las 02:00 UTC (23:00 ARG anterior) $\rightarrow$ `POST /api/v1/admin/sync/deep`.
+   - **`monthly_actor_photos.yml`:** Día 1 de cada mes a las 04:00 UTC $\rightarrow$ `POST /api/v1/admin/sync/actor-photos`.
+   - **`monthly_reviews_sync.yml`:** Día 1 de cada mes a las 05:00 UTC $\rightarrow$ `POST /api/v1/admin/sync/reviews`.
+4. Cualquiera de los workflows puede ejecutarse manualmente a demanda desde la pestaña **Actions $\rightarrow$ [Nombre del Workflow] $\rightarrow$ Run workflow**, con parámetros configurables.
 
 ---
 
