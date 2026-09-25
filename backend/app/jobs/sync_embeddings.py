@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import logging
 import time
+from datetime import date
 from typing import Optional
 
 from sqlalchemy import func, select
@@ -10,6 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.session import AsyncSessionLocal
 from app.models.titulo import Titulo
+from app.services.catalog_service import get_released_filter_condition
 from app.services.embedding_service import EmbeddingService
 
 logging.basicConfig(
@@ -44,12 +46,15 @@ async def sync_catalog_embeddings(
             logger.info("Base de datos actual es SQLite (sin soporte pgvector). Omitiendo cálculo de embeddings.")
             return
 
-        query = select(Titulo).options(selectinload(Titulo.generos))
+        today = date.today()
+        released_cond = get_released_filter_condition(today)
+
+        query = select(Titulo).options(selectinload(Titulo.generos)).where(released_cond)
         if not force:
             query = query.where(Titulo.embedding.is_(None))
 
         # Contar total pendiente
-        count_query = select(func.count(Titulo.id))
+        count_query = select(func.count(Titulo.id)).where(released_cond)
         if not force:
             count_query = count_query.where(Titulo.embedding.is_(None))
         total_pending = await session.scalar(count_query) or 0

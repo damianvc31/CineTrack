@@ -304,6 +304,15 @@
   - [x] Soporte de retrocompatibilidad en `config.py` con `@property` y `@model_validator` para entornos existentes.
   - [x] Actualización de `.env.example`, `render.yaml`, `.env`, `.env.local` y documentación.
 
+- [x] **Ciclo de Vida de Próximos Estrenos, Embeddings Selectivos y Umbrales del Recomendador (v1.6.0):**
+  - [x] Paso 1: Configuración en `backend/app/core/config.py`, `.env`, `.env.example` y `render.yaml` (`AI_RECOMMENDER_MIN_VOTES_VECTOR`, `AI_RECOMMENDER_MIN_VOTES_THEMATIC`, `AI_RECOMMENDER_MIN_VOTES_FALLBACK`, `AI_RECOMMENDER_NEW_RELEASE_DAYS`).
+  - [x] Paso 2: Blindaje y umbrales en `backend/app/services/catalog_service.py` (`apply_base_filters` con `get_released_filter_condition(today)` y soporte de estrenos recientes sin piso de votos).
+  - [x] Paso 3: Generación selectiva de embeddings en `backend/app/jobs/sync_embeddings.py` (excluir unreleased/upcoming para no gastar cuota de API).
+  - [x] Paso 4: Invocación de `sync_pending_embeddings()` tras `expand_catalog_by_genres()` y persistencia de `status_tmdb` en `refresh_catalog_metrics()`.
+  - [x] Paso 5: Suite de tests automatizados unitarios y de integración para validar candidatos y embeddings selectivos.
+  - [x] Paso 6: Exigencia de póster oficial en ingesta (`upsert_movie`/`upsert_series`) e inclusión de "sin póster" en purga (`purge_invalid_or_incomplete_titles`) con suite ampliada a 105 tests en verde.
+  - [x] Paso 7: Actualización de documentación viva (`ARCHITECTURE.md`, `README.md`, `CHANGELOG.md`, `ROADMAP.md`).
+
 ---
 
 ## Backlog / Versión Superior (Post-Entrega):

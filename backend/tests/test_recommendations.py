@@ -520,4 +520,138 @@ async def test_language_filtering(db_session: AsyncSession, sample_catalog_for_r
     assert 2 not in cand_ids
 
 
+@pytest.mark.asyncio
+async def test_unreleased_titles_excluded_from_recommendations(db_session: AsyncSession, sample_catalog_for_recs):
+    """Verifica que un título futuro/no estrenado quede 100% excluido de los candidatos del recomendador, aun si coincide el director."""
+    from datetime import date, timedelta
+    from app.models.titulo import Titulo
+    from app.services.catalog_service import get_recommendation_candidates
+
+    # Título no estrenado (upcoming) dirigido por Christopher Nolan
+    upcoming_nolan = Titulo(
+        id=6,
+        tmdb_id=401,
+        tipo="movie",
+        nombre="The Odyssey",
+        sinopsis="Un viaje épico a través del cosmos en producción.",
+        fecha_estreno=date.today() + timedelta(days=120),
+        status_tmdb="In Production",
+        director="Christopher Nolan",
+        pais="US",
+        idioma_original="en",
+        popularidad=300.0,
+        vote_average_tmdb=9.0,
+        vote_count_tmdb=50,
+        rating_unificado=9.0,
+    )
+    db_session.add(upcoming_nolan)
+    await db_session.commit()
+
+    candidates, _ = await get_recommendation_candidates(
+        db_session,
+        prompt="peliculas de christopher nolan",
+        usuario_id=None
+    )
+    cand_ids = [c["id"] for c in candidates]
+    # Los estrenados (Inception=2, Interstellar=1) deben estar
+    assert 1 in cand_ids or 2 in cand_ids
+    # El no estrenado no debe ser recomendado bajo ningún concepto
+    assert 6 not in cand_ids
+
+
+@pytest.mark.asyncio
+async def test_recent_release_with_low_votes_allowed_in_recommendations(db_session: AsyncSession, sample_catalog_for_recs):
+    """Verifica que una obra recién estrenada (<= 30 días) sea elegible para recomendación aun con vote_count bajo (< 25)."""
+    from datetime import date, timedelta
+    from app.models.titulo import Titulo
+    from app.services.catalog_service import get_recommendation_candidates
+
+    # Estreno de hace 3 días con solo 5 votos
+    recent_movie = Titulo(
+        id=7,
+        tmdb_id=402,
+        tipo="movie",
+        nombre="Nolan Secret Project",
+        sinopsis="Una nueva obra maestra recientemente estrenada en cines.",
+        fecha_estreno=date.today() - timedelta(days=3),
+        status_tmdb="Released",
+        director="Christopher Nolan",
+        pais="US",
+        idioma_original="en",
+        popularidad=250.0,
+        vote_average_tmdb=8.0,
+        vote_count_tmdb=5,  # Muy pocos votos, pero es estreno reciente
+        rating_unificado=8.0,
+    )
+    db_session.add(recent_movie)
+    await db_session.commit()
+
+    candidates, _ = await get_recommendation_candidates(
+        db_session,
+        prompt="peliculas de christopher nolan",
+        usuario_id=None
+    )
+    cand_ids = [c["id"] for c in candidates]
+    assert 7 in cand_ids
+
+
+@pytest.mark.asyncio
+async def test_sync_embeddings_skips_unreleased_titles(db_session: AsyncSession):
+    """Verifica que sync_catalog_embeddings solo procese títulos estrenados y omita títulos futuros o unreleased."""
+    from datetime import date, timedelta
+    from unittest.mock import AsyncMock, MagicMock
+    from app.models.titulo import Titulo
+    from app.jobs.sync_embeddings import sync_catalog_embeddings
+
+    t_released = Titulo(
+        id=81,
+        tmdb_id=501,
+        tipo="movie",
+        nombre="Released Film",
+        fecha_estreno=date.today() - timedelta(days=10),
+        status_tmdb="Released",
+        embedding=None,
+    )
+    t_unreleased = Titulo(
+        id=82,
+        tmdb_id=502,
+        tipo="movie",
+        nombre="Upcoming Film",
+        fecha_estreno=date.today() + timedelta(days=60),
+        status_tmdb="In Production",
+        embedding=None,
+    )
+    db_session.add_all([t_released, t_unreleased])
+    await db_session.commit()
+
+    # Mock del servicio de embeddings
+    mock_emb_svc = MagicMock()
+    mock_emb_svc.build_title_text.return_value = "Texto formateado"
+    mock_emb_svc.get_embeddings_batch = AsyncMock(return_value=[[0.1] * 768])
+
+    # Forzar dialect.name == "postgresql" en el bind para simular entorno de producción
+    mock_bind = MagicMock()
+    mock_bind.dialect.name = "postgresql"
+
+    orig_bind = getattr(db_session, "bind", None)
+    db_session.bind = mock_bind
+    try:
+        res = await sync_catalog_embeddings(
+            batch_size=10,
+            db=db_session,
+            embedding_service=mock_emb_svc,
+        )
+        # Solo debe haber contado y procesado el título estrenado (t_released)
+        assert res["total_pending"] == 1
+        assert res["total_updated"] == 1
+        # Se llamó a get_embeddings_batch con 1 solo texto (no 2)
+        assert mock_emb_svc.get_embeddings_batch.call_count == 1
+        call_args = mock_emb_svc.get_embeddings_batch.call_args[0][0]
+        assert len(call_args) == 1
+    finally:
+        db_session.bind = orig_bind
+
+
+
+
 

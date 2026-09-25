@@ -289,6 +289,11 @@ class TMDBSyncService:
             logger.info(f"Omitiendo película no legible en alfabeto no latino (TMDB ID: {tmdb_id}, nombre: {nombre})")
             return None
 
+        # Exigir póster oficial
+        if not details.get("poster_path"):
+            logger.info(f"Omitiendo película sin póster oficial (TMDB ID: {tmdb_id}, nombre: {nombre})")
+            return None
+
         if not allow_unrel and (fecha_estreno is None or not idioma or not pais):
             logger.info(f"Omitiendo película con metadatos incompletos (TMDB ID: {tmdb_id}, fecha: {fecha_estreno}, idioma: {idioma}, pais: {pais})")
             return None
@@ -440,6 +445,11 @@ class TMDBSyncService:
         # Filtro de Calidad Mínima y Legibilidad
         if not is_latin_legible(nombre):
             logger.info(f"Omitiendo serie no legible en alfabeto no latino (TMDB ID: {tmdb_id}, nombre: {nombre})")
+            return None
+
+        # Exigir póster oficial
+        if not details.get("poster_path"):
+            logger.info(f"Omitiendo serie sin póster oficial (TMDB ID: {tmdb_id}, nombre: {nombre})")
             return None
 
         if not allow_unrel and (fecha_estreno is None or not idioma or not pais):
@@ -1369,7 +1379,9 @@ class TMDBSyncService:
                 pop = details.get("popularity", 0.0)
                 v_avg = details.get("vote_average", 0.0)
                 v_cnt = details.get("vote_count", 0)
-                return tit_id, pop, v_avg, v_cnt
+                status_val = details.get("status")
+                duracion_val = details.get("runtime") if tipo == "movie" else None
+                return tit_id, pop, v_avg, v_cnt, status_val, duracion_val
             except Exception as e:
                 logger.debug(f"Error obteniendo métricas de {tipo} {tmdb_id}: {e}")
                 return None
@@ -1382,15 +1394,21 @@ class TMDBSyncService:
 
             for res_item in results:
                 if res_item:
-                    tid, pop, v_avg, v_cnt = res_item
+                    tid, pop, v_avg, v_cnt, status_val, duracion_val = res_item
+                    update_vals = {
+                        "popularidad": pop,
+                        "vote_average_tmdb": v_avg,
+                        "vote_count_tmdb": v_cnt,
+                    }
+                    if status_val:
+                        update_vals["status_tmdb"] = status_val
+                    if duracion_val:
+                        update_vals["duracion"] = duracion_val
+
                     await self.db.execute(
                         update(Titulo)
                         .where(Titulo.id == tid)
-                        .values(
-                            popularidad=pop,
-                            vote_average_tmdb=v_avg,
-                            vote_count_tmdb=v_cnt
-                        )
+                        .values(**update_vals)
                     )
                     updated_count += 1
 
@@ -1460,6 +1478,7 @@ class TMDBSyncService:
         2. Títulos sin fecha de estreno (fecha_estreno IS NULL).
         3. Títulos sin idioma original (idioma_original IS NULL).
         4. Títulos sin país (pais IS NULL).
+        5. Títulos sin póster oficial (portada_url IS NULL o vacío).
         Tras la purga, recalcula percentiles y ratings unificados, e invalida la caché del catálogo.
         """
         logger.info("Iniciando auditoría y purga de títulos incompletos o no legibles...")
@@ -1472,12 +1491,13 @@ class TMDBSyncService:
                 Titulo.fecha_estreno,
                 Titulo.idioma_original,
                 Titulo.pais,
+                Titulo.portada_url,
             )
         )
         all_titles = res.all()
 
         to_delete: List[Dict[str, Any]] = []
-        for tid, tmid, tipo, nombre, fecha, idioma, pais in all_titles:
+        for tid, tmid, tipo, nombre, fecha, idioma, pais, portada in all_titles:
             reasons = []
             if not is_latin_legible(nombre):
                 reasons.append("alfabeto_no_latino")
@@ -1487,6 +1507,8 @@ class TMDBSyncService:
                 reasons.append("sin_idioma_original")
             if not pais:
                 reasons.append("sin_pais")
+            if not portada:
+                reasons.append("sin_poster")
 
             if reasons:
                 to_delete.append({
@@ -1865,6 +1887,12 @@ class TMDBSyncService:
             logger.info("Recalculando percentiles y ratings tras expansión...")
             await self.recalculate_percentiles()
             await self.recalculate_unified_ratings()
+
+            # 5. Sincronizar embeddings pendientes para títulos ya estrenados
+            try:
+                await self.sync_pending_embeddings()
+            except Exception as e:
+                logger.warning(f"No se pudieron sincronizar embeddings tras expansión: {e}")
 
         summary = {
             "genres_processed": len(target_genres) if target_genres != [None] else 1,

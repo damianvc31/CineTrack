@@ -91,6 +91,14 @@ services:
         value: "openai/gpt-oss-20b,groq/compound-mini,qwen/qwen3.8-27b"
       - key: RECOMMENDATION_CANDIDATES_LIMIT
         value: "20"
+      - key: AI_RECOMMENDER_MIN_VOTES_VECTOR
+        value: "25"
+      - key: AI_RECOMMENDER_MIN_VOTES_THEMATIC
+        value: "80"
+      - key: AI_RECOMMENDER_MIN_VOTES_FALLBACK
+        value: "150"
+      - key: AI_RECOMMENDER_NEW_RELEASE_DAYS
+        value: "30"
 
       # --- Parámetros de Secciones y Pools de Home ---
       - key: HOME_SECTION_SAMPLE_SIZE

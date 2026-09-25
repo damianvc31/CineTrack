@@ -31,6 +31,10 @@ Variables clave requeridas:
   - `GROQ_API_KEY`: Clave de API de Groq Cloud para modelos de alta velocidad.
   - `GROQ_MODEL`: Identificador del modelo Groq (default: `openai/gpt-oss-120b`).
   - `AI_RECOMMENDER_PRIMARY`: Proveedor primario de IA (`gemini` o `groq`, con fallback cruzado automático y degradación elegante al motor heurístico determinista local).
+  - `AI_RECOMMENDER_MIN_VOTES_VECTOR`: Piso de votos para candidatos vectoriales en pgvector (default: `25`).
+  - `AI_RECOMMENDER_MIN_VOTES_THEMATIC`: Piso de votos para coincidencias léxicas en sinopsis (default: `80`).
+  - `AI_RECOMMENDER_MIN_VOTES_FALLBACK`: Piso de votos para fallbacks de relleno (default: `150`).
+  - `AI_RECOMMENDER_NEW_RELEASE_DAYS`: Ventana temporal para admitir estrenos recientes sin piso estricto de votos (default: `30` días).
 - **Expansión de Catálogo TMDB (Criterio 1: /discover por géneros con filtros de calidad):**
   - `TMDB_EXPAND_MIN_VOTE_COUNT`: Umbral mínimo de votos en TMDB (default: `300`).
   - `TMDB_EXPAND_MIN_VOTE_AVERAGE`: Umbral mínimo de calificación en TMDB (default: `7.0`).

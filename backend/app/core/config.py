@@ -117,6 +117,10 @@ class Settings(BaseSettings):
     GROQ_FALLBACK_MODELS: str = "openai/gpt-oss-20b,groq/compound-mini,qwen/qwen3.8-27b"
     AI_RECOMMENDER_PRIMARY: str = "gemini"  # "gemini" o "groq"
     RECOMMENDATION_CANDIDATES_LIMIT: int = 20
+    AI_RECOMMENDER_MIN_VOTES_VECTOR: int = 25
+    AI_RECOMMENDER_MIN_VOTES_THEMATIC: int = 80
+    AI_RECOMMENDER_MIN_VOTES_FALLBACK: int = 150
+    AI_RECOMMENDER_NEW_RELEASE_DAYS: int = 30
 
     # Home Sections & Pools Configuration
     HOME_SECTION_SAMPLE_SIZE: int = 10

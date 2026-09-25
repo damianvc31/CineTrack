@@ -125,6 +125,13 @@
   - Desambiguación cromática de badges en detalle de título: "Renewed TBA" preserva púrpura (`purple-950`), "En Producción" adopta Teal (`teal-950/80`), y nuevo badge "Estrenada" (`Released`) en verde esmeralda para películas.
   - Corrección de etiquetas e iconos en chips de sección de Catálogo (`⭐ Top Rated`, `🕒 New Releases`).
   - Suite de backend ampliada a 101 tests unitarios e integración en verde (100%).
+- [x] **Ciclo de Vida de Próximos Estrenos, Embeddings Selectivos y Umbrales del Recomendador (v1.6.0):**
+  - Vectorización selectiva en `sync_embeddings`: exclusión estricta de obras no estrenadas (`get_released_filter_condition(today)`) para preservar cuota de Gemini.
+  - Sincronización automática de embeddings tras `expand_catalog` para títulos ya estrenados.
+  - Transición automática de estrenos en `refresh_catalog_metrics`: actualización liviana de `status_tmdb` y `duracion`, permitiendo que títulos recién estrenados sean detectados y vectorizados en la sync diaria.
+  - Blindaje estricto de candidatos en el recomendador con IA (`apply_base_filters` con `get_released_filter_condition(today)`).
+  - Umbrales de votos mínimos y excepción de estreno reciente desacoplados a variables operativas (`AI_RECOMMENDER_MIN_VOTES_VECTOR=25`, `AI_RECOMMENDER_MIN_VOTES_THEMATIC=80`, `AI_RECOMMENDER_MIN_VOTES_FALLBACK=150`, `AI_RECOMMENDER_NEW_RELEASE_DAYS=30`).
+  - Suite ampliada a 104 tests unitarios e integración pasando en verde (100%).
 
 ---
 

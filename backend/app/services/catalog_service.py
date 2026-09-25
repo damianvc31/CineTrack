@@ -2522,7 +2522,12 @@ async def get_recommendation_candidates(
                 if c_code == detected_country:
                     syn_search_words.append(city_name)
 
+    today = date.today()
+    recent_release_cutoff = today - timedelta(days=settings.AI_RECOMMENDER_NEW_RELEASE_DAYS)
+
     def apply_base_filters(query):
+        # Excluir estrictamente obras no estrenadas / próximas
+        query = query.where(get_released_filter_condition(today))
         if effective_tipo in ("movie", "tv"):
             query = query.where(Titulo.tipo == effective_tipo)
         if min_year:
@@ -2711,8 +2716,17 @@ async def get_recommendation_candidates(
                     .where(Titulo.embedding.isnot(None))
                 )
                 vector_q = apply_base_filters(vector_q)
-                # Exigir un piso razonable de votos para evitar registros con metadata vacía
-                vector_q = vector_q.where(Titulo.vote_count_tmdb >= 25)
+                # Exigir un piso razonable de votos o permitir estrenos recientes
+                vector_q = vector_q.where(
+                    or_(
+                        Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_VECTOR,
+                        and_(
+                            Titulo.fecha_estreno.isnot(None),
+                            Titulo.fecha_estreno >= recent_release_cutoff,
+                            Titulo.fecha_estreno <= today
+                        )
+                    )
+                )
                 # Ordenar por distancia coseno de pgvector
                 vector_q = vector_q.order_by(Titulo.embedding.cosine_distance(user_vec).asc()).limit(25)
                 v_res = await db.execute(vector_q)
@@ -2742,7 +2756,14 @@ async def get_recommendation_candidates(
         theme_genre_q = apply_base_filters(theme_genre_q)
         theme_genre_q = theme_genre_q.where(
             Genero.nombre.in_(expanded_genres),
-            Titulo.vote_count_tmdb >= 80,
+            or_(
+                Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_THEMATIC,
+                and_(
+                    Titulo.fecha_estreno.isnot(None),
+                    Titulo.fecha_estreno >= recent_release_cutoff,
+                    Titulo.fecha_estreno <= today
+                )
+            ),
             or_(*[Titulo.sinopsis.ilike(f"%{w}%") for w in syn_search_words])
         )
         theme_genre_q = theme_genre_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(25)
@@ -2756,7 +2777,14 @@ async def get_recommendation_candidates(
         )
         theme_syn_q = apply_base_filters(theme_syn_q)
         theme_syn_q = theme_syn_q.where(
-            Titulo.vote_count_tmdb >= 80,
+            or_(
+                Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_THEMATIC,
+                and_(
+                    Titulo.fecha_estreno.isnot(None),
+                    Titulo.fecha_estreno >= recent_release_cutoff,
+                    Titulo.fecha_estreno <= today
+                )
+            ),
             or_(*[Titulo.sinopsis.ilike(f"%{w}%") for w in syn_search_words])
         )
         theme_syn_q = theme_syn_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(25)
@@ -2783,7 +2811,7 @@ async def get_recommendation_candidates(
         g_q = apply_base_filters(g_q)
         g_q = g_q.where(
             Genero.nombre.in_(expanded_genres),
-            Titulo.vote_count_tmdb >= 150
+            Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_FALLBACK
         )
         g_q = g_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(20)
         g_res = await db.execute(g_q)
@@ -2805,7 +2833,7 @@ async def get_recommendation_candidates(
         fill_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
         fill_q = apply_base_filters(fill_q)
         fill_q = fill_q.where(
-            Titulo.vote_count_tmdb >= 150,
+            Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_FALLBACK,
             Titulo.rating_unificado >= 7.5
         )
         fill_q = fill_q.order_by(func.random()).limit(needed)

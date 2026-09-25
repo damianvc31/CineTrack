@@ -2,6 +2,38 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.6.0] - 2026-09-25
+### Agregado (Ciclo de Vida de Próximos Estrenos, Embeddings Selectivos y Umbrales del Recomendador)
+- **Cálculo Selectivo de Embeddings Vectoriales (Zero-Waste):**
+  - Restricción estricta en `sync_catalog_embeddings()` y `sync_pending_embeddings()` mediante `get_released_filter_condition(today)`.
+  - Los títulos en producción, planificados o con fecha de estreno futura agregados al catálogo quedan excluidos de la vectorización para preservar la cuota de la API de Google Gemini (`gemini-embedding-001`).
+- **Sincronización de Embeddings en Expansión de Catálogo (`expand_catalog`):**
+  - Invocación automática de `sync_pending_embeddings()` al concluir la ingesta en `expand_catalog_by_genres()`.
+  - Los títulos ya estrenados se vectorizan de inmediato en la base de datos sin tener que esperar a la sincronización nocturna.
+- **Transición Automática de Próximos Estrenos en Sync Diaria:**
+  - El proceso ligero `refresh_catalog_metrics()` ahora actualiza `status_tmdb` y `duracion` a partir de la respuesta de TMDB.
+  - Cuando una obra alcanza su fecha de estreno y pasa a estado `Released`, el paso posterior de la sync diaria la detecta como estrenada y le calcula su embedding por primera vez.
+- **Blindaje Estricto del Recomendador con IA contra Títulos No Estrenados:**
+  - Incorporación de `get_released_filter_condition(today)` en `apply_base_filters()` de `get_recommendation_candidates()`, garantizando que ninguna obra *upcoming* sea seleccionada como candidata de recomendación bajo ningún concepto.
+- **Parametrización de Umbrales de Votos y Excepción de Estrenos Recientes:**
+  - Desacople de números mágicos hardcodeados en el recomendador a variables de entorno en `Settings`:
+    - `AI_RECOMMENDER_MIN_VOTES_VECTOR` (default: 25) para candidatos semánticos por distancia coseno.
+    - `AI_RECOMMENDER_MIN_VOTES_THEMATIC` (default: 80) para coincidencias léxicas en sinopsis.
+    - `AI_RECOMMENDER_MIN_VOTES_FALLBACK` (default: 150) para títulos de respaldo de alta calidad.
+    - `AI_RECOMMENDER_NEW_RELEASE_DAYS` (default: 30 días) como excepción temporal que admite obras recientemente estrenadas sin exigir un piso estricto de votos comunitarios.
+- **Filtro Estricto de Calidad Visual (Exigencia de Póster y Purga):**
+  - Validación de póster oficial en ingesta (`upsert_movie` y `upsert_series`): rechazo automático de producciones sin póster (`poster_path IS NULL`).
+  - Incorporación de la regla "sin póster" (`portada_url IS NULL` o vacío) en la purga masiva de títulos incompletos (`purge_invalid_or_incomplete_titles`).
+
+### Cobertura de Tests
+- 4 nuevas pruebas unitarias en backend (105 tests totales en verde):
+  - `test_unreleased_titles_excluded_from_recommendations`: verificación de que títulos futuros no ingresen al recomendador aun con directores o actores coincidentes.
+  - `test_recent_release_with_low_votes_allowed_in_recommendations`: verificación de la excepción de estreno reciente para títulos con pocos votos.
+  - `test_sync_embeddings_skips_unreleased_titles`: validación de que `sync_catalog_embeddings` solo procese obras estrenadas y preserve cuota de Gemini.
+  - `test_upsert_rejects_missing_poster`: verificación de que no se ingesten obras sin póster oficial.
+  - Actualización de `test_refresh_catalog_metrics` para verificar la actualización de `status_tmdb` y `duracion`.
+  - Actualización de `test_purge_invalid_or_incomplete_titles` para verificar la eliminación de títulos sin póster.
+
 ## [v1.5.0] - 2026-09-25
 ### Agregado (Expansión de Próximos Estrenos, Desacoplamiento de Límites y Desbloqueo de Ingesta Manual)
 - **Modo Próximos Estrenos en Expansión de Catálogo (`--expand --upcoming`):**

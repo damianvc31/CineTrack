@@ -149,6 +149,17 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
     - **Desbloqueo de `--allow-unreleased` en Ingesta Manual:** Los comandos `--import-tmdb-id` e `--import-json`, junto con el endpoint administrativo `POST /api/v1/admin/sync/import-tmdb`, admiten `--allow-unreleased` para importar proyectos futuros arbitrarios sin alterar la variable de entorno global `TMDB_ALLOW_UNRELEASED=false`.
     - **Desambiguación de Badges en Frontend:** Badge 'Renewed TBA' preservado en púrpura (`purple-950`), badge 'En Producción' en tono Teal (`teal-950/80`), y nuevo badge 'Estrenada' (`Released`) en verde esmeralda para películas.
 
+17. **Ciclo de Vida de Próximos Estrenos, Embeddings Selectivos y Umbrales del Recomendador (`v1.6.0`):**
+    - **Cálculo Selectivo de Embeddings (Zero-Waste):** Tanto el script `sync_embeddings.py` como el servicio `sync_pending_embeddings()` filtran estrictamente por `get_released_filter_condition(today)`. Los títulos en producción o futuros agregados al catálogo no gastan cuota de la API de Google Gemini en vectorización semántica mientras no hayan sido estrenados.
+    - **Vectorización en Expansión de Catálogo (`expand_catalog`):** Al concluir una expansión por géneros, se invoca automáticamente `sync_pending_embeddings()`. Los títulos estrenados que se acaban de ingerir se vectorizan de inmediato, mientras que los títulos futuros (`--upcoming`) quedan en espera hasta su estreno.
+    - **Transición Automática de Próximos Estrenos en Sync Diaria:** El método `refresh_catalog_metrics()` ahora actualiza `status_tmdb` y `duracion` a partir del detalle ligero de TMDB. Cuando una obra alcanza su fecha de estreno (`fecha_estreno <= today`) y pasa a `Released`, el paso posterior de la sync diaria detecta que ya califica como estrenada y le calcula su embedding por primera vez.
+    - **Blindaje Total de Candidatos del Recomendador:** La función `apply_base_filters()` inyecta `get_released_filter_condition(today)` para garantizar que ninguna obra no estrenada (incluso con directores o actores coincidentes con el prompt) pueda calificar como candidata de recomendación.
+    - **Parametrización de Umbrales de Calidad y Excepción de Estrenos Recientes:** Desacople de constantes hardcodeadas a variables de entorno en `Settings`:
+      - `AI_RECOMMENDER_MIN_VOTES_VECTOR`: Piso de votos para búsqueda semántica vectorial (default: 25).
+      - `AI_RECOMMENDER_MIN_VOTES_THEMATIC`: Piso de votos para búsqueda léxica por palabras en sinopsis (default: 80).
+      - `AI_RECOMMENDER_MIN_VOTES_FALLBACK`: Piso de votos para relleno de cupo con títulos de respaldo (default: 150).
+      - `AI_RECOMMENDER_NEW_RELEASE_DAYS`: Ventana temporal (default: 30 días) que exime del piso estricto de votos a obras recientemente estrenadas, permitiendo que el recomendador las descubra y sugiera de inmediato.
+
 ---
 
 ## 4. Arquitectura de Frontend (React 19 + Vite 8 + Tailwind CSS v4)

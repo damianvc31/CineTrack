@@ -463,6 +463,8 @@ async def test_refresh_catalog_metrics(db_session, mock_tmdb_client):
         vote_average_tmdb=5.0,
         vote_count_tmdb=10,
         rating_unificado=5.0,
+        status_tmdb="In Production",
+        duracion=None,
     )
     db_session.add(t)
     await db_session.commit()
@@ -473,6 +475,8 @@ async def test_refresh_catalog_metrics(db_session, mock_tmdb_client):
         "popularity": 88.5,
         "vote_average": 8.4,
         "vote_count": 1500,
+        "status": "Released",
+        "runtime": 130,
     }
 
     res = await service.refresh_catalog_metrics(batch_size=10)
@@ -484,6 +488,8 @@ async def test_refresh_catalog_metrics(db_session, mock_tmdb_client):
     assert t.vote_average_tmdb == pytest.approx(8.4)
     assert t.vote_count_tmdb == 1500
     assert t.rating_unificado == pytest.approx(8.4)
+    assert t.status_tmdb == "Released"
+    assert t.duracion == 130
     assert t.popularidad_percentil is not None
 
 
@@ -627,6 +633,7 @@ async def test_upsert_movie_multi_country_and_fallback(db_session, mock_tmdb_cli
         "status": "Released",
         "original_language": "en",
         "origin_country": ["FR", "GB"],
+        "poster_path": "/doc.jpg",
     }
     m = await service.upsert_movie(88801, doc_details)
     assert m is not None
@@ -640,6 +647,7 @@ async def test_upsert_movie_multi_country_and_fallback(db_session, mock_tmdb_cli
         "original_language": "en",
         "origin_country": [],
         "production_countries": [{"iso_3166_1": "US"}, {"iso_3166_1": "CA"}],
+        "poster_path": "/barbie.jpg",
     }
     b = await service.upsert_movie(88802, barbie_details)
     assert b is not None
@@ -660,6 +668,7 @@ async def test_purge_invalid_or_incomplete_titles(db_session, mock_tmdb_client):
         idioma_original="en",
         pais="US",
         popularidad=10.0,
+        portada_url="https://image.tmdb.org/t/p/w500/valid.jpg",
     )
     # 2. Título no latino
     t_non_latin = Titulo(
@@ -670,6 +679,7 @@ async def test_purge_invalid_or_incomplete_titles(db_session, mock_tmdb_client):
         idioma_original="ja",
         pais="JP",
         popularidad=10.0,
+        portada_url="https://image.tmdb.org/t/p/w500/conan.jpg",
     )
     # 3. Título sin fecha
     t_no_date = Titulo(
@@ -680,6 +690,7 @@ async def test_purge_invalid_or_incomplete_titles(db_session, mock_tmdb_client):
         idioma_original="en",
         pais="GB",
         popularidad=5.0,
+        portada_url="https://image.tmdb.org/t/p/w500/nodate.jpg",
     )
     # 4. Título sin país
     t_no_country = Titulo(
@@ -690,13 +701,25 @@ async def test_purge_invalid_or_incomplete_titles(db_session, mock_tmdb_client):
         idioma_original="tr",
         pais=None,
         popularidad=5.0,
+        portada_url="https://image.tmdb.org/t/p/w500/nocountry.jpg",
+    )
+    # 5. Título sin póster
+    t_no_poster = Titulo(
+        nombre="No Poster Film",
+        tipo="movie",
+        tmdb_id=77705,
+        fecha_estreno=date(2021, 5, 1),
+        idioma_original="es",
+        pais="ES",
+        popularidad=5.0,
+        portada_url=None,
     )
 
-    db_session.add_all([t_valid, t_non_latin, t_no_date, t_no_country])
+    db_session.add_all([t_valid, t_non_latin, t_no_date, t_no_country, t_no_poster])
     await db_session.commit()
 
     res = await service.purge_invalid_or_incomplete_titles()
-    assert res["purged_count"] == 3
+    assert res["purged_count"] == 4
 
     # Verificar que el válido sigue existiendo y los inválidos fueron eliminados
     res_check = await db_session.execute(select(Titulo.nombre))
@@ -705,6 +728,42 @@ async def test_purge_invalid_or_incomplete_titles(db_session, mock_tmdb_client):
     assert "名探偵コナン" not in remaining
     assert "No Date Show" not in remaining
     assert "No Country Film" not in remaining
+    assert "No Poster Film" not in remaining
+
+
+@pytest.mark.asyncio
+async def test_upsert_rejects_missing_poster(db_session, mock_tmdb_client):
+    """Verifica que upsert_movie y upsert_series rechacen producciones sin póster oficial."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+
+    # Detalle de película sin poster_path
+    no_poster_movie = {
+        "id": 99901,
+        "title": "Movie Without Poster",
+        "release_date": "2023-01-01",
+        "original_language": "en",
+        "origin_country": ["US"],
+        "poster_path": None,
+        "overview": "Overview test",
+    }
+    mock_tmdb_client.get_details.return_value = no_poster_movie
+    res_m = await service.upsert_movie(99901, details=no_poster_movie)
+    assert res_m is None
+
+    # Detalle de serie sin poster_path
+    no_poster_series = {
+        "id": 99902,
+        "name": "Series Without Poster",
+        "first_air_date": "2023-01-01",
+        "original_language": "en",
+        "origin_country": ["US"],
+        "poster_path": None,
+        "overview": "Overview test",
+    }
+    mock_tmdb_client.get_details.return_value = no_poster_series
+    res_s = await service.upsert_series(99902, details=no_poster_series)
+    assert res_s is None
+
 
 
 @pytest.mark.asyncio
@@ -732,6 +791,7 @@ async def test_expand_catalog_by_genres_upcoming_single_genre(db_session, mock_t
         "status": "In Production",
         "original_language": "en",
         "origin_country": ["US"],
+        "poster_path": "/future.jpg",
         "genres": [{"id": 878, "name": "Ciencia ficción"}],
     }
     mock_tmdb_client.get_details.side_effect = lambda m, id_, *args, **kwargs: future_movie
@@ -783,6 +843,7 @@ async def test_expand_catalog_by_genres_upcoming_global_no_genre(db_session, moc
         "status": "Planned",
         "original_language": "en",
         "origin_country": ["US"],
+        "poster_path": "/global.jpg",
         "genres": [],
     }
     mock_tmdb_client.get_details.side_effect = lambda m, id_, *args, **kwargs: mock_movie
@@ -830,6 +891,7 @@ async def test_expand_catalog_by_genres_upcoming_infinite_days(db_session, mock_
         "status": "Planned",
         "original_language": "en",
         "origin_country": ["US"],
+        "poster_path": "/far_future.jpg",
         "genres": [],
     }
     mock_tmdb_client.get_details.side_effect = lambda m, id_, *args, **kwargs: mock_movie
@@ -879,6 +941,7 @@ async def test_expand_catalog_by_genres_upcoming_unlimited_target(db_session, mo
         "status": "In Production",
         "original_language": "en",
         "origin_country": ["US"],
+        "poster_path": "/upcoming_unl.jpg",
         "genres": [],
     }
     mock_tmdb_client.get_details.side_effect = lambda m, id_, *args, **kwargs: mock_movie
