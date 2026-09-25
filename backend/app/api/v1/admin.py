@@ -249,6 +249,35 @@ async def _run_job_refresh_metrics(batch_size: int):
         await client.close()
 
 
+async def _run_job_backfill_countries():
+    client = TMDBClient()
+    try:
+        async with AsyncSessionLocal() as db:
+            service = TMDBSyncService(db, client)
+            await service.backfill_catalog_countries()
+            try:
+                from app.services.catalog_service import clear_catalog_cache
+                clear_catalog_cache()
+            except Exception:
+                pass
+    except Exception as e:
+        logger.error(f"[Job Background] Error en backfill de países: {e}")
+    finally:
+        await client.close()
+
+
+async def _run_job_purge_incomplete():
+    client = TMDBClient()
+    try:
+        async with AsyncSessionLocal() as db:
+            service = TMDBSyncService(db, client)
+            await service.purge_invalid_or_incomplete_titles()
+    except Exception as e:
+        logger.error(f"[Job Background] Error en purga de títulos incompletos: {e}")
+    finally:
+        await client.close()
+
+
 async def _run_job_import_json(items: List[Dict[str, Any]]):
     client = TMDBClient()
     try:
@@ -452,6 +481,32 @@ async def trigger_refresh_metrics(
     return JobResponse(
         job="refresh_metrics",
         message=f"Refresco de métricas de catálogo (popularidad y votos) iniciado en segundo plano (lote: {bs})."
+    )
+
+
+@router.post("/sync/backfill-countries", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def trigger_backfill_countries(
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    _: Any = Depends(get_current_admin)
+) -> JobResponse:
+    """Actualiza la columna 'pais' con origen y producción consolidados para todo el catálogo en background."""
+    background_tasks.add_task(_run_job_backfill_countries)
+    return JobResponse(
+        job="backfill_countries",
+        message="Backfill de países consolidando origen y producción iniciado en segundo plano."
+    )
+
+
+@router.post("/sync/purge-incomplete", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def trigger_purge_incomplete(
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    _: Any = Depends(get_current_admin)
+) -> JobResponse:
+    """Purga títulos no legibles (alfabeto no latino) o sin fecha, idioma o país en background."""
+    background_tasks.add_task(_run_job_purge_incomplete)
+    return JobResponse(
+        job="purge_incomplete",
+        message="Purga selectiva de títulos incompletos o no legibles iniciada en segundo plano."
     )
 
 

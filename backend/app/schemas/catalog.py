@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 
 class GenreResponse(BaseModel):
@@ -95,6 +95,13 @@ class TitleCardResponse(BaseModel):
     seasons_progress: list[SeasonProgressResponse] | None = None
     following_status_text: str | None = None
     user_rating: float | None = None
+
+    @computed_field
+    @property
+    def paises(self) -> list[str]:
+        if not self.pais:
+            return []
+        return [p.strip().upper() for p in self.pais.split(",") if p.strip()]
 
 
 class TitleDetailResponse(TitleCardResponse):

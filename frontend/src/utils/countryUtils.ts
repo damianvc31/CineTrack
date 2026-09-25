@@ -12,10 +12,22 @@ export function getFlagEmoji(countryCode?: string | null): string {
   return ''
 }
 
+const HISTORICAL_COUNTRY_NAMES: Record<string, { en: string; es: string }> = {
+  SU: { en: 'Soviet Union', es: 'Unión Soviética' },
+  YU: { en: 'Yugoslavia', es: 'Yugoslavia' },
+  CS: { en: 'Czechoslovakia', es: 'Checoslovaquia' },
+  DDR: { en: 'East Germany', es: 'Alemania Oriental' },
+  AN: { en: 'Netherlands Antilles', es: 'Antillas Holandesas' },
+}
+
 export function getCountryName(countryCode?: string | null, locale = 'en'): string {
   if (!countryCode || countryCode.trim() === '' || countryCode === '-') return '-'
   const code = countryCode.trim().toUpperCase()
-  if (code.length === 2) {
+  if (code.length === 2 || code.length === 3) {
+    if (HISTORICAL_COUNTRY_NAMES[code]) {
+      const isEs = locale.toLowerCase().startsWith('es')
+      return isEs ? HISTORICAL_COUNTRY_NAMES[code].es : HISTORICAL_COUNTRY_NAMES[code].en
+    }
     try {
       const displayNames = new Intl.DisplayNames([locale], { type: 'region' })
       const name = displayNames.of(code)

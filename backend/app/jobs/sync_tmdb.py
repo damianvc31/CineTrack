@@ -32,6 +32,8 @@ async def main():
     parser.add_argument("--percentiles", action="store_true", help="Recalcular percentiles de popularidad")
     parser.add_argument("--ratings", action="store_true", help="Recalcular rating unificado para todos los títulos")
     parser.add_argument("--refresh-metrics", action="store_true", help="Refrescar popularidad y votos para todo el catálogo desde TMDB")
+    parser.add_argument("--backfill-countries", action="store_true", help="Actualizar la columna 'pais' con origen y producción consolidados para todo el catálogo")
+    parser.add_argument("--purge-incomplete", action="store_true", help="Purgar títulos con caracteres no latinos o sin fecha, idioma o país")
     parser.add_argument("--reviews", action="store_true", help="Sincronizar reseñas de TMDB para todos los títulos hasta el tope (20)")
     parser.add_argument("--import-json", type=str, help="Ruta al archivo JSON con títulos a importar")
     parser.add_argument("--import-tmdb-id", type=str, help="Importar o actualizar títulos por ID(s) de TMDB (ej. 319562 o separados por coma: 319562,550)")
@@ -176,7 +178,15 @@ async def main():
                     min_vote_average=args.min_vote_average,
                     allow_unreleased=args.allow_unreleased,
                 )
-                logger.info(f"Resultado de expansión de catálogo: {res}")
+            elif args.backfill_countries:
+                logger.info("-> Ejecutando backfill de países consolidados para todo el catálogo...")
+                res = await service.backfill_catalog_countries()
+                logger.info(f"Backfill de países completado: {res}")
+
+            elif args.purge_incomplete:
+                logger.info("-> Ejecutando purga selectiva de títulos incompletos o no legibles...")
+                res = await service.purge_invalid_or_incomplete_titles()
+                logger.info(f"Purga completada: {res['purged_count']} títulos eliminados.")
 
             else:
                 parser.print_help()

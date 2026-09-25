@@ -283,7 +283,8 @@ async def get_titles(
         target_countries.extend([p.strip().upper() for p in pais.split(",") if p.strip()])
 
     if target_countries:
-        query = query.where(Titulo.pais.in_(target_countries))
+        conds = [func.concat(", ", Titulo.pais, ", ").like(f"%, {tc}, %") for tc in target_countries]
+        query = query.where(or_(*conds))
 
     # Filtro por idioma(s)
     target_languages: list[str] = []
@@ -1592,9 +1593,18 @@ async def get_available_countries(db: AsyncSession) -> list[CountryItem]:
         select(Titulo.pais, func.count(Titulo.id))
         .where(Titulo.pais.isnot(None), Titulo.pais != "")
         .group_by(Titulo.pais)
-        .order_by(func.count(Titulo.id).desc())
     )
-    return [CountryItem(code=row[0], count=row[1]) for row in res.all()]
+    counts: dict[str, int] = {}
+    for raw_pais, cnt in res.all():
+        if not raw_pais:
+            continue
+        for p in raw_pais.split(","):
+            code = p.strip().upper()
+            if code:
+                counts[code] = counts.get(code, 0) + cnt
+
+    sorted_items = sorted(counts.items(), key=lambda x: x[1], reverse=True)
+    return [CountryItem(code=code, count=cnt) for code, cnt in sorted_items]
 
 
 async def get_available_languages(db: AsyncSession) -> list[LanguageItem]:
@@ -2464,10 +2474,9 @@ async def get_recommendation_candidates(
             query = query.where(extract("year", Titulo.fecha_estreno) <= max_year)
         # Si la intención es de Producción / Origen (no Setting), filtrar estrictamente por país
         if detected_country and not is_setting_intent:
-            if isinstance(detected_country, list):
-                query = query.where(Titulo.pais.in_(detected_country))
-            else:
-                query = query.where(Titulo.pais == detected_country)
+            c_list = [detected_country] if isinstance(detected_country, str) else detected_country
+            conds = [func.concat(", ", Titulo.pais, ", ").like(f"%, {c}, %") for c in c_list]
+            query = query.where(or_(*conds))
         # Filtro estricto por idioma original
         if detected_language:
             if isinstance(detected_language, list):
@@ -2517,10 +2526,9 @@ async def get_recommendation_candidates(
     # incluir las mejores producciones de ese país (que naturalmente transcurren allí) como candidatas destacadas
     if is_setting_intent and detected_country:
         set_nat_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-        if isinstance(detected_country, list):
-            set_nat_q = set_nat_q.where(Titulo.pais.in_(detected_country))
-        else:
-            set_nat_q = set_nat_q.where(Titulo.pais == detected_country)
+        c_list = [detected_country] if isinstance(detected_country, str) else detected_country
+        conds = [func.concat(", ", Titulo.pais, ", ").like(f"%, {c}, %") for c in c_list]
+        set_nat_q = set_nat_q.where(or_(*conds))
         set_nat_q = apply_base_filters(set_nat_q)
         set_nat_res = await db.execute(set_nat_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(8))
         for t in set_nat_res.scalars().all():

@@ -119,6 +119,15 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
     - **Recálculo Optimizado de Rating Unificado:** Reducción de miles de queries individuales a un único `UPDATE` SQL en lote para títulos sin reseñas de usuario (`rating_unificado = vote_average_tmdb`), limitando el recálculo minucioso exclusivamente a los títulos con reseñas locales registradas.
     - **Desacople de Reseñas y Workflow Mensual:** Retiro de consultas de reseñas TMDB en las syncs diarias rutinarias y delegación a un job mensual dedicado (`.github/workflows/monthly_reviews_sync.yml`) programado para el día 1 de cada mes a las 05:00 UTC.
 
+13. **Soporte Multi-País, Blindaje de Calidad y Países Históricos (`v1.2.3`):**
+    - **Esquema Delimitado y Eficiente:** Almacenamiento de múltiples países en `Titulo.pais` como lista de códigos ISO-3166-1 alpha-2 separados por comas (ej. `"FR, GB"`). El tipo `VARCHAR(100)` existente admite hasta 25 países sin requerir cambios de esquema ni migraciones de base de datos.
+    - **Extracción Consolidada con Fallback:** Priorización de `origin_country` con fallback a `production_countries` si el primero está vacío, resolviendo coproducciones internacionales y recuperando países en obras donde TMDB omite el origen.
+    - **Filtro SQL de Tokens Exactos:** Búsqueda mediante `func.concat(", ", Titulo.pais, ", ").like(f"%, {code}, %")`, eliminando falsos positivos por subcadenas o prefijos coincidentes.
+    - **Contrato OpenAPI y Frontend:** Campo computado `@computed_field` `paises: list[str]` en los schemas del catálogo (`TitleCardResponse`). Renderizado múltiple en `<CountryFlag />` (múltiples banderas en carruseles y nombres completos separados por comas en detalle).
+    - **Integración Transparente con Recomendador IA:** Los títulos con múltiples países son seleccionados automáticamente ante solicitudes de cualquiera de sus países de origen o locación (`apply_base_filters`). El modelo de lenguaje (Gemini / Groq) recibe la lista completa y reconoce las coproducciones de forma nativa.
+    - **Banderas y Países Históricos:** Soporte de banderas vectoriales inline en SVG para países extintos como la Unión Soviética (`SU`), Yugoslavia (`YU`) y Checoslovaquia (`CS`), evitando errores 404 en CDNs externas. Diccionario de excepciones históricas en `countryUtils.ts` que previene traducciones automáticas anacrónicas (ej. Rusia o Serbia) en toda la UI.
+    - **Blindaje Preventivo de Calidad:** Módulo de validación `is_latin_legible()` y descarte en ingesta (`upsert_movie` / `upsert_series`) de títulos sin fecha de estreno, sin país, sin idioma original, o con nombres en alfabetos no latinos sin traducción.
+
 ---
 
 ## 4. Arquitectura de Frontend (React 19 + Vite 8 + Tailwind CSS v4)

@@ -7,6 +7,7 @@ import { TitleCard } from '@/components/common/TitleCard'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { MultiSelectDropdown, type MultiSelectOption } from '@/components/common/MultiSelectDropdown'
 import { useLanguage } from '@/context/LanguageContext'
+import { getCountryName, getLanguageName } from '@/utils/countryUtils'
 
 interface OutletContextType {
   openAuth: (mode?: 'login' | 'register') => void
@@ -92,27 +93,12 @@ export const CatalogPage: React.FC = () => {
 
   // Nombres localizados para países e idiomas
   const getCountryLabel = useCallback(
-    (code: string) => {
-      try {
-        const dn = new Intl.DisplayNames([language], { type: 'region' })
-        return dn.of(code.toUpperCase()) || code
-      } catch {
-        return code
-      }
-    },
+    (code: string) => getCountryName(code, language),
     [language]
   )
 
   const getLanguageLabel = useCallback(
-    (code: string) => {
-      try {
-        const dn = new Intl.DisplayNames([language], { type: 'language' })
-        const name = dn.of(code.toLowerCase())
-        return name ? name.charAt(0).toUpperCase() + name.slice(1) : code
-      } catch {
-        return code
-      }
-    },
+    (code: string) => getLanguageName(code, language),
     [language]
   )
 

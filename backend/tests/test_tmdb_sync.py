@@ -540,5 +540,127 @@ async def test_upsert_series_skips_already_completed_seasons(db_session, mock_tm
     mock_tmdb_client.get_season_details.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_upsert_movie_rejects_non_latin_and_incomplete(db_session, mock_tmdb_client):
+    """Verifica que upsert_movie descarte obras con caracteres no latinos o metadatos faltantes."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+
+    # 1. Película no latina
+    bad_latin = {
+        "title": "丫丫",
+        "release_date": "2024-01-01",
+        "status": "Released",
+        "original_language": "zh",
+        "origin_country": ["CN"],
+    }
+    m1 = await service.upsert_movie(99901, bad_latin)
+    assert m1 is None
+
+    # 2. Película sin país
+    no_country = {
+        "title": "Mystery Film",
+        "release_date": "2024-01-01",
+        "status": "Released",
+        "original_language": "en",
+        "origin_country": [],
+        "production_countries": [],
+    }
+    m2 = await service.upsert_movie(99902, no_country)
+    assert m2 is None
+
+
+@pytest.mark.asyncio
+async def test_upsert_movie_multi_country_and_fallback(db_session, mock_tmdb_client):
+    """Verifica que upsert_movie consolide múltiples países y use el fallback de producción."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+
+    # Coproducción con origin_country múltiple
+    doc_details = {
+        "title": "Doc Martin The Movie",
+        "release_date": "2020-01-01",
+        "status": "Released",
+        "original_language": "en",
+        "origin_country": ["FR", "GB"],
+    }
+    m = await service.upsert_movie(88801, doc_details)
+    assert m is not None
+    assert m.pais == "FR, GB"
+
+    # Fallback a production_countries
+    barbie_details = {
+        "title": "Barbie Pegasus",
+        "release_date": "2005-10-01",
+        "status": "Released",
+        "original_language": "en",
+        "origin_country": [],
+        "production_countries": [{"iso_3166_1": "US"}, {"iso_3166_1": "CA"}],
+    }
+    b = await service.upsert_movie(88802, barbie_details)
+    assert b is not None
+    assert b.pais == "US, CA"
+
+
+@pytest.mark.asyncio
+async def test_purge_invalid_or_incomplete_titles(db_session, mock_tmdb_client):
+    """Verifica que purge_invalid_or_incomplete_titles elimine en cascada solo títulos inválidos."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+
+    # 1. Título válido
+    t_valid = Titulo(
+        nombre="Valid Movie",
+        tipo="movie",
+        tmdb_id=77701,
+        fecha_estreno=date(2022, 1, 1),
+        idioma_original="en",
+        pais="US",
+        popularidad=10.0,
+    )
+    # 2. Título no latino
+    t_non_latin = Titulo(
+        nombre="名探偵コナン",
+        tipo="tv",
+        tmdb_id=77702,
+        fecha_estreno=date(2022, 1, 1),
+        idioma_original="ja",
+        pais="JP",
+        popularidad=10.0,
+    )
+    # 3. Título sin fecha
+    t_no_date = Titulo(
+        nombre="No Date Show",
+        tipo="tv",
+        tmdb_id=77703,
+        fecha_estreno=None,
+        idioma_original="en",
+        pais="GB",
+        popularidad=5.0,
+    )
+    # 4. Título sin país
+    t_no_country = Titulo(
+        nombre="No Country Film",
+        tipo="movie",
+        tmdb_id=77704,
+        fecha_estreno=date(2021, 5, 1),
+        idioma_original="tr",
+        pais=None,
+        popularidad=5.0,
+    )
+
+    db_session.add_all([t_valid, t_non_latin, t_no_date, t_no_country])
+    await db_session.commit()
+
+    res = await service.purge_invalid_or_incomplete_titles()
+    assert res["purged_count"] == 3
+
+    # Verificar que el válido sigue existiendo y los inválidos fueron eliminados
+    res_check = await db_session.execute(select(Titulo.nombre))
+    remaining = res_check.scalars().all()
+    assert "Valid Movie" in remaining
+    assert "名探偵コナン" not in remaining
+    assert "No Date Show" not in remaining
+    assert "No Country Film" not in remaining
+
+
+
 
 

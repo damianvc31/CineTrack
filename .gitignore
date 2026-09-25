@@ -33,6 +33,7 @@ venv.bak/
 *.sqlite
 *.sqlite3
 *.db
+*.db.bak
 *.db-journal
 *.db-shm
 *.db-wal

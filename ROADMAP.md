@@ -100,6 +100,11 @@
   - Omitido automático (`Season Skipping`) de temporadas concluidas y completas en `upsert_series`, reduciendo >85% de llamadas HTTP y roundtrips a la base de datos.
   - Eliminación de consultas N+1 en episodios agrupando las consultas por temporada.
   - Suite de 84 tests de backend pasando en verde (100%).
+- [x] **Soporte Multi-País, Países Históricos y Blindaje de Calidad de Catálogo (v1.2.3):**
+  - Soporte de coproducciones múltiples delimitadas por comas con fallback prioritario de `origin_country` a `production_countries`.
+  - Banderas vectoriales SVG dedicadas y nombres localizados para países históricos (`SU`, `YU`, `CS`).
+  - Módulo `is_latin_legible` y blindaje preventivo contra títulos sin fecha, sin país, sin idioma o en alfabetos no latinos.
+  - Jobs de backfill (`--backfill-countries`) y purga en cascada (`--purge-incomplete`) verificados al 100% (92 tests en verde).
 
 ---
 

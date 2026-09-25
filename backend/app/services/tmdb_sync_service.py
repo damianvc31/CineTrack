@@ -3,11 +3,12 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Set
 
-from sqlalchemy import func, select, update, text
+from sqlalchemy import delete, func, select, update, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
+from app.core.text_utils import extract_tmdb_countries, is_latin_legible
 from app.models import (
     Actor,
     Episodio,
@@ -279,13 +280,24 @@ class TMDBSyncService:
             return None
 
         director, guionista, elenco_list = self._parse_credits(details.get("credits", {}))
+        nombre = details.get("title", "")
+        idioma = details.get("original_language")
+        pais = extract_tmdb_countries(details)
+
+        # Filtro de Calidad Mínima y Legibilidad
+        if not is_latin_legible(nombre):
+            logger.info(f"Omitiendo película no legible en alfabeto no latino (TMDB ID: {tmdb_id}, nombre: {nombre})")
+            return None
+
+        if not allow_unrel and (fecha_estreno is None or not idioma or not pais):
+            logger.info(f"Omitiendo película con metadatos incompletos (TMDB ID: {tmdb_id}, fecha: {fecha_estreno}, idioma: {idioma}, pais: {pais})")
+            return None
 
         # Buscar título existente
         result = await self.db.execute(select(Titulo).where(Titulo.tmdb_id == tmdb_id, Titulo.tipo == "movie"))
         titulo = result.scalar_one_or_none()
 
         portada = f"https://image.tmdb.org/t/p/w500{details['poster_path']}" if details.get("poster_path") else None
-        pais = details.get("origin_country", [""])[0] if details.get("origin_country") else None
         vote_avg = details.get("vote_average", 0.0)
         vote_cnt = details.get("vote_count", 0)
         rating_unif = vote_avg if vote_cnt > 0 else 0.0
@@ -411,11 +423,23 @@ class TMDBSyncService:
             creators = [c["name"] for c in details["created_by"] if "name" in c]
             director = ", ".join(creators[:2])
 
+        nombre = details.get("name", "")
+        idioma = details.get("original_language")
+        pais = extract_tmdb_countries(details)
+
+        # Filtro de Calidad Mínima y Legibilidad
+        if not is_latin_legible(nombre):
+            logger.info(f"Omitiendo serie no legible en alfabeto no latino (TMDB ID: {tmdb_id}, nombre: {nombre})")
+            return None
+
+        if not allow_unrel and (fecha_estreno is None or not idioma or not pais):
+            logger.info(f"Omitiendo serie con metadatos incompletos (TMDB ID: {tmdb_id}, fecha: {fecha_estreno}, idioma: {idioma}, pais: {pais})")
+            return None
+
         result = await self.db.execute(select(Titulo).where(Titulo.tmdb_id == tmdb_id, Titulo.tipo == "tv"))
         titulo = result.scalar_one_or_none()
 
         portada = f"https://image.tmdb.org/t/p/w500{details['poster_path']}" if details.get("poster_path") else None
-        pais = details.get("origin_country", [""])[0] if details.get("origin_country") else None
         vote_avg = details.get("vote_average", 0.0)
         vote_cnt = details.get("vote_count", 0)
         rating_unif = vote_avg if vote_cnt > 0 else 0.0
@@ -1094,6 +1118,163 @@ class TMDBSyncService:
         await self.recalculate_percentiles()
         await self.recalculate_unified_ratings()
         return {"total_titles": total_titles, "updated": updated_count}
+
+    # -------------------------------------------------------------------------
+    # BACKFILL DE PAÍSES (ORIGEN Y PRODUCCIÓN CONSOLIDADOS)
+    # -------------------------------------------------------------------------
+    async def backfill_catalog_countries(self, batch_size: int = 50) -> Dict[str, int]:
+        """
+        Recorre todos los títulos del catálogo en lotes concurrentes y actualiza
+        el campo 'pais' con la lista consolidada de códigos ISO extraída de TMDB
+        (origin_country con fallback a production_countries).
+        """
+        logger.info("Iniciando backfill de países para todos los títulos del catálogo...")
+        res = await self.db.execute(
+            select(Titulo.id, Titulo.tmdb_id, Titulo.tipo, Titulo.pais).where(Titulo.tmdb_id.isnot(None))
+        )
+        titles_info = res.all()
+        total_titles = len(titles_info)
+        updated_count = 0
+
+        async def fetch_and_extract_country(tit_id: int, tmdb_id: int, tipo: str, current_pais: Optional[str]):
+            try:
+                details = await self.client.get_details(tipo, tmdb_id, append_to_response="")
+                new_pais = extract_tmdb_countries(details)
+                if new_pais != current_pais:
+                    return tit_id, new_pais
+                return None
+            except Exception as e:
+                logger.debug(f"Error obteniendo países para {tipo} {tmdb_id}: {e}")
+                return None
+
+        for i in range(0, total_titles, batch_size):
+            chunk = titles_info[i:i + batch_size]
+            tasks = [fetch_and_extract_country(tid, tmid, mtype, cpais) for tid, tmid, mtype, cpais in chunk]
+            results = await asyncio.gather(*tasks)
+
+            for res_item in results:
+                if res_item:
+                    tid, new_pais = res_item
+                    await self.db.execute(
+                        update(Titulo)
+                        .where(Titulo.id == tid)
+                        .values(pais=new_pais)
+                    )
+                    updated_count += 1
+
+            await self.db.commit()
+            logger.info(f"Progreso backfill países: {min(i + batch_size, total_titles)}/{total_titles} procesados ({updated_count} modificados)...")
+
+        logger.info(f"Backfill de países completado: {updated_count}/{total_titles} títulos actualizados con nuevos códigos.")
+        return {"total_titles": total_titles, "updated": updated_count}
+
+    # -------------------------------------------------------------------------
+    # PURGA SELECTIVA DE TÍTULOS INCOMPLETOS O NO LEGIBLES
+    # -------------------------------------------------------------------------
+    async def purge_invalid_or_incomplete_titles(self) -> Dict[str, Any]:
+        """
+        Elimina en cascada todos los títulos que incumplan las condiciones mínimas de calidad:
+        1. Nombres con caracteres no latinos (sin traducción al inglés).
+        2. Títulos sin fecha de estreno (fecha_estreno IS NULL).
+        3. Títulos sin idioma original (idioma_original IS NULL).
+        4. Títulos sin país (pais IS NULL).
+        Tras la purga, recalcula percentiles y ratings unificados, e invalida la caché del catálogo.
+        """
+        logger.info("Iniciando auditoría y purga de títulos incompletos o no legibles...")
+        res = await self.db.execute(
+            select(
+                Titulo.id,
+                Titulo.tmdb_id,
+                Titulo.tipo,
+                Titulo.nombre,
+                Titulo.fecha_estreno,
+                Titulo.idioma_original,
+                Titulo.pais,
+            )
+        )
+        all_titles = res.all()
+
+        to_delete: List[Dict[str, Any]] = []
+        for tid, tmid, tipo, nombre, fecha, idioma, pais in all_titles:
+            reasons = []
+            if not is_latin_legible(nombre):
+                reasons.append("alfabeto_no_latino")
+            if fecha is None:
+                reasons.append("sin_fecha_estreno")
+            if not idioma:
+                reasons.append("sin_idioma_original")
+            if not pais:
+                reasons.append("sin_pais")
+
+            if reasons:
+                to_delete.append({
+                    "id": tid,
+                    "tmdb_id": tmid,
+                    "tipo": tipo,
+                    "nombre": nombre,
+                    "motivos": reasons,
+                })
+
+        if not to_delete:
+            logger.info("No se encontraron títulos para purgar. El catálogo cumple al 100% las directivas de calidad.")
+            return {"purged_count": 0, "purged_titles": []}
+
+        target_ids = [t["id"] for t in to_delete]
+        logger.warning(f"Purgando {len(target_ids)} títulos del catálogo por directivas de calidad...")
+
+        # 1. Eliminar episodios de series dependientes
+        season_ids_res = await self.db.execute(
+            select(Temporada.id).where(Temporada.titulo_id.in_(target_ids))
+        )
+        season_ids = season_ids_res.scalars().all()
+        if season_ids:
+            await self.db.execute(
+                delete(Episodio).where(Episodio.temporada_id.in_(season_ids))
+            )
+
+        # 2. Eliminar temporadas
+        await self.db.execute(
+            delete(Temporada).where(Temporada.titulo_id.in_(target_ids))
+        )
+
+        # 3. Eliminar relaciones de tablas intermedias
+        await self.db.execute(
+            delete(titulos_generos).where(titulos_generos.c.titulo_id.in_(target_ids))
+        )
+        await self.db.execute(
+            delete(titulos_elenco).where(titulos_elenco.c.titulo_id.in_(target_ids))
+        )
+
+        # 4. Eliminar estados de usuario y reseñas asociadas si existieran
+        await self.db.execute(
+            delete(EstadoUsuarioTitulo).where(EstadoUsuarioTitulo.titulo_id.in_(target_ids))
+        )
+        await self.db.execute(
+            delete(Resena).where(Resena.titulo_id.in_(target_ids))
+        )
+
+        # 5. Eliminar títulos principales
+        await self.db.execute(
+            delete(Titulo).where(Titulo.id.in_(target_ids))
+        )
+        await self.db.commit()
+
+        # 6. Recalcular percentiles y ratings unificados
+        await self.recalculate_percentiles()
+        await self.recalculate_unified_ratings()
+
+        # 7. Invalidar caché del catálogo
+        try:
+            from app.services.catalog_service import clear_catalog_cache
+            clear_catalog_cache()
+        except Exception as e:
+            logger.debug(f"Aviso al limpiar caché de catálogo post-purga: {e}")
+
+        logger.info(f"Purga completada exitosamente. Se eliminaron {len(target_ids)} títulos.")
+        return {
+            "purged_count": len(target_ids),
+            "purged_titles": to_delete
+        }
 
     # -------------------------------------------------------------------------
     # RECÁLCULO DE PERCENTILES

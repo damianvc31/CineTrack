@@ -2,6 +2,24 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.2.3] - 2026-09-25
+### Agregado & Mejorado (Soporte Multi-País, Países Históricos y Blindaje de Calidad del Catálogo)
+- **Soporte Multi-País y Coproducciones en Catálogo:**
+  - `TMDBSyncService` consolida múltiples códigos ISO de `origin_country` (con fallback inteligente a `production_countries` si el primero está vacío) guardándolos en `Titulo.pais` como cadena delimitada (ej. `"FR, GB"`, `"US, CA"`).
+  - Nuevo campo computado `@computed_field` `paises: list[str]` en los schemas de respuesta `TitleCardResponse` y `TitleDetailResponse` para consumo inmediato en el cliente.
+  - Filtrado SQL robusto mediante tokens exactos (`func.concat(", ", Titulo.pais, ", ").like(...)`), evitando colisiones y falsos positivos de subcadenas.
+  - Agrupación precisa en `get_available_countries()` que desglosa cadenas compuestas y contabiliza frecuencias reales por país en el selector del catálogo.
+  - Compatibilidad transparente con el Recomendador IA: un título de doble nacionalidad califica y es seleccionado ante consultas de cualquiera de sus países de producción.
+- **Banderas Vectoriales SVG y Nombres para Países Históricos (`SU`, `YU`, `CS`):**
+  - Implementación de banderas inline en SVG puro para `SU` (Unión Soviética), `YU` (RFS de Yugoslavia) y `CS` (Checoslovaquia) en `<CountryFlag />`, evitando errores 404 en FlagCDN y caracteres rotos en Windows.
+  - Diccionario de países históricos en `countryUtils.ts` para evitar que `Intl.DisplayNames` los traduzca erróneamente como Rusia o Serbia, unificado y corregido en el selector desplegable de `CatalogPage.tsx`.
+- **Blindaje Preventivo de Ingesta y Calidad de Catálogo:**
+  - Módulo `backend/app/core/text_utils.py` con `is_latin_legible()` para admitir únicamente alfabetos latinos legibles con caracteres alfanuméricos, acentuación y diacríticos europeos, bloqueando alfabetos no latinos sin traducción (canto/cirílico/asiático).
+  - Reglas de validación en `upsert_movie` y `upsert_series` que rechazan automáticamente títulos sin fecha de estreno, sin país, sin idioma original o en alfabetos no latinos.
+- **Jobs de Backfill y Purga:**
+  - Nuevas flags `--backfill-countries` y `--purge-incomplete` en el CLI `sync_tmdb.py` y endpoints administrativos equivalentes en `/api/v1/admin/sync`.
+  - Verificación exitosa en la base de datos local SQLite (`cinetrack.db`): 255 títulos actualizados con múltiples países o rescate por productoras, y 6 títulos inválidos purgados en cascada, logrando un catálogo 100% íntegro (0 sin fecha, 0 sin país, 0 sin idioma, 0 no latinos).
+
 ## [v1.2.2] - 2026-09-25
 ### Optimizado (Sincronización Selectiva de Temporadas y Eliminación de N+1 Queries en Series)
 - **Omitido Inteligente de Temporadas Históricas (`Season Skipping`):**

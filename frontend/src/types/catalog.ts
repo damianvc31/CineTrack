@@ -35,6 +35,7 @@ export interface TitleCard {
   user_favorito?: boolean
   user_estado?: string | null
   pais?: string | null
+  paises?: string[]
   idioma_original?: string | null
   seasons_progress?: SeasonProgress[] | null
   following_status_text?: string | null
