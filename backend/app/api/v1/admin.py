@@ -65,6 +65,18 @@ class DailySyncRequest(BaseModel):
     )
 
 
+class DeepSyncRequest(BaseModel):
+    changes_days_window: Optional[int] = Field(
+        default=7, ge=1, le=14, description="Ventana en días para consultar /changes de TMDB (default: 7, máx permitido por TMDB: 14)"
+    )
+    releases_days_window: Optional[int] = Field(
+        default=None, ge=1, le=90, description="Ventana en días para consultar estrenos en cartelera (default config: 15 días)"
+    )
+    allow_unreleased: Optional[bool] = Field(
+        default=False, description="Permitir títulos no estrenados (default: False)"
+    )
+
+
 class ReviewsSyncRequest(BaseModel):
     limit_per_title: Optional[int] = Field(
         default=None, ge=1, le=50, description="Límite máximo de reseñas a sincronizar por título"
@@ -123,6 +135,7 @@ ACTIVE_JOBS: Dict[str, Dict[str, Any]] = {
     "sync_genres": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
     "initial_ingest": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
     "daily_sync": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "deep_sync": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
     "recalculate_percentiles": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
     "sync_reviews": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
     "import_tmdb": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
@@ -217,6 +230,29 @@ async def _run_job_daily(
     except Exception as e:
         logger.error(f"[Job Background] Error en sincronización diaria: {e}")
         _update_job_status("daily_sync", "failed", error=str(e))
+    finally:
+        await client.close()
+
+
+async def _run_job_deep(
+    changes_days_window: Optional[int] = None,
+    releases_days_window: Optional[int] = None,
+    allow_unreleased: Optional[bool] = None,
+):
+    _update_job_status("deep_sync", "running")
+    client = TMDBClient()
+    try:
+        async with AsyncSessionLocal() as db:
+            service = TMDBSyncService(db, client)
+            res = await service.run_deep_sync(
+                changes_days_window=changes_days_window,
+                releases_days_window=releases_days_window,
+                allow_unreleased=allow_unreleased,
+            )
+            _update_job_status("deep_sync", "completed", result=res)
+    except Exception as e:
+        logger.error(f"[Job Background] Error en sincronización profunda: {e}")
+        _update_job_status("deep_sync", "failed", error=str(e))
     finally:
         await client.close()
 
@@ -477,6 +513,25 @@ async def trigger_daily_sync(
     return JobResponse(
         job="daily_sync",
         message=f"Sincronización diaria iniciada en segundo plano (cambios: {changes_desc}, cartelera: {releases_desc})."
+    )
+
+
+@router.post("/sync/deep", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def trigger_deep_sync(
+    payload: DeepSyncRequest,
+    background_tasks: BackgroundTasks,
+    _: Any = Depends(get_current_admin)
+) -> JobResponse:
+    """Ejecuta la sincronización profunda semanal de cambios TMDB (7 días) y cartelera en background."""
+    background_tasks.add_task(
+        _run_job_deep,
+        changes_days_window=payload.changes_days_window,
+        releases_days_window=payload.releases_days_window,
+        allow_unreleased=payload.allow_unreleased,
+    )
+    return JobResponse(
+        job="deep_sync",
+        message=f"Sincronización profunda semanal iniciada en segundo plano (cambios: {payload.changes_days_window or 7} días)."
     )
 
 

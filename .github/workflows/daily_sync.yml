@@ -2,8 +2,8 @@ name: CineTrack Daily TMDB Sync
 
 on:
   schedule:
-    # 03:00 UTC = 00:00 Argentina (UTC-3)
-    - cron: '0 3 * * *'
+    # 03:00 UTC = 00:00 Argentina (UTC-3) - Lunes a Sábado (los Domingos a las 02:00 UTC corre weekly_deep_sync)
+    - cron: '0 3 * * 1-6'
   workflow_dispatch:
     inputs:
       allow_unreleased:
@@ -50,7 +50,7 @@ jobs:
 
           echo "Sincronización disparada exitosamente. Iniciando monitoreo y keep-alive de Render..."
           START_TIME=$(date +%s)
-          TIMEOUT=1800 # 30 minutos
+          TIMEOUT=7200 # 2 horas (tiempo de guardia seguro para sondeo continuo)
 
           while true; do
             sleep 15

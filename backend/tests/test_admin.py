@@ -136,6 +136,15 @@ async def test_admin_sync_jobs_with_parameters(async_client: AsyncClient):
     assert resp_json.status_code == 202
     assert resp_json.json()["job"] == "import_json"
 
+    # Deep sync (semanal de cambios TMDB)
+    resp_deep = await async_client.post(
+        "/api/v1/admin/sync/deep",
+        json={"changes_days_window": 7, "releases_days_window": 15, "allow_unreleased": False},
+        headers=headers
+    )
+    assert resp_deep.status_code == 202
+    assert resp_deep.json()["job"] == "deep_sync"
+
     # Actor photos sync
     resp_photos = await async_client.post(
         "/api/v1/admin/sync/actor-photos",
@@ -168,6 +177,9 @@ async def test_admin_background_workers_execution(monkeypatch):
 
     await admin._run_job_daily(hours_window=48)
     assert mock_service.run_daily_sync.called
+
+    await admin._run_job_deep(changes_days_window=7)
+    assert mock_service.run_deep_sync.called
 
     await admin._run_job_percentiles()
     assert mock_service.recalculate_percentiles.called
@@ -256,6 +268,7 @@ async def test_admin_sync_job_status_endpoints(async_client: AsyncClient):
     assert res_all.status_code == 200
     all_data = res_all.json()
     assert "daily_sync" in all_data
+    assert "deep_sync" in all_data
     assert "actor_photos" in all_data
     assert "sync_reviews" in all_data
 

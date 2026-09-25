@@ -248,10 +248,9 @@ async def test_daily_sync_updates_untracked_titles_from_changes(db_session, mock
 
     mock_tmdb_client.get_changes.side_effect = mock_changes
     mock_tmdb_client.discover.return_value = {"results": []}
+    res_sync = await service.run_daily_sync(changes_hours_window=24)
 
-    res_sync = await service.run_daily_sync()
-
-    # La serie se actualizó porque estaba en /tv/changes aunque nadie la siguiera
+    # La serie se actualizó porque estaba en /tv/changes con ventana explícita
     assert res_sync["updated_series"] == 1
 
     # Verificar que el nombre de la película se refrescó con MOCK_MOVIE_DETAILS
@@ -516,6 +515,53 @@ async def test_daily_sync_exhaustive_pagination_and_active_series(db_session, mo
     res = await service.run_daily_sync(changes_hours_window=24)
     # Debe haber llamado a upsert de la serie activa (9999) y refrescado métricas
     assert "updated_series" in res
+    assert res["updated_series"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_deep_sync_changes_and_active_series(db_session, mock_tmdb_client):
+    """Verifica que run_deep_sync pagine changes exhaustivamente para 7 días y sincronice series y películas."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+
+    # Crear una serie y una película en BD
+    s = Titulo(tmdb_id=8888, tipo="tv", nombre="Deep Sync Series", status_tmdb="Returning Series", popularidad=15.0)
+    m = Titulo(tmdb_id=7777, tipo="movie", nombre="Deep Sync Movie", popularidad=20.0)
+    db_session.add_all([s, m])
+    await db_session.commit()
+
+    # Mock get_changes
+    def mock_get_changes(media_type, start_date=None, end_date=None, page=1):
+        if media_type == "tv":
+            return {"page": 1, "total_pages": 1, "results": [{"id": 8888}]}
+        return {"page": 1, "total_pages": 1, "results": [{"id": 7777}]}
+
+    mock_tmdb_client.get_changes.side_effect = mock_get_changes
+    mock_tmdb_client.discover.return_value = {"page": 1, "total_pages": 1, "results": []}
+
+    res = await service.run_deep_sync(changes_days_window=7)
+    assert "updated_series" in res
+    assert "updated_movies" in res
+    assert res["updated_series"] >= 1
+    assert res["updated_movies"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_daily_sync_lightweight_symmetric_window(db_session, mock_tmdb_client):
+    """Verifica que run_daily_sync liviano sincronice series activas y aplique ventana simétrica cuando allow_unreleased=True."""
+    service = TMDBSyncService(db_session, mock_tmdb_client)
+
+    # Crear serie activa
+    s = Titulo(tmdb_id=6666, tipo="tv", nombre="Active Returning Show", status_tmdb="Returning Series", popularidad=30.0)
+    db_session.add(s)
+    await db_session.commit()
+
+    mock_tmdb_client.get_changes.reset_mock()
+    mock_tmdb_client.discover.return_value = {"page": 1, "total_pages": 1, "results": []}
+
+    # Ejecutar sync diaria sin hours_window (h_changes=0)
+    res = await service.run_daily_sync(releases_days_window=15, allow_unreleased=True)
+    # No debió llamar a get_changes porque h_changes es 0
+    mock_tmdb_client.get_changes.assert_not_called()
     assert res["updated_series"] >= 1
 
 

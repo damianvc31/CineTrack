@@ -133,6 +133,17 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
     - **Monitoreo Keep-Alive Reactivo:** Implementación de endpoints de telemetría de jobs (`GET /api/v1/admin/sync/jobs/{job_name}/status` y `GET /api/v1/admin/sync/jobs/status`) respaldados por un registro de estado concurrente en memoria (`ACTIVE_JOBS`). Todos los workflows automatizados en GitHub Actions (`daily_sync.yml`, `monthly_actor_photos.yml`, `monthly_reviews_sync.yml`) incorporan un bucle de polling cada 15 segundos que sondea el estado del job, reseteando continuamente el contador de inactividad de Render y reportando el progreso en vivo hasta recibir `completed` o `failed`.
     - **Prefetching Concurrente en Lotes (`asyncio.gather`):** Reestructuración de `run_daily_sync` para precargar detalles de series activas y películas en lotes concurrentes de 10 peticiones HTTP a TMDB, desacoplando la latencia de red del procesamiento secuencial en `AsyncSession` de SQLAlchemy y recortando el tiempo de ejecución en más de un 85%.
 
+15. **Desacople de Sincronización Diaria Liviana y Sincronización Profunda Semanal (`v1.4.0`):**
+    - **Desacople de `/changes` del Ciclo Diario:** Los cambios comunitarios de TMDB en películas estrenadas hace años o series concluidas son casi en su totalidad cosméticos (traducciones a idiomas no utilizados, revisiones de tags). La sincronización diaria (`run_daily_sync`) descarta la consulta a `/changes` y se focaliza exclusivamente en entidades vivas de CineTrack: series con status `Returning Series`, `In Production` o `Planned`, novedades en cartelera y refresco masivo de métricas en ~1 a 2 minutos diarios.
+    - **Ventana de Estrenos Simétrica:** Para incorporar títulos no estrenados (`allow_unreleased=True`), la ventana se expande simétricamente a 30 días (`[hoy - 15d, hoy + 15d]`), exigiendo popularidad estricta (`>= 10.0`) para admitir exclusivamente obras esperadas con tracción confirmada.
+    - **Sincronización Profunda Semanal (`run_deep_sync`):** Se introduce una pasada semanal los domingos a las 02:00 UTC que consulta exhaustivamente `/movie/changes` y `/tv/changes` para una ventana de 7 días (cumpliendo el límite de 14 días por petición de TMDB) sobre todo el catálogo, capturando revisiones de sinopsis y pósters en alta resolución.
+    - **Matriz de Ejecución Automatizada sin Colisiones:**
+      - Lunes a Sábado a las 03:00 UTC: `daily_sync.yml` (liviano).
+      - Domingos a las 02:00 UTC: `weekly_deep_sync.yml` (profundo).
+      - Día 1 del mes a las 04:00 UTC: `monthly_actor_photos.yml`.
+      - Día 1 del mes a las 05:00 UTC: `monthly_reviews_sync.yml`.
+      - Cero colisiones de escritura concurrente en PostgreSQL y separación temporal garantizada.
+
 ---
 
 ## 4. Arquitectura de Frontend (React 19 + Vite 8 + Tailwind CSS v4)

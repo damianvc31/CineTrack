@@ -582,11 +582,76 @@ export const TitleDetailPage: React.FC = () => {
   const seasonsCount = visibleSeasons.length || 1
   const seasonsLabel = `${seasonsCount} ${language === 'es' ? (seasonsCount === 1 ? 'temporada' : 'temporadas') : (seasonsCount === 1 ? 'season' : 'seasons')}`
 
-  // Render semantic series status badge based on season progress and TMDB status
-  const renderStatusBadge = () => {
-    if (title.tipo !== 'tv' || !title.status_tmdb) return null
-    const st = title.status_tmdb.toLowerCase()
+  // Helper to check if a date is between today and today + 15 days
+  const isWithin15Days = (dStr?: string | null, todayStrVal?: string) => {
+    if (!dStr) return false
+    const nowStr = todayStrVal || new Date().toISOString().split('T')[0]
+    const target = new Date(dStr)
+    const today = new Date(nowStr)
+    const diffDays = (target.getTime() - today.getTime()) / (1000 * 3600 * 24)
+    return diffDays >= 0 && diffDays <= 15
+  }
 
+  // Render semantic status badge based on season progress, release dates and TMDB status
+  const renderStatusBadge = () => {
+    if (!title.status_tmdb) return null
+    const st = title.status_tmdb.toLowerCase()
+    const todayStr = new Date().toISOString().split('T')[0]
+
+    // 1. Películas (tipo === 'movie')
+    if (title.tipo === 'movie') {
+      const movieDate = title.fecha_estreno
+      const isSoon = isWithin15Days(movieDate, todayStr)
+
+      if (isSoon) {
+        return (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/60 text-cyan-300 text-xs font-bold shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-cyan-400" />
+            <span>{language === 'es' ? 'Muy Pronto' : 'Coming Soon'} — {language === 'es' ? `Estreno el ${movieDate}` : `Release on ${movieDate}`}</span>
+          </span>
+        )
+      }
+
+      if (st.includes('post')) {
+        return (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-950/80 border border-indigo-500/60 text-indigo-300 text-xs font-bold shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-indigo-400" />
+            <span>{language === 'es' ? 'Postproducción' : 'Post-Production'}{movieDate ? (language === 'es' ? ` — Estreno el ${movieDate}` : ` — Release on ${movieDate}`) : ' (TBA)'}</span>
+          </span>
+        )
+      }
+
+      if (st.includes('production')) {
+        return (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-500/60 text-purple-300 text-xs font-bold shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-purple-400" />
+            <span>{language === 'es' ? 'En Producción' : 'In Production'}{movieDate ? (language === 'es' ? ` — Estreno el ${movieDate}` : ` — Release on ${movieDate}`) : ' (TBA)'}</span>
+          </span>
+        )
+      }
+
+      if (st.includes('planned')) {
+        return (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-slate-300 text-xs font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+            <span>{language === 'es' ? 'Planificada' : 'Planned'}{movieDate ? (language === 'es' ? ` — Estreno el ${movieDate}` : ` — Release on ${movieDate}`) : ' (TBA)'}</span>
+          </span>
+        )
+      }
+
+      if (movieDate && movieDate > todayStr) {
+        return (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/60 border border-amber-600/50 text-amber-300 text-xs font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            <span>{language === 'es' ? 'Próximo Estreno' : 'Upcoming Release'} — {language === 'es' ? `el ${movieDate}` : `on ${movieDate}`}</span>
+          </span>
+        )
+      }
+
+      return null
+    }
+
+    // 2. Series (tipo === 'tv')
     if (st.includes('ended') || st.includes('finaliz')) {
       return (
         <span className="px-3 py-1 rounded-full bg-gray-800/90 border border-gray-600 text-gray-300 text-xs font-semibold">
@@ -603,15 +668,11 @@ export const TitleDetailPage: React.FC = () => {
       )
     }
 
-    const todayStr = new Date().toISOString().split('T')[0]
-
-    // 1. Detect if a season is actively in progress:
-    // (has at least 1 aired episode AND at least 1 unreleased/future episode)
+    // Detectar avance de temporadas y episodios
     let inProgressSeason: { seasonNum: number; nextEpDate?: string } | null = null
-    // 2. Future season with a scheduled air date
     let upcomingSeasonWithDate: { seasonNum: number; startDate: string } | null = null
-    // 3. Confirmed future season WITHOUT scheduled date (dateless, like Landman Season 3)
     let confirmedSeasonDateless: { seasonNum: number } | null = null
+    let totalAiredEpisodesCount = 0
 
     if (title.temporadas && title.temporadas.length > 0) {
       const sortedSeasons = [...title.temporadas].sort((a, b) => a.numero - b.numero)
@@ -625,6 +686,8 @@ export const TitleDetailPage: React.FC = () => {
               ? ep.fecha_estreno < title.proximo_episodio_fecha && ep.fecha_estreno <= todayStr
               : ep.fecha_estreno <= todayStr)
         )
+        totalAiredEpisodesCount += airedEpisodes.length
+
         const unreleasedEpisodes = eps
           .filter(
             (ep) =>
@@ -641,7 +704,7 @@ export const TitleDetailPage: React.FC = () => {
           break
         }
 
-        // Check if this season is entirely in the future (not started yet)
+        // Temporada que aún no comenzó
         if (airedEpisodes.length === 0) {
           if (unreleasedEpisodes.length > 0) {
             if (!upcomingSeasonWithDate) {
@@ -658,7 +721,6 @@ export const TitleDetailPage: React.FC = () => {
               }
             }
           } else {
-            // Season confirmed without episodes or air_date yet (e.g. Landman S3)
             if (!confirmedSeasonDateless) {
               confirmedSeasonDateless = {
                 seasonNum: season.numero,
@@ -669,10 +731,9 @@ export const TitleDetailPage: React.FC = () => {
       }
     }
 
-    // Next scheduled date from TMDB if available
     const nextDate = title.proximo_episodio_fecha
 
-    // State 1: Active season in progress -> Currently Airing (Green pulse)
+    // State 1: Temporada activa en emisión -> Currently Airing (Pulso verde)
     if (inProgressSeason) {
       const nextDateStr = inProgressSeason.nextEpDate
         ? (language === 'es' ? ` — Próximo ep. el ${inProgressSeason.nextEpDate}` : ` — Next ep on ${inProgressSeason.nextEpDate}`)
@@ -685,12 +746,70 @@ export const TitleDetailPage: React.FC = () => {
       )
     }
 
-    // State 2: A new season is scheduled in the calendar with a known/estimated date -> Renewed (Blue)
+    // State 2: La serie AÚN NO HA ESTRENADO ningún episodio (Season 1 o totalAiredEpisodesCount === 0)
+    const isShowUnreleased = totalAiredEpisodesCount === 0 || (upcomingSeasonWithDate && upcomingSeasonWithDate.seasonNum === 1) || (title.fecha_estreno && title.fecha_estreno > todayStr)
+    if (isShowUnreleased) {
+      const premiereDate = upcomingSeasonWithDate?.startDate || nextDate || title.fecha_estreno
+      const isSoon = isWithin15Days(premiereDate, todayStr)
+
+      // 2.a: Fecha confirmada en <= 15 días -> Muy Pronto / Coming Soon (Cian)
+      if (isSoon && premiereDate) {
+        return (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/60 text-cyan-300 text-xs font-bold shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-cyan-400" />
+            <span>{language === 'es' ? 'Muy Pronto' : 'Coming Soon'} — {language === 'es' ? `Estreno el ${premiereDate}` : `Series Premiere on ${premiereDate}`}</span>
+          </span>
+        )
+      }
+
+      // 2.b: TMDB status En Producción (Púrpura)
+      if (st.includes('production')) {
+        return (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-500/60 text-purple-300 text-xs font-bold shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-purple-400" />
+            <span>{language === 'es' ? 'En Producción' : 'In Production'}{premiereDate ? (language === 'es' ? ` — Estreno el ${premiereDate}` : ` — Premiere on ${premiereDate}`) : ' (TBA)'}</span>
+          </span>
+        )
+      }
+
+      // 2.c: TMDB status Planificada (Gris/Slate)
+      if (st.includes('planned')) {
+        return (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-slate-300 text-xs font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+            <span>{language === 'es' ? 'Planificada' : 'Planned'}{premiereDate ? (language === 'es' ? ` — Estreno el ${premiereDate}` : ` — Premiere on ${premiereDate}`) : ' (TBA)'}</span>
+          </span>
+        )
+      }
+
+      // 2.d: Fecha lejana (> 15 días)
+      if (premiereDate) {
+        return (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/60 border border-amber-600/50 text-amber-300 text-xs font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            <span>{language === 'es' ? 'Próximo Estreno' : 'Upcoming Premiere'} — {language === 'es' ? `el ${premiereDate}` : `on ${premiereDate}`}</span>
+          </span>
+        )
+      }
+    }
+
+    // State 3: Serie activa con temporadas previas que estrena NUEVA temporada en el calendario (Temporada > 1)
     if (upcomingSeasonWithDate || nextDate) {
       const dateStr = upcomingSeasonWithDate?.startDate || nextDate
       const label = upcomingSeasonWithDate
         ? (language === 'es' ? `Temporada ${upcomingSeasonWithDate.seasonNum}` : `Season ${upcomingSeasonWithDate.seasonNum}`)
         : (language === 'es' ? 'Nueva Temporada' : 'New Season')
+
+      const isSoon = isWithin15Days(dateStr, todayStr)
+      if (isSoon && dateStr) {
+        return (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/60 text-cyan-300 text-xs font-bold shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-cyan-400" />
+            <span>{language === 'es' ? 'Muy Pronto' : 'Coming Soon'} — {label} {language === 'es' ? `el ${dateStr}` : `on ${dateStr}`}</span>
+          </span>
+        )
+      }
+
       return (
         <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-950/80 border border-blue-500/60 text-blue-300 text-xs font-bold shadow-sm">
           <span className="w-2 h-2 rounded-full bg-blue-400" />
@@ -699,7 +818,7 @@ export const TitleDetailPage: React.FC = () => {
       )
     }
 
-    // State 3: Confirmed renewal without a release date yet, or TMDB status In Production / Planned -> Renewed TBA (Purple/Violet)
+    // State 4: Renovación confirmada sin fecha fijada aún (o In Production / Planned para serie con temporadas previas)
     if (confirmedSeasonDateless || st.includes('production') || st.includes('planned')) {
       const label = confirmedSeasonDateless
         ? (language === 'es' ? `Temporada ${confirmedSeasonDateless.seasonNum}` : `Season ${confirmedSeasonDateless.seasonNum}`)
@@ -715,7 +834,7 @@ export const TitleDetailPage: React.FC = () => {
       )
     }
 
-    // State 4: Season concluded, active show without scheduled future seasons -> Pending Renewal (Amber)
+    // State 5: Temporada concluida, show activo sin fecha futura anunciada -> Pending Renewal (Ámbar)
     return (
       <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/60 border border-amber-600/50 text-amber-300 text-xs font-semibold">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />

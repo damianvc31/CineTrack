@@ -2,6 +2,26 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.4.0] - 2026-09-25
+### Agregado & Optimizado (Desacople de Sincronización Diaria Liviana y Sincronización Profunda Semanal)
+- **Sincronización Diaria Liviana ("Heartbeat Vivo"):**
+  - Desacople completo del endpoint `/changes` de la rutina diaria. La sincronización diaria ahora se enfoca exclusivamente en las entidades vivas de CineTrack.
+  - Actualización directa de series activas (`Returning Series`, `In Production`, `Planned`) en lotes concurrentes de 10 peticiones solapadas, aprovechando el *Season Skipping* para omitir temporadas históricas ya finalizadas.
+  - Ingesta de estrenos en cartelera con ventana simétrica configurable: 15 días retrospectivos si `allow_unreleased=False` o 30 días centrados en la fecha actual (`[hoy - 15d, hoy + 15d]`) si `allow_unreleased=True`, aplicando filtro de popularidad estricto (`>= 10.0`) para admitir únicamente obras con tracción y marketing real.
+  - Refresco masivo de métricas de popularidad y votos para todo el catálogo (`refresh_catalog_metrics`) con recálculo de percentiles y rating unificado en ~1 a 2 minutos diarios.
+- **Sincronización Profunda Semanal (`run_deep_sync`):**
+  - Nuevo método `run_deep_sync()` programado para recorrer exhaustivamente todas las páginas de `/movie/changes` y `/tv/changes` de los últimos 7 días (ajustado de forma óptima al límite de 14 días por petición de la API de TMDB).
+  - Captura y actualiza mejoras cosméticas en todo el catálogo de CineTrack (series finalizadas, clásicos, nuevos pósters en alta resolución y correcciones de sinopsis).
+- **Nuevo Endpoint Administrativo y CLI:**
+  - Endpoint `POST /api/v1/admin/sync/deep` con esquema `DeepSyncRequest` y telemetría de ejecución en `ACTIVE_JOBS["deep_sync"]`.
+  - CLI `sync_tmdb.py`: nuevas flags `--deep` y `--changes-days`.
+- **Estrategia de Workflows de GitHub Actions (Cero Colisiones):**
+  - `daily_sync.yml`: Ajustado para ejecutarse de **Lunes a Sábado a las 03:00 UTC** (`0 3 * * 1-6`).
+  - `weekly_deep_sync.yml`: Nuevo workflow programado los **Domingos a las 02:00 UTC** (`0 2 * * 0`) con monitoreo Keep-Alive cada 15 segundos.
+  - Se eliminan por completo los solapamientos de escritura en base de datos y se mantiene una separación de 2 horas respecto a los jobs mensuales de fotos de elenco (04:00 UTC) y reseñas (05:00 UTC).
+- **Cobertura de Tests:**
+  - Nuevas pruebas automatizadas para sincronización profunda semanal (`test_deep_sync_changes_and_active_series`) y ventana simétrica liviana (`test_daily_sync_lightweight_symmetric_window`). Suite ampliada a 95 tests unitarios e integración en verde (100%).
+
 ## [v1.3.0] - 2026-09-25
 ### Agregado & Optimizado (Resiliencia PaaS de Workflows, Monitoreo Keep-Alive y Concurrencia en Sincronización)
 - **Resiliencia de Workflows y Keep-Alive Activo de Render PaaS:**

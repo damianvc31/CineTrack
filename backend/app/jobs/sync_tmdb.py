@@ -23,7 +23,9 @@ async def main():
     parser.add_argument("--priority", choices=["popular_first", "toprated_first"], default=None, help="Prioridad de ingesta inicial")
     parser.add_argument("--movies-target", type=int, default=None, help="Cantidad objetivo de películas para ingesta inicial")
     parser.add_argument("--series-target", type=int, default=None, help="Cantidad objetivo de series para ingesta inicial")
-    parser.add_argument("--daily", action="store_true", help="Ejecutar sincronización diaria")
+    parser.add_argument("--daily", action="store_true", help="Ejecutar sincronización diaria liviana")
+    parser.add_argument("--deep", action="store_true", help="Ejecutar sincronización profunda semanal de cambios TMDB")
+    parser.add_argument("--changes-days", type=int, default=None, help="Ventana en días para consultar /changes de TMDB en sincronización profunda (default: 7 días, máx: 14)")
     parser.add_argument("--changes-hours", type=int, default=None, help="Ventana en horas para consultar /changes de TMDB en series y películas (default config: 48 hs, ej. 120 para 5 días)")
     parser.add_argument("--releases-days", type=int, default=None, help="Ventana en días para consultar estrenos recientes en cartelera (default config: 15 días)")
     parser.add_argument("--hours-window", type=int, default=None, help="Alias compatible de --changes-hours")
@@ -76,7 +78,7 @@ async def main():
                 logger.info(f"Resultado de ingesta inicial: {res}")
 
             elif args.daily:
-                logger.info(f"-> Ejecutando sincronización diaria (allow_unreleased: {args.allow_unreleased})...")
+                logger.info(f"-> Ejecutando sincronización diaria liviana (allow_unreleased: {args.allow_unreleased})...")
                 changes_h = args.changes_hours if args.changes_hours is not None else args.hours_window
                 res = await service.run_daily_sync(
                     changes_hours_window=changes_h,
@@ -84,6 +86,15 @@ async def main():
                     allow_unreleased=args.allow_unreleased,
                 )
                 logger.info(f"Resultado sincronización diaria: {res}")
+
+            elif args.deep:
+                logger.info(f"-> Ejecutando sincronización profunda semanal (changes_days: {args.changes_days or 7}, allow_unreleased: {args.allow_unreleased})...")
+                res = await service.run_deep_sync(
+                    changes_days_window=args.changes_days,
+                    releases_days_window=args.releases_days,
+                    allow_unreleased=args.allow_unreleased,
+                )
+                logger.info(f"Resultado sincronización profunda: {res}")
 
             elif args.cleanup_unreleased:
                 logger.info("-> Saneando catálogo: eliminando títulos no estrenados...")

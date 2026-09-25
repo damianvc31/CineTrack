@@ -110,6 +110,12 @@
   - Endpoints administrativos de estado y telemetría de jobs en segundo plano (`GET /api/v1/admin/sync/jobs/{job_name}/status`).
   - Monitoreo continuo keep-alive en todos los workflows de GitHub Actions (`daily_sync.yml`, `monthly_actor_photos.yml`, `monthly_reviews_sync.yml`), previniendo el apagado prematuro por inactividad de Render Free Tier (15 min) y transmitiendo el progreso en tiempo real hasta su finalización exitosa.
   - Suite de 93 tests de backend pasando en verde (100%).
+- [x] **Desacople de Sincronización Diaria Liviana y Sincronización Profunda Semanal (v1.4.0):**
+  - Desacople de `/changes` del flujo diario: `run_daily_sync` optimizado para series activas, cartelera simétrica y refresco de métricas en ~1 a 2 minutos diarios.
+  - Sincronización profunda semanal (`run_deep_sync`): recorrido exhaustivo de 7 días de cambios TMDB los domingos a las 02:00 UTC.
+  - Matriz de workflows de GitHub Actions sin colisiones (`daily_sync.yml` lun-sáb 03:00 UTC, `weekly_deep_sync.yml` dom 02:00 UTC).
+  - Nuevo endpoint administrativo `POST /api/v1/admin/sync/deep` y flags CLI `--deep` y `--changes-days`.
+  - Suite ampliada a 95 tests automatizados de backend en verde (100%).
 
 ---
 
@@ -125,6 +131,8 @@
 - [ ] **Sistema de notificaciones activas por panel in-app:**
   - Avisos informativos por cambio de status de series en cualquier lista del usuario (renovación con/sin fecha, cancelación, finalización, hiatus entre temporadas o reboots sin alterar el estado del usuario).
   - Alertas automáticas cuando una serie en estado "Vista" estrena nueva temporada/episodios, pasando automáticamente a "Siguiendo".
+- [ ] **Carrusel y Filtro "Upcoming / Próximamente" en Home y Catálogo:**
+  - Sección destacada en Home y filtro en Catálogo para explorar películas y series que estrenarán en las próximas semanas/meses (`allow_unreleased`), con fecha visible y badges contextuales ("Muy Pronto", "Próximo Estreno").
 - [ ] **Badge visual "Viendo Actualmente" (🔥):**
   - Indicador en series de "Siguiendo" con episodios recientes, con ventana de días configurable por cada usuario desde su pantalla de Configuración (`/settings`).
 - [ ] **Soporte multirregión para plataformas de streaming:**

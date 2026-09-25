@@ -218,20 +218,54 @@
 
 ---
 
-## Hito Actual: Sincronización Selectiva de Temporadas y Rendimiento WAN (v1.2.2)
-- [x] **Omitido Inteligente de Temporadas Históricas (`Season Skipping`):** En `upsert_series`, detección en lote de temporadas previas completas en series terminadas/activas para evitar invocar llamadas HTTP redundantes a `get_season_details` y el loop de episodios.
-- [x] **Agrupación de Consultas SQL en Episodios:** Carga en una sola consulta de todos los episodios existentes por temporada, erradicando el problema de consultas N+1 sobre conexiones de red con latencia WAN.
-- [x] **Suite de Tests Automatizada:** Nuevo test unitario `test_upsert_series_skips_already_completed_seasons`, elevando la suite a 84 tests en verde (100%).
-- [ ] **Verificación en Neon Dev:** Ejecución de la daily sync con ventana de 72h contra la base de datos remota para corroborar los tiempos de ejecución.
+## Hito Completado: Soporte Multi-País, Banderas Históricas y Purga de Calidad (v1.2.3)
+- [x] **Soporte Multi-País y Coproducciones:** Delimitación por comas en `Titulo.pais`, extracción con fallback `origin_country` -> `production_countries`, campo computado `paises: list[str]`.
+- [x] **Banderas Vectoriales SVG y Países Históricos:** Banderas SVG inline para `SU`, `YU` y `CS`, y diccionario de nombres sin anacronismos en frontend.
+- [x] **Blindaje Preventivo de Ingesta:** Módulo `is_latin_legible()` y descarte de obras sin fecha, país, idioma o no latinas.
+- [x] **Backfill y Purga en Neon Prod:** 256 títulos enriquecidos y 7 inválidos purgados. Catálogo 100% íntegro.
+
+---
+
+## Hito Completado: Resiliencia PaaS, Keep-Alive y Concurrencia de Sincronización (v1.3.0)
+- [x] **Prefetching Concurrente en Lotes (`asyncio.gather`):** Concurrencia de 10 peticiones simultáneas en `run_daily_sync`.
+- [x] **Endpoints Administrativos de Estado de Jobs:** `/api/v1/admin/sync/jobs/{job_name}/status` y `/api/v1/admin/sync/jobs/status` respaldados por `ACTIVE_JOBS`.
+- [x] **Keep-Alive en Workflows:** Polling cada 15 segundos en `daily_sync.yml`, `monthly_actor_photos.yml` y `monthly_reviews_sync.yml`.
+
+---
+
+## Hito Completado: Desacople de Sincronización Diaria Liviana y Sincronización Profunda Semanal (v1.4.0)
+- [x] **Paso 1: Sincronización Diaria Liviana (`run_daily_sync`):**
+  - [x] Retirar la consulta de `/changes` del flujo diario.
+  - [x] Enfocar exclusivamente en series activas de CineTrack (`Returning Series`, `In Production`, `Planned`) con lotes concurrentes y Season Skipping.
+  - [x] Nuevos releases: ventana retrospectiva de 15 días si `allow_unreleased=False`, o simétrica centrada de 30 días (`[hoy-15d, hoy+15d]`) si `allow_unreleased=True`, con filtro `popularidad >= 10.0`.
+  - [x] Refresco masivo de métricas (`refresh_catalog_metrics`), percentiles, ratings unificados, embeddings y purga de caché.
+- [x] **Paso 2: Sincronización Profunda Semanal (`run_deep_sync`):**
+  - [x] Implementar `run_deep_sync(changes_days_window=7, releases_days_window=15, allow_unreleased=False)`.
+  - [x] Recorrer exhaustivamente `/movie/changes` y `/tv/changes` de los últimos 7 días contra todo el catálogo local de CineTrack.
+  - [x] Incluir verificación de series activas, releases y refresco de métricas completo.
+- [x] **Paso 3: Endpoint Administrativo y CLI:**
+  - [x] Registrar job `deep_sync` en `ACTIVE_JOBS`.
+  - [x] Endpoint `POST /api/v1/admin/sync/deep` con `DeepSyncRequest` y worker en background.
+  - [x] CLI `sync_tmdb.py`: agregar flags `--deep` y `--changes-days`.
+- [x] **Paso 4: Workflows de GitHub Actions (Cero Colisiones):**
+  - [x] Ajustar `daily_sync.yml` para correr de Lunes a Sábado a las 03:00 UTC (`0 3 * * 1-6`).
+  - [x] Crear `weekly_deep_sync.yml` para correr los Domingos a las 02:00 UTC (`0 2 * * 0`) con bucle keep-alive.
+- [x] **Paso 5: Pruebas Automatizadas y Verificación:**
+  - [x] Tests unitarios con mocks para `run_daily_sync` (ventana simétrica y sin changes), `run_deep_sync` y nuevo endpoint.
+  - [x] Ejecutar suite completa (95/95 tests en verde).
+- [x] **Paso 6: Documentación y Versionado:**
+  - [x] Actualizar `ARCHITECTURE.md`, `CHANGELOG.md`, `ROADMAP.md` y elevar a `v1.4.0`.
 
 ---
 
 ## Backlog / Versión Superior (Post-Entrega):
+- [ ] Carrusel y Filtro "Upcoming / Próximamente" en Home y Catálogo (sección destacada en Home y filtro en Catálogo con badges "Muy Pronto" y fechas confirmadas).
 - [ ] Purga selectiva de títulos en idiomas/alfabetos no legibles sin traducción.
 - [ ] Sistema de notificaciones in-app para estrenos y cambios de status en series.
 - [ ] Badge visual "Viendo Actualmente" (🔥).
 - [ ] Soporte multirregión para plataformas de streaming (JustWatch / TMDB Watch Providers).
 - [ ] Selector de idioma para títulos y sinopsis.
+
 
 
 

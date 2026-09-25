@@ -1,41 +1,48 @@
-name: CineTrack Monthly Actor Photos Sync
+name: CineTrack Weekly Deep TMDB Sync
 
 on:
   schedule:
-    # 04:00 UTC el día 1 de cada mes
-    - cron: '0 4 1 * *'
+    # 02:00 UTC = 23:00 Sábado Argentina (UTC-3) - Todos los Domingos
+    - cron: '0 2 * * 0'
   workflow_dispatch:
     inputs:
-      limit:
-        description: 'Límite de actores sin foto a procesar'
+      changes_days_window:
+        description: 'Ventana en días para consultar /changes de TMDB (default: 7, máx: 14)'
         required: false
-        default: '500'
+        default: '7'
         type: string
+      allow_unreleased:
+        description: 'Permitir títulos no estrenados (default: false)'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
-  monthly-photos-sync:
-    name: Sync Actor Photos
+  weekly-deep-sync:
+    name: Trigger Weekly Deep Sync
     runs-on: ubuntu-latest
     steps:
-      - name: Send Actor Photos Sync Request to Production Backend
+      - name: Send Deep Sync Request to Production Backend
         env:
           PROD_API_URL: ${{ secrets.PROD_API_URL }}
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
-          LIMIT: ${{ inputs.limit || '500' }}
+          CHANGES_DAYS: ${{ inputs.changes_days_window || '7' }}
+          ALLOW_UNRELEASED: ${{ inputs.allow_unreleased || 'false' }}
         run: |
           if [ -z "$PROD_API_URL" ] || [ -z "$ADMIN_API_KEY" ]; then
             echo "Error: PROD_API_URL o ADMIN_API_KEY secret no está configurado en GitHub Secrets."
             exit 1
           fi
 
+          # Eliminar barra final si existe
           API_URL="${PROD_API_URL%/}"
 
-          echo "Disparando sincronización mensual de fotos de actores en $API_URL/api/v1/admin/sync/actor-photos (límite: $LIMIT)..."
+          echo "Disparando sincronización profunda semanal en $API_URL/api/v1/admin/sync/deep..."
 
-          HTTP_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$API_URL/api/v1/admin/sync/actor-photos" \
+          HTTP_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$API_URL/api/v1/admin/sync/deep" \
             -H "X-Admin-Key: $ADMIN_API_KEY" \
             -H "Content-Type: application/json" \
-            -d "{\"limit\": $LIMIT}")
+            -d "{\"changes_days_window\": $CHANGES_DAYS, \"allow_unreleased\": $ALLOW_UNRELEASED}")
 
           echo "Código HTTP recibido: $HTTP_CODE"
           echo "Respuesta del servidor:"
@@ -47,23 +54,23 @@ jobs:
             exit 1
           fi
 
-          echo "Sincronización disparada exitosamente. Iniciando monitoreo y keep-alive de Render..."
+          echo "Sincronización profunda disparada exitosamente. Iniciando monitoreo y keep-alive de Render..."
           START_TIME=$(date +%s)
           TIMEOUT=7200 # 2 horas (tiempo de guardia seguro para sondeo continuo)
 
           while true; do
             sleep 15
             ELAPSED=$(( $(date +%s) - START_TIME ))
-            STATUS_JSON=$(curl -s -H "X-Admin-Key: $ADMIN_API_KEY" "$API_URL/api/v1/admin/sync/jobs/actor_photos/status")
+            STATUS_JSON=$(curl -s -H "X-Admin-Key: $ADMIN_API_KEY" "$API_URL/api/v1/admin/sync/jobs/deep_sync/status")
             echo "[$ELAPSED s] Estado del job: $STATUS_JSON"
 
             STATUS=$(echo "$STATUS_JSON" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
 
             if [ "$STATUS" = "completed" ]; then
-              echo "¡Sincronización de fotos de actores completada exitosamente en $ELAPSED segundos!"
+              echo "¡Sincronización profunda completada exitosamente en $ELAPSED segundos!"
               break
             elif [ "$STATUS" = "failed" ]; then
-              echo "Error: La sincronización de fotos de actores falló en el servidor."
+              echo "Error: La sincronización profunda falló en el servidor."
               exit 1
             fi
 
