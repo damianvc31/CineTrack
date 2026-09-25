@@ -238,3 +238,25 @@ async def test_admin_clear_catalog_execution(async_client: AsyncClient, db_sessi
     title_check = (await db_session.execute(select(Titulo).where(Titulo.id == 999))).scalar_one_or_none()
     assert title_check is None
 
+
+@pytest.mark.asyncio
+async def test_admin_sync_job_status_endpoints(async_client: AsyncClient):
+    """Verifica la consulta de estado de jobs individuales y todos los jobs en /sync/jobs."""
+    headers = {"X-Admin-Key": settings.ADMIN_API_KEY}
+
+    # 1. Consultar job individual existente
+    res = await async_client.get("/api/v1/admin/sync/jobs/daily_sync/status", headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["job"] == "daily_sync"
+    assert data["status"] in ("idle", "running", "completed", "failed")
+
+    # 2. Consultar todos los jobs
+    res_all = await async_client.get("/api/v1/admin/sync/jobs/status", headers=headers)
+    assert res_all.status_code == 200
+    all_data = res_all.json()
+    assert "daily_sync" in all_data
+    assert "actor_photos" in all_data
+    assert "sync_reviews" in all_data
+
+

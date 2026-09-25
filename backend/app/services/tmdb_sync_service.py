@@ -828,21 +828,39 @@ class TMDBSyncService:
                 f"({len(tv_from_changes)} por changes, {len(active_tv_remaining)} por seguimiento activo)."
             )
 
-            for tmdb_id in all_tv_to_update:
-                if tmdb_id:
+            tv_batch_size = 10
+            all_tv_list = [tid for tid in all_tv_to_update if tid]
+            for i in range(0, len(all_tv_list), tv_batch_size):
+                chunk = all_tv_list[i:i + tv_batch_size]
+
+                async def fetch_series_details(t_id: int):
                     try:
-                        t = await self.upsert_series(
-                            tmdb_id,
-                            fetch_episodes=True,
-                            allow_unreleased=allow_unrel,
-                            fetch_reviews=False
-                        )
-                        if t is not None:
-                            updated_series_count += 1
-                            await self.db.commit()
-                    except Exception as e:
-                        logger.error(f"Error actualizando serie id {tmdb_id}: {e}")
-                        await self.db.rollback()
+                        return t_id, await self.client.get_details("tv", t_id)
+                    except Exception as ex:
+                        logger.error(f"Error al obtener detalle de serie {t_id}: {ex}")
+                        return t_id, None
+
+                details_results = await asyncio.gather(*[fetch_series_details(tid) for tid in chunk])
+
+                for tmdb_id, details in details_results:
+                    if details:
+                        try:
+                            t = await self.upsert_series(
+                                tmdb_id,
+                                details=details,
+                                fetch_episodes=True,
+                                allow_unreleased=allow_unrel,
+                                fetch_reviews=False
+                            )
+                            if t is not None:
+                                updated_series_count += 1
+                        except Exception as e:
+                            logger.error(f"Error actualizando serie id {tmdb_id}: {e}")
+                            await self.db.rollback()
+
+                await self.db.commit()
+                if (i + tv_batch_size) % 50 == 0 or (i + tv_batch_size) >= len(all_tv_list):
+                    logger.info(f"Progreso sync series: {min(i + tv_batch_size, len(all_tv_list))}/{len(all_tv_list)} ({updated_series_count} actualizadas)...")
 
             # 4. Consultar /movie/changes y refrescar películas locales modificadas
             try:
@@ -853,15 +871,37 @@ class TMDBSyncService:
                 local_movie_ids = set(res_local_movies.scalars().all())
                 movies_to_update = local_movie_ids.intersection(changed_movie_ids)
                 logger.info(f"Películas locales a sincronizar por changes: {len(movies_to_update)}.")
-                for m_id in movies_to_update:
-                    try:
-                        t = await self.upsert_movie(m_id, allow_unreleased=allow_unrel, fetch_reviews=False)
-                        if t is not None:
-                            updated_movies_count += 1
-                            await self.db.commit()
-                    except Exception as e:
-                        logger.error(f"Error actualizando película cambiada id {m_id}: {e}")
-                        await self.db.rollback()
+
+                movie_batch_size = 10
+                movies_list = [mid for mid in movies_to_update if mid]
+                for i in range(0, len(movies_list), movie_batch_size):
+                    chunk = movies_list[i:i + movie_batch_size]
+
+                    async def fetch_movie_details(m_id: int):
+                        try:
+                            return m_id, await self.client.get_details("movie", m_id)
+                        except Exception as ex:
+                            logger.error(f"Error al obtener detalle de película {m_id}: {ex}")
+                            return m_id, None
+
+                    movie_details_results = await asyncio.gather(*[fetch_movie_details(mid) for mid in chunk])
+
+                    for m_id, details in movie_details_results:
+                        if details:
+                            try:
+                                t = await self.upsert_movie(
+                                    m_id,
+                                    details=details,
+                                    allow_unreleased=allow_unrel,
+                                    fetch_reviews=False
+                                )
+                                if t is not None:
+                                    updated_movies_count += 1
+                            except Exception as e:
+                                logger.error(f"Error actualizando película cambiada id {m_id}: {e}")
+                                await self.db.rollback()
+
+                    await self.db.commit()
             except Exception as e:
                 logger.warning(f"No se pudo sincronizar /movie/changes: {e}")
         else:

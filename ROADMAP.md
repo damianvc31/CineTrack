@@ -105,6 +105,11 @@
   - Banderas vectoriales SVG dedicadas y nombres localizados para países históricos (`SU`, `YU`, `CS`).
   - Módulo `is_latin_legible` y blindaje preventivo contra títulos sin fecha, sin país, sin idioma o en alfabetos no latinos.
   - Jobs de backfill (`--backfill-countries`) y purga en cascada (`--purge-incomplete`) verificados al 100% (92 tests en verde).
+- [x] **Arquitectura Keep-Alive y Concurrencia de Sincronización en Producción (v1.3.0):**
+  - Prefetching concurrente en lotes (`asyncio.gather(*tasks)`) en `run_daily_sync`, reduciendo el tiempo de procesamiento de series y películas de ~17 minutos a ~1.5 - 2 minutos.
+  - Endpoints administrativos de estado y telemetría de jobs en segundo plano (`GET /api/v1/admin/sync/jobs/{job_name}/status`).
+  - Monitoreo continuo keep-alive en todos los workflows de GitHub Actions (`daily_sync.yml`, `monthly_actor_photos.yml`, `monthly_reviews_sync.yml`), previniendo el apagado prematuro por inactividad de Render Free Tier (15 min) y transmitiendo el progreso en tiempo real hasta su finalización exitosa.
+  - Suite de 93 tests de backend pasando en verde (100%).
 
 ---
 

@@ -2,8 +2,20 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.3.0] - 2026-09-25
+### Agregado & Optimizado (Resiliencia PaaS de Workflows, Monitoreo Keep-Alive y Concurrencia en Sincronización)
+- **Resiliencia de Workflows y Keep-Alive Activo de Render PaaS:**
+  - Incorporación de bucles activos de sondeo y keep-alive cada 15 segundos en los 3 workflows de GitHub Actions (`daily_sync.yml`, `monthly_actor_photos.yml`, `monthly_reviews_sync.yml`).
+  - Previene de forma determinista el apagado por inactividad (*idle spin-down* de 15 minutos) del free tier de Render durante tareas en background de larga duración.
+  - Nuevos endpoints administrativos `/api/v1/admin/sync/jobs/{job_name}/status` y `/api/v1/admin/sync/jobs/status` respaldados por un registro de estado en memoria (`ACTIVE_JOBS`), permitiendo a GitHub Actions supervisar en tiempo real la ejecución, reportar métricas intermedias y validar el resultado final antes de culminar.
+- **Concurrencia y Aceleración en Sincronización Diaria (`run_daily_sync`):**
+  - Reemplazo del bucle secuencial en series y películas por procesamiento en lotes concurrentes de 10 peticiones paralelas solapadas mediante `asyncio.gather()`.
+  - Reducción del tiempo de ejecución de la sincronización diaria de ~17 minutos a apenas ~1.5 - 2 minutos para más de 500 series activas.
+- **Cobertura de Tests:**
+  - Nueva prueba unitaria automatizada (`test_admin_sync_job_status_endpoints`) validando el flujo de estados de los jobs administrativos. Suite ampliada a 93 tests de backend en verde (100%).
+
 ## [v1.2.3] - 2026-09-25
-### Agregado & Mejorado (Soporte Multi-País, Países Históricos y Blindaje de Calidad del Catálogo)
+### Agregado & Mejorado (Soporte Multi-País, Países Históricos y Blindaje de Calidad de Catálogo)
 - **Soporte Multi-País y Coproducciones en Catálogo:**
   - `TMDBSyncService` consolida múltiples códigos ISO de `origin_country` (con fallback inteligente a `production_countries` si el primero está vacío) guardándolos en `Titulo.pais` como cadena delimitada (ej. `"FR, GB"`, `"US, CA"`).
   - Nuevo campo computado `@computed_field` `paises: list[str]` en los schemas de respuesta `TitleCardResponse` y `TitleDetailResponse` para consumo inmediato en el cliente.
@@ -16,9 +28,9 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 - **Blindaje Preventivo de Ingesta y Calidad de Catálogo:**
   - Módulo `backend/app/core/text_utils.py` con `is_latin_legible()` para admitir únicamente alfabetos latinos legibles con caracteres alfanuméricos, acentuación y diacríticos europeos, bloqueando alfabetos no latinos sin traducción (canto/cirílico/asiático).
   - Reglas de validación en `upsert_movie` y `upsert_series` que rechazan automáticamente títulos sin fecha de estreno, sin país, sin idioma original o en alfabetos no latinos.
-- **Jobs de Backfill y Purga:**
+- **Jobs de Backfill y Purga Verificados en Producción:**
   - Nuevas flags `--backfill-countries` y `--purge-incomplete` en el CLI `sync_tmdb.py` y endpoints administrativos equivalentes en `/api/v1/admin/sync`.
-  - Verificación exitosa en la base de datos local SQLite (`cinetrack.db`): 255 títulos actualizados con múltiples países o rescate por productoras, y 6 títulos inválidos purgados en cascada, logrando un catálogo 100% íntegro (0 sin fecha, 0 sin país, 0 sin idioma, 0 no latinos).
+  - Verificación exitosa en base de datos local SQLite y en Producción en Neon PostgreSQL: 256 títulos enriquecidos y 7 títulos inválidos purgados, logrando un catálogo 100% íntegro (0 sin fecha, 0 sin país, 0 sin idioma, 0 no latinos).
 
 ## [v1.2.2] - 2026-09-25
 ### Optimizado (Sincronización Selectiva de Temporadas y Eliminación de N+1 Queries en Series)

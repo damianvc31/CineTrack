@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import logging
 from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
@@ -23,6 +24,15 @@ class JobResponse(BaseModel):
     status: str = "accepted"
     job: str
     message: str
+
+
+class JobStatusResponse(BaseModel):
+    job: str
+    status: str = "idle"  # "idle" | "running" | "completed" | "failed"
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+    result: Optional[Any] = None
+    error: Optional[str] = None
 
 
 class InitialIngestRequest(BaseModel):
@@ -107,16 +117,56 @@ class ActorPhotosSyncRequest(BaseModel):
 
 
 # -------------------------------------------------------------------------
+# REGISTRO GLOBAL DE ESTADO DE JOBS DE SINCRONIZACIÓN (EN MEMORIA)
+# -------------------------------------------------------------------------
+ACTIVE_JOBS: Dict[str, Dict[str, Any]] = {
+    "sync_genres": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "initial_ingest": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "daily_sync": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "recalculate_percentiles": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "sync_reviews": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "import_tmdb": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "refresh_metrics": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "backfill_countries": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "purge_incomplete": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "import_json": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "expand_catalog": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "actor_photos": {"status": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+}
+
+
+def _update_job_status(job_name: str, status_str: str, result: Optional[Any] = None, error: Optional[str] = None):
+    now = datetime.now(timezone.utc).isoformat()
+    if job_name not in ACTIVE_JOBS:
+        ACTIVE_JOBS[job_name] = {}
+    ACTIVE_JOBS[job_name]["status"] = status_str
+    if status_str == "running":
+        ACTIVE_JOBS[job_name]["started_at"] = now
+        ACTIVE_JOBS[job_name]["finished_at"] = None
+        ACTIVE_JOBS[job_name]["result"] = None
+        ACTIVE_JOBS[job_name]["error"] = None
+    elif status_str in ("completed", "failed"):
+        ACTIVE_JOBS[job_name]["finished_at"] = now
+        if result is not None:
+            ACTIVE_JOBS[job_name]["result"] = result
+        if error is not None:
+            ACTIVE_JOBS[job_name]["error"] = error
+
+
+# -------------------------------------------------------------------------
 # FUNCIONES WRAPPER PARA BACKGROUND TASKS
 # -------------------------------------------------------------------------
 async def _run_job_genres():
+    _update_job_status("sync_genres", "running")
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
-            await service.sync_genres()
+            res = await service.sync_genres()
+            _update_job_status("sync_genres", "completed", result={"added_genres": res})
     except Exception as e:
         logger.error(f"[Job Background] Error en sincronización de géneros: {e}")
+        _update_job_status("sync_genres", "failed", error=str(e))
     finally:
         await client.close()
 
@@ -127,18 +177,21 @@ async def _run_job_initial(
     series_target: Optional[int],
     allow_unreleased: Optional[bool] = None,
 ):
+    _update_job_status("initial_ingest", "running")
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
-            await service.run_initial_ingest(
+            res = await service.run_initial_ingest(
                 priority=priority,
                 movies_target=movies_target,
                 series_target=series_target,
                 allow_unreleased=allow_unreleased,
             )
+            _update_job_status("initial_ingest", "completed", result=res)
     except Exception as e:
         logger.error(f"[Job Background] Error en ingesta inicial: {e}")
+        _update_job_status("initial_ingest", "failed", error=str(e))
     finally:
         await client.close()
 
@@ -149,43 +202,52 @@ async def _run_job_daily(
     hours_window: Optional[int] = None,
     allow_unreleased: Optional[bool] = None,
 ):
+    _update_job_status("daily_sync", "running")
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
             changes_h = changes_hours_window if changes_hours_window is not None else hours_window
-            await service.run_daily_sync(
+            res = await service.run_daily_sync(
                 changes_hours_window=changes_h,
                 releases_days_window=releases_days_window,
                 allow_unreleased=allow_unreleased,
             )
+            _update_job_status("daily_sync", "completed", result=res)
     except Exception as e:
         logger.error(f"[Job Background] Error en sincronización diaria: {e}")
+        _update_job_status("daily_sync", "failed", error=str(e))
     finally:
         await client.close()
 
 
 async def _run_job_percentiles():
+    _update_job_status("recalculate_percentiles", "running")
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
             await service.recalculate_percentiles()
             await service.recalculate_unified_ratings()
+            _update_job_status("recalculate_percentiles", "completed", result={"status": "ok"})
     except Exception as e:
         logger.error(f"[Job Background] Error recalculando métricas: {e}")
+        _update_job_status("recalculate_percentiles", "failed", error=str(e))
     finally:
         await client.close()
 
 
 async def _run_job_reviews(limit_per_title: Optional[int]):
+    _update_job_status("sync_reviews", "running")
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
-            await service.sync_all_missing_reviews(limit_per_title=limit_per_title)
+            res = await service.sync_all_missing_reviews(limit_per_title=limit_per_title)
+            _update_job_status("sync_reviews", "completed", result=res)
     except Exception as e:
         logger.error(f"[Job Background] Error sincronizando reseñas: {e}")
+        _update_job_status("sync_reviews", "failed", error=str(e))
     finally:
         await client.close()
 
@@ -195,12 +257,14 @@ async def _run_job_import_tmdb(
     tmdb_id: Optional[int] = None,
     media_type: Optional[str] = "movie",
 ):
+    _update_job_status("import_tmdb", "running")
     if items is None:
         if tmdb_id is not None:
             items = [(tmdb_id, media_type or "movie")]
         else:
             items = []
     client = TMDBClient()
+    imported_count = 0
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
@@ -211,6 +275,7 @@ async def _run_job_import_tmdb(
                     else:
                         await service.upsert_series(tmdb_id, fetch_episodes=True, fetch_reviews=True)
                     await db.commit()
+                    imported_count += 1
                 except Exception as item_err:
                     logger.error(f"[Job Background] Error importando {media_type} id {tmdb_id}: {item_err}")
                     await db.rollback()
@@ -226,66 +291,80 @@ async def _run_job_import_tmdb(
                 clear_catalog_cache()
             except Exception:
                 pass
+            _update_job_status("import_tmdb", "completed", result={"imported_count": imported_count})
     except Exception as e:
         logger.error(f"[Job Background] Error general en importación TMDB: {e}")
+        _update_job_status("import_tmdb", "failed", error=str(e))
     finally:
         await client.close()
 
 
 async def _run_job_refresh_metrics(batch_size: int):
+    _update_job_status("refresh_metrics", "running")
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
-            await service.refresh_catalog_metrics(batch_size=batch_size)
+            res = await service.refresh_catalog_metrics(batch_size=batch_size)
             try:
                 from app.services.catalog_service import clear_catalog_cache
                 clear_catalog_cache()
             except Exception:
                 pass
+            _update_job_status("refresh_metrics", "completed", result=res)
     except Exception as e:
         logger.error(f"[Job Background] Error en refresco de métricas: {e}")
+        _update_job_status("refresh_metrics", "failed", error=str(e))
     finally:
         await client.close()
 
 
 async def _run_job_backfill_countries():
+    _update_job_status("backfill_countries", "running")
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
-            await service.backfill_catalog_countries()
+            res = await service.backfill_catalog_countries()
             try:
                 from app.services.catalog_service import clear_catalog_cache
                 clear_catalog_cache()
             except Exception:
                 pass
+            _update_job_status("backfill_countries", "completed", result=res)
     except Exception as e:
         logger.error(f"[Job Background] Error en backfill de países: {e}")
+        _update_job_status("backfill_countries", "failed", error=str(e))
     finally:
         await client.close()
 
 
 async def _run_job_purge_incomplete():
+    _update_job_status("purge_incomplete", "running")
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
-            await service.purge_invalid_or_incomplete_titles()
+            res = await service.purge_invalid_or_incomplete_titles()
+            _update_job_status("purge_incomplete", "completed", result=res)
     except Exception as e:
         logger.error(f"[Job Background] Error en purga de títulos incompletos: {e}")
+        _update_job_status("purge_incomplete", "failed", error=str(e))
     finally:
         await client.close()
 
 
 async def _run_job_import_json(items: List[Dict[str, Any]]):
+    _update_job_status("import_json", "running")
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
-            await service.import_from_json_data(items)
+            res = await service.import_from_json_data(items)
+            _update_job_status("import_json", "completed", result=res)
     except Exception as e:
         logger.error(f"[Job Background] Error importando JSON manual: {e}")
+        _update_job_status("import_json", "failed", error=str(e))
     finally:
         await client.close()
 
@@ -298,11 +377,12 @@ async def _run_job_expand(
     min_vote_average: Optional[float],
     allow_unreleased: Optional[bool],
 ):
+    _update_job_status("expand_catalog", "running")
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
-            await service.expand_catalog_by_genres(
+            res = await service.expand_catalog_by_genres(
                 genre=genre,
                 media_type=media_type,
                 target_per_genre=target_per_genre,
@@ -310,20 +390,25 @@ async def _run_job_expand(
                 min_vote_average=min_vote_average,
                 allow_unreleased=allow_unreleased,
             )
+            _update_job_status("expand_catalog", "completed", result=res)
     except Exception as e:
         logger.error(f"[Job Background] Error en expansión de catálogo: {e}")
+        _update_job_status("expand_catalog", "failed", error=str(e))
     finally:
         await client.close()
 
 
 async def _run_job_actor_photos(limit: Optional[int], actor_id: Optional[int]):
+    _update_job_status("actor_photos", "running")
     from app.jobs.populate_actor_photos import populate_actor_photos
     client = TMDBClient()
     try:
         async with AsyncSessionLocal() as db:
-            await populate_actor_photos(limit=limit, actor_id=actor_id, db=db, client=client)
+            res = await populate_actor_photos(limit=limit, actor_id=actor_id, db=db, client=client)
+            _update_job_status("actor_photos", "completed", result={"updated_actors": res})
     except Exception as e:
         logger.error(f"[Job Background] Error en sincronización de fotos de actores: {e}")
+        _update_job_status("actor_photos", "failed", error=str(e))
     finally:
         await client.close()
 
@@ -580,6 +665,41 @@ async def trigger_actor_photos_sync(
     return JobResponse(
         job="sync_actor_photos",
         message=f"Sincronización de fotos de actores iniciada en background (límite: {desc})."
+    )
+
+
+@router.get("/sync/jobs/status", response_model=Dict[str, JobStatusResponse])
+async def get_all_sync_jobs_status(
+    _: Any = Depends(get_current_admin)
+) -> Dict[str, JobStatusResponse]:
+    """Retorna el estado en tiempo real de todos los jobs de sincronización."""
+    return {
+        name: JobStatusResponse(
+            job=name,
+            status=info.get("status", "idle"),
+            started_at=info.get("started_at"),
+            finished_at=info.get("finished_at"),
+            result=info.get("result"),
+            error=info.get("error"),
+        )
+        for name, info in ACTIVE_JOBS.items()
+    }
+
+
+@router.get("/sync/jobs/{job_name}/status", response_model=JobStatusResponse)
+async def get_sync_job_status(
+    job_name: str,
+    _: Any = Depends(get_current_admin)
+) -> JobStatusResponse:
+    """Consulta el estado en tiempo real de un job de sincronización en segundo plano."""
+    info = ACTIVE_JOBS.get(job_name, {"status": "idle"})
+    return JobStatusResponse(
+        job=job_name,
+        status=info.get("status", "idle"),
+        started_at=info.get("started_at"),
+        finished_at=info.get("finished_at"),
+        result=info.get("result"),
+        error=info.get("error"),
     )
 
 

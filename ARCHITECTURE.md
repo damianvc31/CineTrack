@@ -128,6 +128,11 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
     - **Banderas y Países Históricos:** Soporte de banderas vectoriales inline en SVG para países extintos como la Unión Soviética (`SU`), Yugoslavia (`YU`) y Checoslovaquia (`CS`), evitando errores 404 en CDNs externas. Diccionario de excepciones históricas en `countryUtils.ts` que previene traducciones automáticas anacrónicas (ej. Rusia o Serbia) en toda la UI.
     - **Blindaje Preventivo de Calidad:** Módulo de validación `is_latin_legible()` y descarte en ingesta (`upsert_movie` / `upsert_series`) de títulos sin fecha de estreno, sin país, sin idioma original, o con nombres en alfabetos no latinos sin traducción.
 
+14. **Arquitectura Keep-Alive y Monitoreo de Workflows en GitHub Actions (`v1.3.0`):**
+    - **Problema de Idle Timeout en Render Free Tier:** Las instancias gratuitas de Render se suspenden tras 15 minutos sin tráfico HTTP entrante. Dado que las llamadas `POST /api/v1/admin/sync/*` retornan inmediatamente un código `202 Accepted` delegando el procesamiento a `BackgroundTasks`, la petición inicial finaliza en milisegundos y Render suspende el contenedor mientras el job aún se ejecuta en background.
+    - **Monitoreo Keep-Alive Reactivo:** Implementación de endpoints de telemetría de jobs (`GET /api/v1/admin/sync/jobs/{job_name}/status` y `GET /api/v1/admin/sync/jobs/status`) respaldados por un registro de estado concurrente en memoria (`ACTIVE_JOBS`). Todos los workflows automatizados en GitHub Actions (`daily_sync.yml`, `monthly_actor_photos.yml`, `monthly_reviews_sync.yml`) incorporan un bucle de polling cada 15 segundos que sondea el estado del job, reseteando continuamente el contador de inactividad de Render y reportando el progreso en vivo hasta recibir `completed` o `failed`.
+    - **Prefetching Concurrente en Lotes (`asyncio.gather`):** Reestructuración de `run_daily_sync` para precargar detalles de series activas y películas en lotes concurrentes de 10 peticiones HTTP a TMDB, desacoplando la latencia de red del procesamiento secuencial en `AsyncSession` de SQLAlchemy y recortando el tiempo de ejecución en más de un 85%.
+
 ---
 
 ## 4. Arquitectura de Frontend (React 19 + Vite 8 + Tailwind CSS v4)

@@ -43,9 +43,33 @@ jobs:
           cat response.txt || true
           echo ""
 
-          if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 202 ]; then
-            echo "Sincronización disparada exitosamente."
-          else
+          if [ "$HTTP_CODE" -ne 200 ] && [ "$HTTP_CODE" -ne 202 ]; then
             echo "Error: El servidor respondió con código HTTP $HTTP_CODE"
             exit 1
           fi
+
+          echo "Sincronización disparada exitosamente. Iniciando monitoreo y keep-alive de Render..."
+          START_TIME=$(date +%s)
+          TIMEOUT=1800 # 30 minutos
+
+          while true; do
+            sleep 15
+            ELAPSED=$(( $(date +%s) - START_TIME ))
+            STATUS_JSON=$(curl -s -H "X-Admin-Key: $ADMIN_API_KEY" "$API_URL/api/v1/admin/sync/jobs/daily_sync/status")
+            echo "[$ELAPSED s] Estado del job: $STATUS_JSON"
+
+            STATUS=$(echo "$STATUS_JSON" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+            if [ "$STATUS" = "completed" ]; then
+              echo "¡Sincronización diaria completada exitosamente en $ELAPSED segundos!"
+              break
+            elif [ "$STATUS" = "failed" ]; then
+              echo "Error: La sincronización diaria falló en el servidor."
+              exit 1
+            fi
+
+            if [ $ELAPSED -ge $TIMEOUT ]; then
+              echo "Error: Se superó el tiempo máximo de espera ($TIMEOUT s)."
+              exit 1
+            fi
+          done
