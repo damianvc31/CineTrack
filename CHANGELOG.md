@@ -2,6 +2,17 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.6.1] - 2026-09-26
+### Agregado (Telemetría Granular de Ingesta: Títulos Creados vs. Actualizados)
+- **Detección Atómica de Altas vs. Modificaciones en Ingesta:**
+  - Incorporación del flag `_is_new` en los métodos centrales `upsert_movie()` y `upsert_series()` para determinar de forma determinista si un título fue insertado de cero o actualizado por existencia previa.
+- **Desglose de Resultados en Jobs de Administración y CLI:**
+  - El endpoint de ingesta TMDB (`POST /api/v1/admin/sync/import-tmdb` y su job en segundo plano) ahora reporta `imported_count`, `created_count` y `updated_count`.
+  - La importación manual de JSON (`POST /api/v1/admin/sync/import-json` y `import_from_json_data()`) ahora incluye `created` y `updated` en su payload de resultado.
+  - El comando CLI `python -m app.jobs.sync_tmdb --import-tmdb-id` y `--import-json` ahora imprime en consola los logs diferenciados `[CREADO]` vs. `[ACTUALIZADO]` con el balance final de obras creadas vs actualizadas.
+- **Cobertura de Tests:**
+  - Suite unitaria ampliada en `test_tmdb_sync.py` validando la transición de `created` en la primera ingesta a `updated` en la re-importación idempotente.
+
 ## [v1.6.0] - 2026-09-25
 ### Agregado (Ciclo de Vida de Próximos Estrenos, Embeddings Selectivos y Umbrales del Recomendador)
 - **Cálculo Selectivo de Embeddings Vectoriales (Zero-Waste):**

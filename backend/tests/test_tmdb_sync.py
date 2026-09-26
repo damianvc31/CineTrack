@@ -154,12 +154,20 @@ async def test_import_manual_from_json_without_id_uses_search(db_session, mock_t
 
     res = await service.import_from_json_data(json_data)
     assert res["imported"] == 1
+    assert res["created"] == 1
+    assert res["updated"] == 0
     assert len(res["errors"]) == 0
 
     # Verificamos que llamó a search y luego guardó con el ID resuelto
     mock_tmdb_client.search.assert_called_once()
     saved = await db_session.execute(select(Titulo).where(Titulo.tmdb_id == 157336))
     assert saved.scalar_one_or_none() is not None
+
+    # Al volver a importar el mismo item, debe detectarlo como updated en vez de created
+    res_again = await service.import_from_json_data(json_data)
+    assert res_again["imported"] == 1
+    assert res_again["created"] == 0
+    assert res_again["updated"] == 1
 
 
 @pytest.mark.asyncio

@@ -318,6 +318,12 @@
   - [x] Documentación exhaustiva en `docs/postman/README.md` y simplificación de endpoints administrativos y fórmulas en `README.md` de raíz.
   - [x] Verificación de conectividad en producción contra Render (`https://cinetrack-api-zsen.onrender.com`).
   - [x] Commit `52c3327` y push a `origin/main`.
+- [x] **Telemetría Granular de Ingesta (Creados vs. Actualizados):**
+  - [x] Flag `_is_new` en `upsert_movie` y `upsert_series` para discriminar altas de modificaciones.
+  - [x] Desglose `created_count` y `updated_count` en resultado del job `import_tmdb` de la API de administración.
+  - [x] Desglose `created` y `updated` en `import_from_json_data` y en job `import_json`.
+  - [x] Logs diferenciados `[CREADO]` vs `[ACTUALIZADO]` en CLI `sync_tmdb.py` para `--import-tmdb-id` y `--import-json`.
+  - [x] Cobertura unitaria ampliada en `test_tmdb_sync.py` validando la detección precisa de títulos creados vs actualizados (105 tests pasando en verde).
 
 ---
 

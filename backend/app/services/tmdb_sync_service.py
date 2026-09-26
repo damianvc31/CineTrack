@@ -326,9 +326,11 @@ class TMDBSyncService:
                 rating_unificado=rating_unif,
                 status_tmdb=details.get("status"),
             )
+            titulo._is_new = True
             self.db.add(titulo)
             await self.db.flush()
         else:
+            titulo._is_new = False
             titulo.nombre = details.get("title", titulo.nombre)
             titulo.sinopsis = details.get("overview", titulo.sinopsis)
             titulo.portada_url = portada or titulo.portada_url
@@ -485,9 +487,11 @@ class TMDBSyncService:
                 status_tmdb=status,
                 proximo_episodio_fecha=fecha_prox_ep,
             )
+            titulo._is_new = True
             self.db.add(titulo)
             await self.db.flush()
         else:
+            titulo._is_new = False
             titulo.nombre = details.get("name", titulo.nombre)
             titulo.sinopsis = details.get("overview", titulo.sinopsis)
             titulo.portada_url = portada or titulo.portada_url
@@ -1314,6 +1318,8 @@ class TMDBSyncService:
     ) -> Dict[str, Any]:
         """Importa títulos desde una lista de diccionarios con esquema TituloManualImportSchema."""
         imported_count = 0
+        created_count = 0
+        updated_count = 0
         errors = []
 
         for idx, item_raw in enumerate(items_data):
@@ -1334,11 +1340,16 @@ class TMDBSyncService:
                 if tmdb_id:
                     # Enriquecer directo desde TMDB
                     if item.tipo == "movie":
-                        await self.upsert_movie(tmdb_id, allow_unreleased=allow_unreleased)
+                        titulo = await self.upsert_movie(tmdb_id, allow_unreleased=allow_unreleased)
                     else:
-                        await self.upsert_series(tmdb_id, fetch_episodes=True, allow_unreleased=allow_unreleased)
-                    await self.db.commit()
-                    imported_count += 1
+                        titulo = await self.upsert_series(tmdb_id, fetch_episodes=True, allow_unreleased=allow_unreleased)
+                    if titulo is not None:
+                        await self.db.commit()
+                        imported_count += 1
+                        if getattr(titulo, "_is_new", False):
+                            created_count += 1
+                        else:
+                            updated_count += 1
                 else:
                     # Regla estricta: No se permiten títulos huérfanos sin respaldo en TMDB
                     err_msg = f"No se encontró coincidencia en TMDB para '{item.titulo}' y no se proveyó id_tmdb. Registro omitido."
@@ -1353,7 +1364,12 @@ class TMDBSyncService:
         if imported_count > 0:
             await self.recalculate_percentiles()
             await self.recalculate_unified_ratings()
-        return {"imported": imported_count, "errors": errors}
+        return {
+            "imported": imported_count,
+            "created": created_count,
+            "updated": updated_count,
+            "errors": errors,
+        }
 
     # -------------------------------------------------------------------------
     # REFRESCO DE MÉTRICAS (POPULARIDAD Y VOTOS)

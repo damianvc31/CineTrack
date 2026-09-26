@@ -136,7 +136,7 @@ async def main():
                 if not isinstance(data, list):
                     data = [data]
                 res = await service.import_from_json_data(data, allow_unreleased=allow_unrel_arg)
-                logger.info(f"Importación completada: {res['imported']} importados, {len(res['errors'])} errores.")
+                logger.info(f"Importación completada: {res['imported']} procesados ({res.get('created', 0)} creados, {res.get('updated', 0)} actualizados), {len(res['errors'])} errores.")
                 if res["errors"]:
                     for err in res["errors"]:
                         logger.warning(f"  - {err}")
@@ -151,6 +151,8 @@ async def main():
                 allow_unrel_arg = True if args.allow_unreleased else None
                 logger.info(f"-> Importando/actualizando {len(raw_ids)} títulos ({args.type}, allow_unreleased: {args.allow_unreleased}): {raw_ids}...")
                 success_count = 0
+                created_count = 0
+                updated_count = 0
                 for r_id_str in raw_ids:
                     t_id = int(r_id_str)
                     try:
@@ -161,7 +163,12 @@ async def main():
                         if titulo:
                             await db.commit()
                             success_count += 1
-                            logger.info(f"  [OK] '{titulo.nombre}' (TMDB ID: {t_id}, ID local: {titulo.id})")
+                            if getattr(titulo, "_is_new", False):
+                                created_count += 1
+                                logger.info(f"  [CREADO] '{titulo.nombre}' (TMDB ID: {t_id}, ID local: {titulo.id})")
+                            else:
+                                updated_count += 1
+                                logger.info(f"  [ACTUALIZADO] '{titulo.nombre}' (TMDB ID: {t_id}, ID local: {titulo.id})")
                         else:
                             logger.error(f"  [FAIL] No se pudo obtener/guardar título con ID {t_id}")
                     except Exception as e:
@@ -180,7 +187,7 @@ async def main():
                         clear_catalog_cache()
                     except Exception:
                         pass
-                logger.info(f"Importación de IDs completada: {success_count}/{len(raw_ids)} procesados con éxito.")
+                logger.info(f"Importación de IDs completada: {success_count}/{len(raw_ids)} procesados ({created_count} creados, {updated_count} actualizados).")
 
             elif args.expand:
                 mode_desc = "[UPCOMING] " if args.upcoming else ""

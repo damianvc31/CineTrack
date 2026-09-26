@@ -314,17 +314,24 @@ async def _run_job_import_tmdb(
             items = []
     client = TMDBClient()
     imported_count = 0
+    created_count = 0
+    updated_count = 0
     try:
         async with AsyncSessionLocal() as db:
             service = TMDBSyncService(db, client)
             for tmdb_id, media_type in items:
                 try:
                     if media_type == "movie":
-                        await service.upsert_movie(tmdb_id, allow_unreleased=allow_unreleased, fetch_reviews=True)
+                        t = await service.upsert_movie(tmdb_id, allow_unreleased=allow_unreleased, fetch_reviews=True)
                     else:
-                        await service.upsert_series(tmdb_id, fetch_episodes=True, allow_unreleased=allow_unreleased, fetch_reviews=True)
-                    await db.commit()
-                    imported_count += 1
+                        t = await service.upsert_series(tmdb_id, fetch_episodes=True, allow_unreleased=allow_unreleased, fetch_reviews=True)
+                    if t is not None:
+                        await db.commit()
+                        imported_count += 1
+                        if getattr(t, "_is_new", False):
+                            created_count += 1
+                        else:
+                            updated_count += 1
                 except Exception as item_err:
                     logger.error(f"[Job Background] Error importando {media_type} id {tmdb_id}: {item_err}")
                     await db.rollback()
@@ -340,7 +347,11 @@ async def _run_job_import_tmdb(
                 clear_catalog_cache()
             except Exception:
                 pass
-            _update_job_status("import_tmdb", "completed", result={"imported_count": imported_count})
+            _update_job_status("import_tmdb", "completed", result={
+                "imported_count": imported_count,
+                "created_count": created_count,
+                "updated_count": updated_count,
+            })
     except Exception as e:
         logger.error(f"[Job Background] Error general en importación TMDB: {e}")
         _update_job_status("import_tmdb", "failed", error=str(e))
