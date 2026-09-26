@@ -6,7 +6,7 @@ import re
 from typing import Any, Dict, List, Optional
 import httpx
 
-from app.core.config import settings
+from app.core.config import VarietyLevel, settings
 from app.schemas.recommendations import (
     RecommendationItem,
     RecommendationResponse,
@@ -14,6 +14,44 @@ from app.schemas.recommendations import (
 from app.services.catalog_service import THEME_EXPANSION_MAP
 
 logger = logging.getLogger(__name__)
+
+# Clasificación de modelos según capacidades de inferencia y razonamiento
+REASONING_MODELS = {
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b"
+}
+
+STANDARD_MODELS = {
+    "gemini-3.6-flash",
+    "gemini-3.8-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
+    "meta-llama/llama-3.3-70b-specdec"
+}
+
+# Mapeo de variedad/factor sorpresa a parámetros LLM
+SLIDER_MAPPING = {
+    VarietyLevel.VERY_LOW: {
+        "reasoning": {"temperature": 0.7, "reasoning_effort": "low"},
+        "standard": {"temperature": 0.1}
+    },
+    VarietyLevel.LOW: {
+        "reasoning": {"temperature": 0.8, "reasoning_effort": "low"},
+        "standard": {"temperature": 0.3}
+    },
+    VarietyLevel.MEDIUM: {
+        "reasoning": {"temperature": 1.0, "reasoning_effort": "medium"},
+        "standard": {"temperature": 0.5}
+    },
+    VarietyLevel.HIGH: {
+        "reasoning": {"temperature": 1.1, "reasoning_effort": "medium"},
+        "standard": {"temperature": 0.7}
+    },
+    VarietyLevel.VERY_HIGH: {
+        "reasoning": {"temperature": 1.2, "reasoning_effort": "high"},
+        "standard": {"temperature": 0.9}
+    }
+}
 
 SYSTEM_PROMPT = """Eres el Asistente Cinematográfico Inteligente de CineTrack.
 Tu objetivo es recomendar entre 2 y 5 títulos de películas o series al usuario, basándote en su pedido (prompt) y en su perfil de preferencias.
@@ -340,9 +378,10 @@ class AIRecommenderService:
         self,
         user_message: str,
         model_override: Optional[str] = None,
-        api_key_override: Optional[str] = None
+        api_key_override: Optional[str] = None,
+        variety_level: VarietyLevel = VarietyLevel.MEDIUM
     ) -> Dict[str, Any]:
-        """Llamada directa asíncrona a Google Gemini API."""
+        """Llamada directa asíncrona a Google Gemini API calibrada según variedad."""
         keys = self.gemini_api_keys
         if not keys:
             raise ValueError("GEMINI_API_KEY no configurada")
@@ -350,6 +389,10 @@ class AIRecommenderService:
         api_key = api_key_override or keys[0]
         gemini_model = model_override or getattr(settings, "GEMINI_MODEL", "gemini-3.6-flash")
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
+        
+        mapping = SLIDER_MAPPING.get(variety_level, SLIDER_MAPPING[VarietyLevel.MEDIUM])
+        temp = mapping["standard"]["temperature"]
+
         payload = {
             "system_instruction": {
                 "parts": [{"text": SYSTEM_PROMPT}]
@@ -359,7 +402,7 @@ class AIRecommenderService:
             ],
             "generationConfig": {
                 "response_mime_type": "application/json",
-                "temperature": 0.3
+                "temperature": temp
             }
         }
 
@@ -379,9 +422,10 @@ class AIRecommenderService:
         self,
         user_message: str,
         model_override: Optional[str] = None,
-        api_key_override: Optional[str] = None
+        api_key_override: Optional[str] = None,
+        variety_level: VarietyLevel = VarietyLevel.MEDIUM
     ) -> Dict[str, Any]:
-        """Llamada directa asíncrona a Groq API."""
+        """Llamada directa asíncrona a Groq API con inyección segura de reasoning_effort."""
         keys = self.groq_api_keys
         if not keys:
             raise ValueError("GROQ_API_KEY no configurada")
@@ -392,15 +436,24 @@ class AIRecommenderService:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
+        
+        mapping = SLIDER_MAPPING.get(variety_level, SLIDER_MAPPING[VarietyLevel.MEDIUM])
         payload = {
             "model": groq_model,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_message}
             ],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.3
+            "response_format": {"type": "json_object"}
         }
+
+        # Modelos de razonamiento: inyectar reasoning_effort y temperatura adecuada
+        if groq_model in REASONING_MODELS:
+            payload["temperature"] = mapping["reasoning"]["temperature"]
+            payload["reasoning_effort"] = mapping["reasoning"]["reasoning_effort"]
+        else:
+            # Modelos estándar en Groq (ej: Llama): temperatura estándar y NUNCA enviar reasoning_effort (evita HTTP 400)
+            payload["temperature"] = mapping["standard"]["temperature"]
 
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(self.groq_url, headers=headers, json=payload)
@@ -639,10 +692,19 @@ class AIRecommenderService:
         candidates: List[Dict[str, Any]],
         language: Optional[str] = "es",
         clarification_context: Optional[Dict[str, Any]] = None,
-        is_cancelled: Optional[Any] = None
+        is_cancelled: Optional[Any] = None,
+        variety_level: Optional[VarietyLevel | str] = None
     ) -> RecommendationResponse:
         """Punto de entrada principal: orquesta llamada con reintentos antes de caer en heurístico."""
-        # 0. Si el cliente ya canceló la petición en vuelo, salir inmediatamente
+        # 0. Determinar nivel de variedad activo
+        active_variety = variety_level or (user_context.get("variety_level") if user_context else None) or getattr(settings, "AI_RECOMMENDER_DEFAULT_VARIETY", VarietyLevel.MEDIUM)
+        if isinstance(active_variety, str):
+            try:
+                active_variety = VarietyLevel(active_variety)
+            except Exception:
+                active_variety = VarietyLevel.MEDIUM
+
+        # Si el cliente ya canceló la petición en vuelo, salir inmediatamente
         if is_cancelled and await is_cancelled():
             return RecommendationResponse(
                 status="clarification_needed",
@@ -730,9 +792,9 @@ class AIRecommenderService:
 
         # Modelos principales y fallbacks configurados
         gemini_primary = getattr(settings, "GEMINI_MODEL", "gemini-3.6-flash")
-        gemini_fallbacks = _parse_model_list(getattr(settings, "GEMINI_FALLBACK_MODELS", "gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.8-flash"))
+        gemini_fallbacks = _parse_model_list(getattr(settings, "GEMINI_FALLBACK_MODELS", "gemini-3.8-flash,gemini-3.5-flash-lite,gemini-flash-lite-latest"))
         groq_primary = getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
-        groq_fallbacks = _parse_model_list(getattr(settings, "GROQ_FALLBACK_MODELS", "openai/gpt-oss-20b,groq/compound-mini,qwen/qwen3.8-27b"))
+        groq_fallbacks = _parse_model_list(getattr(settings, "GROQ_FALLBACK_MODELS", "openai/gpt-oss-20b,meta-llama/llama-3.3-70b-specdec"))
 
         models_by_prov = {
             "gemini": (gemini_primary, gemini_fallbacks),
@@ -760,7 +822,7 @@ class AIRecommenderService:
 
             if prov == "gemini" and settings.GEMINI_API_KEY:
                 try:
-                    raw_result = await self._call_gemini(user_message, model_override=model)
+                    raw_result = await self._call_gemini(user_message, model_override=model, variety_level=active_variety)
                     provider_used = "gemini"
                     model_used = model
                     break
@@ -769,7 +831,7 @@ class AIRecommenderService:
 
             elif prov == "groq" and settings.GROQ_API_KEY:
                 try:
-                    raw_result = await self._call_groq(user_message, model_override=model)
+                    raw_result = await self._call_groq(user_message, model_override=model, variety_level=active_variety)
                     provider_used = "groq"
                     model_used = model
                     break

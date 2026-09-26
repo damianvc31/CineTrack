@@ -2,6 +2,30 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.7.0] - 2026-09-26
+### Agregado y Mejorado (Factor Sorpresa y Variedad en Recomendador IA)
+- **Enum Normalizado y Configuración de Modelos (`VarietyLevel`):**
+  - Mapeo normalizado de 5 niveles de variedad: `VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.
+  - Configuración global `AI_RECOMMENDER_DEFAULT_VARIETY: VarietyLevel = VarietyLevel.MEDIUM` en backend, `.env.example`, `.env`, `.env.local`, `.env.prod` y `render.yaml`.
+  - Actualización de fallbacks de modelos en Gemini y Groq priorizando modelos de razonamiento y modelos rápidos (`openai/gpt-oss-120b`, `gemini-3.6-flash`).
+- **Persistencia de Preferencia de Usuario y Migración de Base de Datos:**
+  - Nueva columna indexada `preferencia_variedad_ia: Mapped[str]` en modelo `Usuario` (`default="MEDIUM"`).
+  - Migración Alembic `0007_user_variety_preference.py` ejecutada y sincronizada en SQLite local, Neon PostgreSQL desarrollo y Neon PostgreSQL producción.
+  - Endpoints `GET /api/v1/auth/me` y `PATCH /api/v1/users/me` adaptados con validación Pydantic estricta.
+- **RAG Multi-Nivel y Modulación de Umbrales de Votos (`catalog_service.py`):**
+  - Aplicación de multiplicadores dinámicos sobre los umbrales base (`AI_RECOMMENDER_MIN_VOTES_*`): $\times 2.0$ para `VERY_LOW`, $\times 1.5$ para `LOW`, $\times 1.0$ para `MEDIUM`, $\times 0.6$ para `HIGH`, y $\times 0.3$ para `VERY_HIGH`.
+  - Restricción estricta de rating crítico (`Titulo.rating_unificado >= 7.5`) en modo `VERY_LOW` para garantizar apuestas seguras de máxima aclamación.
+  - Ampliación del límite de candidatos recuperados a 25 en modos de alta variedad para sacar a la luz joyas ocultas y cine de nicho.
+- **Despachador Dinámico de LLM y Armonía de Parámetros (`ai_recommender_service.py`):**
+  - Clasificación de modelos entre razonamiento (`REASONING_MODELS`: `openai/gpt-oss-120b`, `openai/gpt-oss-20b`) y estándar (`STANDARD_MODELS`: `gemini-3.6-flash`, `llama-3.3-70b-specdec`).
+  - Inyección condicional de `reasoning_effort` (`"low"`, `"medium"`, `"high"`) **exclusivamente** para modelos de razonamiento en Groq API, previniendo errores de cliente `HTTP 400 Bad Request` en arquitecturas LLaMA.
+  - Calibración de temperatura (`temperature: 0.7-1.2` para reasoning; `0.1-0.9` para modelos estándar).
+- **Frontend — Slider en Configuración y Selector Rápido:**
+  - Slider interactivo de 5 pasos en `SettingsPage.tsx` con tarjeta descriptiva contextual y persistencia en perfil o almacenamiento local si es usuario invitado.
+  - Selector rápido de variedad con chips interactivos y badge en `RecommendationsPage.tsx` para alternar la audacia del recomendador al vuelo.
+  - Localización bilingüe completa (ES/EN) en `LanguageContext.tsx`.
+- **Suite de Pruebas Automatizadas:** Cobertura ampliada a 109 tests unitarios e integración en backend (`pytest`) y build de frontend verificado.
+
 ## [v1.6.3] - 2026-09-26
 ### Corregido y Mejorado (Pulido de Interfaz y Cierre de Calidad Pre-Entrega)
 - **Barra de Búsqueda y Botón Interactivo de Lupa:**

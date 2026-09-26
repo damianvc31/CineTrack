@@ -138,6 +138,68 @@ const UI_STRINGS: Record<string, { en: string; es: string }> = {
   },
   preferencesSaved: { en: 'Preferences saved successfully.', es: 'Preferencias guardadas exitosamente.' },
 
+  // AI Variety Preferences (Settings & Recommender)
+  aiVarietyHeading: {
+    en: 'AI Recommendation Variety & Surprise Factor',
+    es: 'Variedad y Factor Sorpresa de Recomendaciones IA'
+  },
+  aiVarietyDesc: {
+    en: 'Control whether the AI suggests safe mainstream consensus or dives into daring hidden gems and unexpected discoveries.',
+    es: 'Controla si la IA sugiere apuestas seguras de gran consenso o se aventura con joyas ocultas y propuestas audaces.'
+  },
+  aiVarietyLevel_VERY_LOW_name: {
+    en: 'Classic / Conservative',
+    es: 'Clásica / Conservadora'
+  },
+  aiVarietyLevel_VERY_LOW_desc: {
+    en: 'Safe bets: titles with high critical acclaim (rating ≥ 7.5) and massive community consensus.',
+    es: 'Apuesta segura: títulos de alta calificación crítica (rating ≥ 7.5) con masivo respaldo popular.'
+  },
+  aiVarietyLevel_LOW_name: {
+    en: 'Familiar',
+    es: 'Familiar'
+  },
+  aiVarietyLevel_LOW_desc: {
+    en: 'Well-known favorites with solid consensus and a slight opening for thematic discovery.',
+    es: 'Favoritos reconocidos con sólido consenso y una leve apertura a nuevas opciones afines.'
+  },
+  aiVarietyLevel_MEDIUM_name: {
+    en: 'Balanced (Recommended)',
+    es: 'Balanceada (Recomendado)'
+  },
+  aiVarietyLevel_MEDIUM_desc: {
+    en: 'The ideal sweet spot between popular hits and fresh discoveries matching your prompt.',
+    es: 'El punto medio óptimo entre grandes éxitos y propuestas frescas afines a tu búsqueda.'
+  },
+  aiVarietyLevel_HIGH_name: {
+    en: 'Exploratory',
+    es: 'Exploratoria'
+  },
+  aiVarietyLevel_HIGH_desc: {
+    en: 'Surfaces hidden gems, cult cinema, and lower-profile titles with fewer votes.',
+    es: 'Descubre joyas ocultas, cine de culto y títulos menos conocidos con menor cantidad de votos.'
+  },
+  aiVarietyLevel_VERY_HIGH_name: {
+    en: 'Creative / Surprising',
+    es: 'Creativa / Sorprendente'
+  },
+  aiVarietyLevel_VERY_HIGH_desc: {
+    en: 'Maximum boldness: unconventional thematic links, indie gems, and unexpected recommendations.',
+    es: 'Máxima audacia: conexiones temáticas inesperadas, rarezas indie y recomendaciones sorprendentes.'
+  },
+  aiVarietyQuickSelector: {
+    en: 'Variety:',
+    es: 'Variedad:'
+  },
+  aiVarietySaved: {
+    en: 'AI variety preference updated successfully.',
+    es: 'Preferencia de variedad IA actualizada exitosamente.'
+  },
+  aiVarietyGuestNote: {
+    en: 'Saved locally for your browser. Sign in to sync across your devices.',
+    es: 'Guardado localmente en tu navegador. Inicia sesión para sincronizarlo entre tus dispositivos.'
+  },
+
   // Library Page
   myLibrary: { en: 'My Library', es: 'Mi Biblioteca' },
   manageSavedDesc: { en: 'Manage your saved movies and series', es: 'Administra tus películas y series guardadas' },

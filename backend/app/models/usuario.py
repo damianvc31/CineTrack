@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import Boolean, DateTime, LargeBinary, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, LargeBinary, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -13,6 +13,12 @@ if TYPE_CHECKING:
 
 class Usuario(Base):
     __tablename__ = "usuarios"
+    __table_args__ = (
+        CheckConstraint(
+            "preferencia_variedad_ia IN ('VERY_LOW', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH')",
+            name="chk_usuario_preferencia_variedad_ia"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     nombre_usuario: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
@@ -24,6 +30,7 @@ class Usuario(Base):
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     avatar_binario: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     es_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    preferencia_variedad_ia: Mapped[str] = mapped_column(String(20), default="MEDIUM", server_default="MEDIUM", nullable=False)
 
     # Relaciones
     estados: Mapped[list["EstadoUsuarioTitulo"]] = relationship(back_populates="usuario", cascade="all, delete-orphan")

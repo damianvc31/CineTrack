@@ -1,9 +1,14 @@
 import React, { useState } from 'react'
-import { Lock, Globe, AlertCircle, CheckCircle } from 'lucide-react'
+import { Lock, Globe, AlertCircle, CheckCircle, Sliders, RefreshCw } from 'lucide-react'
 import { authService } from '@/services/authService'
+import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
+import type { VarietyLevel } from '@/types/auth'
+
+const VARIETY_LEVELS: VarietyLevel[] = ['VERY_LOW', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH']
 
 export const SettingsPage: React.FC = () => {
+  const { user, updateUser } = useAuth()
   const { language, setLanguage, t } = useLanguage()
 
   // Password state
@@ -15,6 +20,14 @@ export const SettingsPage: React.FC = () => {
   const [pwdSuccess, setPwdSuccess] = useState<string | null>(null)
 
   const [langSaved, setLangSaved] = useState(false)
+
+  // Variety level state
+  const [variety, setVariety] = useState<VarietyLevel>(() => {
+    return (user?.preferencia_variedad_ia as VarietyLevel) || (localStorage.getItem('cinetrack_variety_guest') as VarietyLevel) || 'MEDIUM'
+  })
+  const [varietySaving, setVarietySaving] = useState(false)
+  const [varietySaved, setVarietySaved] = useState(false)
+  const [varietyError, setVarietyError] = useState<string | null>(null)
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,6 +70,31 @@ export const SettingsPage: React.FC = () => {
     setLangSaved(true)
     setTimeout(() => setLangSaved(false), 2500)
   }
+
+  const handleVarietyChange = async (newLevel: VarietyLevel) => {
+    setVariety(newLevel)
+    setVarietyError(null)
+    setVarietySaved(false)
+    if (user) {
+      setVarietySaving(true)
+      try {
+        const updated = await authService.updateProfile({ preferencia_variedad_ia: newLevel })
+        updateUser(updated)
+        setVarietySaved(true)
+        setTimeout(() => setVarietySaved(false), 3000)
+      } catch (err: unknown) {
+        setVarietyError(err instanceof Error ? err.message : 'Error al guardar preferencia')
+      } finally {
+        setVarietySaving(false)
+      }
+    } else {
+      localStorage.setItem('cinetrack_variety_guest', newLevel)
+      setVarietySaved(true)
+      setTimeout(() => setVarietySaved(false), 3000)
+    }
+  }
+
+  const currentSliderIndex = VARIETY_LEVELS.indexOf(variety) !== -1 ? VARIETY_LEVELS.indexOf(variety) : 2
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
@@ -146,6 +184,104 @@ export const SettingsPage: React.FC = () => {
             </button>
           </div>
         </form>
+      </section>
+
+      {/* AI Recommender Variety & Surprise Factor */}
+      <section className="bg-[#141414] border border-[#262626] rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl">
+        <div className="flex items-center gap-3 pb-3 border-b border-[#262626]">
+          <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+            <Sliders className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-white">{t('aiVarietyHeading')}</h2>
+            <p className="text-xs text-gray-400">{t('aiVarietyDesc')}</p>
+          </div>
+        </div>
+
+        {varietyError && (
+          <div className="p-3 rounded-xl bg-red-950/40 border border-red-800/60 flex items-center gap-2 text-xs text-red-300">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{varietyError}</span>
+          </div>
+        )}
+
+        <div className="space-y-6 max-w-2xl">
+          {/* Slider Controls */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs font-semibold text-gray-300">
+              <span className="text-blue-400">{t('aiVarietyLevel_VERY_LOW_name')}</span>
+              <span className="text-amber-400 font-bold">{t(`aiVarietyLevel_${variety}_name`)}</span>
+              <span className="text-purple-400">{t('aiVarietyLevel_VERY_HIGH_name')}</span>
+            </div>
+
+            <div className="relative pt-1 pb-2">
+              <input
+                type="range"
+                min={0}
+                max={4}
+                step={1}
+                value={currentSliderIndex}
+                disabled={varietySaving}
+                onChange={(e) => {
+                  const idx = parseInt(e.target.value, 10)
+                  handleVarietyChange(VARIETY_LEVELS[idx])
+                }}
+                className="w-full h-2 bg-[#262626] rounded-lg appearance-none cursor-pointer accent-amber-500 disabled:opacity-50"
+              />
+              
+              {/* Ticks and mini labels */}
+              <div className="flex justify-between text-[11px] text-gray-500 px-1 pt-1.5 font-medium">
+                {VARIETY_LEVELS.map((level, idx) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => handleVarietyChange(level)}
+                    className={`transition-colors cursor-pointer text-center ${
+                      variety === level ? 'text-amber-400 font-bold' : 'hover:text-gray-300'
+                    }`}
+                  >
+                    <span className="block text-[10px] sm:text-xs">
+                      {idx === 0 ? '1' : idx === 1 ? '2' : idx === 2 ? '3' : idx === 3 ? '4' : '5'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Descriptive Card for Current Level */}
+          <div className="p-4 rounded-xl bg-[#181818] border border-[#2d2d2d] space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-xs font-bold text-white tracking-wide">
+                  {t(`aiVarietyLevel_${variety}_name`)}
+                </span>
+              </div>
+              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-[#252525] text-gray-400 border border-[#333333]">
+                {variety}
+              </span>
+            </div>
+            <p className="text-xs text-gray-300 leading-relaxed">
+              {t(`aiVarietyLevel_${variety}_desc`)}
+            </p>
+          </div>
+
+          {/* Feedback messages */}
+          {varietySaving && (
+            <div className="flex items-center gap-2 text-xs text-amber-400">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span>{language === 'es' ? 'Guardando preferencia...' : 'Saving preference...'}</span>
+            </div>
+          )}
+
+          {varietySaved && (
+            <div className="flex items-center gap-2 text-xs text-emerald-400">
+              <CheckCircle className="w-4 h-4 shrink-0" />
+              <span>{user ? t('aiVarietySaved') : `${t('aiVarietySaved')} ${t('aiVarietyGuestNote')}`}</span>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* Interface Preferences */}

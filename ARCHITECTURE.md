@@ -26,7 +26,7 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 - **Beneficio:** Elimina `JOINs` costosos en las pantallas principales y de exploración ("Todos", "Trending", "Estrenos") donde se presentan películas y series de forma unificada.
 
 ### 2.2. Esquema Relacional Principal
-1. **`usuarios`**: Autenticación mínima (login/password con hash `bcrypt`/`argon2`), perfil (país, ciudad, biografía, `avatar_url`, `avatar_binario` para persistencia nativa de imagen recortada, fecha_registro, flag `es_admin`).
+1. **`usuarios`**: Autenticación mínima (login/password con hash `bcrypt`/`argon2`), perfil (país, ciudad, biografía, `avatar_url`, `avatar_binario` para persistencia nativa de imagen recortada, `preferencia_variedad_ia` para recomendador IA, fecha_registro, flag `es_admin`).
 2. **`titulos`**: Catálogo de películas y series con metadatos técnicos y de TMDB. Utiliza campos exactos tipo `Date` (`fecha_estreno` y `fecha_fin`), exponiendo propiedades calculadas `@property anio_estreno` y `anio_fin` con setters para retrocompatibilidad total. Columna indexada y persistida `rating_unificado`.
 3. **`generos`** & **`titulos_generos`**: Clasificación N:M (un título pertenece a múltiples géneros).
 4. **`actores`** & **`titulos_elenco`**: Reparto principal N:M con columnas `foto_url` (imagen oficial TMDB `w185`), `personaje` y `orden`.
@@ -397,4 +397,31 @@ Para mitigar la latencia de red entre servicios de nube en tiers gratuitos (Fast
   - `upcoming_days = 0`: Desactiva la fecha tope (`release_date_lte = None`), permitiendo capturar los títulos más esperados del horizonte infinito futuro hasta completar el cupo.
   - `limit = 0` (o `target_per_genre = 0`): Desactiva el tope de cantidad (`target = None`), procesando todos los títulos que califiquen en la ventana temporal hasta que la popularidad decreciente caiga por debajo de 10.0.
   - Operación por defecto: 10 títulos globales dentro de una ventana de 365 días.
+ 
+---
+ 
+## 10. Factor Sorpresa y Variedad en Recomendaciones IA (v1.7.0)
+ 
+### 10.1. Clasificación Armónica de Modelos y Despacho Dinámico
+El sistema clasifica los modelos de lenguaje en dos categorías funcionales para sincronizar parámetros sin errores de protocolo:
+1. **Modelos de Razonamiento (`REASONING_MODELS`):**
+   - Groq: `openai/gpt-oss-120b`, `openai/gpt-oss-20b`.
+   - Adopta `temperature` en rango 0.7 a 1.2 e inyecta el parámetro `reasoning_effort` (`"low"`, `"medium"`, `"high"`).
+2. **Modelos Estándar (`STANDARD_MODELS`):**
+   - Google Gemini: `gemini-3.6-flash`, `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-flash-lite-latest`.
+   - Groq: `meta-llama/llama-3.3-70b-specdec`.
+   - Adopta `temperature` calibrada (0.1 a 0.9) y **nunca** envía `reasoning_effort` (lo que causaría un `HTTP 400 Bad Request` en la API de Groq).
+ 
+### 10.2. Modulación Multi-Nivel de Candidatos en RAG
+El RAG híbrido modula los umbrales de votos configurados en `.env` mediante multiplicadores dinámicos según el `VarietyLevel`:
+- `VERY_LOW` ($\times 2.0$): Exige obras con doble piso de votos y restringe estrictamente a obras con `rating_unificado >= 7.5`.
+- `LOW` ($\times 1.5$): Enfoque familiar con alto consenso popular.
+- `MEDIUM` ($\times 1.0$): Punto medio calibrado (25 votos vectoriales, 80 temáticos, 150 de respaldo).
+- `HIGH` ($\times 0.6$): Relaja el filtro de votos para incluir cine de culto y títulos independientes.
+- `VERY_HIGH` ($\times 0.3$): Máxima audacia, habilitando gemas ocultas y rarezas temáticas, expandiendo el pool de candidatos a 25.
+ 
+### 10.3. Persistencia y Experiencia de Usuario
+- **Nivel Normalizado (`VarietyLevel`):** `VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.
+- **Preferencia de Usuario:** Columna `Usuario.preferencia_variedad_ia` (default `"MEDIUM"`) persistida con migración Alembic `0007_user_variety_preference.py`. Los usuarios invitados utilizan almacenamiento local en navegador (`cinetrack_variety_guest`).
+- **UI:** Slider interactivo de 5 pasos en `SettingsPage.tsx` y selector rápido en píldoras con badge de resultado en `RecommendationsPage.tsx`.
 

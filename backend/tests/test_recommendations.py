@@ -4,6 +4,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import VarietyLevel
 from app.models import Genero, Titulo, titulos_generos
 from app.schemas.recommendations import RecommendationItem, RecommendationResponse
 
@@ -650,6 +651,98 @@ async def test_sync_embeddings_skips_unreleased_titles(db_session: AsyncSession)
         assert len(call_args) == 1
     finally:
         db_session.bind = orig_bind
+
+
+@pytest.mark.asyncio
+async def test_candidates_variety_modulation(db_session: AsyncSession, sample_catalog_for_recs):
+    """Verifica que el nivel de variedad VERY_LOW filtre títulos con rating < 7.5 y VERY_HIGH los admita."""
+    from app.services.catalog_service import get_recommendation_candidates
+    
+    # Crear un título de nicho con rating regular (7.1) y baja cantidad de votos (300)
+    low_rated = Titulo(
+        id=99,
+        tmdb_id=9999,
+        tipo="movie",
+        nombre="Robot Indie Explora Marte",
+        sinopsis="Un pequeño robot explora marte en una misión solitaria.",
+        fecha_estreno=date(2018, 5, 20),
+        popularidad=50.0,
+        vote_average_tmdb=7.1,
+        vote_count_tmdb=300,
+        rating_unificado=7.1
+    )
+    db_session.add(low_rated)
+    await db_session.commit()
+
+    # Consulta con VERY_LOW: rating_unificado >= 7.5 obligatorio
+    candidates_low, _ = await get_recommendation_candidates(
+        db_session,
+        prompt="robot marte",
+        variety_level=VarietyLevel.VERY_LOW
+    )
+    assert not any(c["id"] == 99 for c in candidates_low)
+
+    # Consulta con VERY_HIGH: admite títulos con rating < 7.5 y umbral de votos reducido
+    candidates_high, _ = await get_recommendation_candidates(
+        db_session,
+        prompt="robot marte",
+        variety_level=VarietyLevel.VERY_HIGH
+    )
+    assert any(c["id"] == 99 for c in candidates_high)
+
+
+@pytest.mark.asyncio
+async def test_groq_reasoning_effort_dispatching():
+    """Verifica que Groq reciba reasoning_effort y temperatura adecuada solo para modelos de razonamiento."""
+    from unittest.mock import MagicMock, patch
+    from app.services.ai_recommender_service import ai_recommender_service
+
+    captured_payloads = []
+
+    async def fake_post(url, headers=None, json=None):
+        captured_payloads.append(json)
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": '{"status":"recommended","recommendations":[]}'}}]
+        }
+        return mock_resp
+
+    from app.core.config import settings
+
+    with patch.object(settings, "GROQ_API_KEY", "test_key"), \
+         patch("httpx.AsyncClient.post", side_effect=fake_post):
+
+        # 1. Modelo de razonamiento (gpt-oss-120b) con VERY_HIGH
+        await ai_recommender_service._call_groq(
+            user_message="test prompt",
+            model_override="openai/gpt-oss-120b",
+            variety_level=VarietyLevel.VERY_HIGH
+        )
+        payload_reasoning = captured_payloads[-1]
+        assert payload_reasoning["reasoning_effort"] == "high"
+        assert payload_reasoning["temperature"] == 1.2
+
+        # 2. Modelo de razonamiento (gpt-oss-120b) con VERY_LOW
+        await ai_recommender_service._call_groq(
+            user_message="test prompt",
+            model_override="openai/gpt-oss-120b",
+            variety_level=VarietyLevel.VERY_LOW
+        )
+        payload_reasoning_low = captured_payloads[-1]
+        assert payload_reasoning_low["reasoning_effort"] == "low"
+        assert payload_reasoning_low["temperature"] == 0.7
+
+        # 3. Modelo estándar en Groq (llama-3.3-70b-specdec) con VERY_HIGH
+        await ai_recommender_service._call_groq(
+            user_message="test prompt",
+            model_override="meta-llama/llama-3.3-70b-specdec",
+            variety_level=VarietyLevel.VERY_HIGH
+        )
+        payload_standard = captured_payloads[-1]
+        assert "reasoning_effort" not in payload_standard
+        assert payload_standard["temperature"] == 0.9
+
 
 
 

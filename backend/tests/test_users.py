@@ -135,3 +135,44 @@ async def test_upload_and_get_avatar(async_client: AsyncClient):
     # Verificar que el endpoint de avatar ahora retorna 404
     get_after_del = await async_client.get(f"/api/v1/users/{user_data['id']}/avatar")
     assert get_after_del.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_update_variety_preference(async_client: AsyncClient):
+    """Verifica la actualización y validación de la preferencia de variedad del recomendador IA."""
+    reg_resp = await async_client.post("/api/v1/auth/register", json={
+        "nombre_usuario": "variety_user_test",
+        "password": "password123"
+    })
+    assert reg_resp.status_code == 201
+    user_data = reg_resp.json()["user"]
+    assert user_data["preferencia_variedad_ia"] == "MEDIUM"
+
+    token = reg_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Actualizar a HIGH
+    patch_resp = await async_client.patch("/api/v1/users/me", headers=headers, json={
+        "preferencia_variedad_ia": "HIGH"
+    })
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["preferencia_variedad_ia"] == "HIGH"
+
+    # Verificar que persiste en GET /auth/me
+    me_resp = await async_client.get("/api/v1/auth/me", headers=headers)
+    assert me_resp.status_code == 200
+    assert me_resp.json()["preferencia_variedad_ia"] == "HIGH"
+
+    # Actualizar a VERY_LOW
+    patch_vl = await async_client.patch("/api/v1/users/me", headers=headers, json={
+        "preferencia_variedad_ia": "VERY_LOW"
+    })
+    assert patch_vl.status_code == 200
+    assert patch_vl.json()["preferencia_variedad_ia"] == "VERY_LOW"
+
+    # Valor inválido debe retornar 422
+    invalid_resp = await async_client.patch("/api/v1/users/me", headers=headers, json={
+        "preferencia_variedad_ia": "INVALID_VARIETY"
+    })
+    assert invalid_resp.status_code == 422
+

@@ -5,6 +5,16 @@ from typing import Any
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from enum import Enum
+
+
+class VarietyLevel(str, Enum):
+    VERY_LOW = "VERY_LOW"
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    VERY_HIGH = "VERY_HIGH"
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "CineTrack API"
@@ -109,14 +119,15 @@ class Settings(BaseSettings):
     # AI Recommender (Híbrido con Cascada Multi-Nivel: Gemini / Groq + Fallback Heurístico)
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.6-flash"
-    GEMINI_FALLBACK_MODELS: str = "gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.8-flash"
+    GEMINI_FALLBACK_MODELS: str = "gemini-3.8-flash,gemini-3.5-flash-lite,gemini-flash-lite-latest"
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-001"
     EMBEDDING_DIMENSION: int = 768
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "openai/gpt-oss-120b"
-    GROQ_FALLBACK_MODELS: str = "openai/gpt-oss-20b,groq/compound-mini,qwen/qwen3.8-27b"
+    GROQ_FALLBACK_MODELS: str = "openai/gpt-oss-20b,meta-llama/llama-3.3-70b-specdec"
     AI_RECOMMENDER_PRIMARY: str = "gemini"  # "gemini" o "groq"
     RECOMMENDATION_CANDIDATES_LIMIT: int = 20
+    AI_RECOMMENDER_DEFAULT_VARIETY: VarietyLevel = VarietyLevel.MEDIUM
     AI_RECOMMENDER_MIN_VOTES_VECTOR: int = 25
     AI_RECOMMENDER_MIN_VOTES_THEMATIC: int = 80
     AI_RECOMMENDER_MIN_VOTES_FALLBACK: int = 150

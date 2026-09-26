@@ -95,6 +95,8 @@ async def update_my_profile(
             current_user.avatar_binario = None
         else:
             current_user.avatar_url = clean_url
+    if payload.preferencia_variedad_ia is not None:
+        current_user.preferencia_variedad_ia = payload.preferencia_variedad_ia.value
 
     await db.commit()
     await db.refresh(current_user)

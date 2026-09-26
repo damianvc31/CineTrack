@@ -12,6 +12,8 @@ export interface UserRegister {
   avatar_url?: string | null
 }
 
+export type VarietyLevel = 'VERY_LOW' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH'
+
 export interface UserResponse {
   id: number
   nombre_usuario: string
@@ -19,6 +21,7 @@ export interface UserResponse {
   ciudad?: string | null
   descripcion?: string | null
   avatar_url?: string | null
+  preferencia_variedad_ia?: VarietyLevel
   es_admin: boolean
   fecha_registro: string
 }
@@ -32,6 +35,7 @@ export interface UserProfileUpdate {
   ciudad?: string | null
   descripcion?: string | null
   avatar_url?: string | null
+  preferencia_variedad_ia?: VarietyLevel
 }
 
 export interface AuthResponse {

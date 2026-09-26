@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Bot, RefreshCw, AlertCircle, Clapperboard, Lightbulb, ArrowRight, CornerDownLeft, Film, Tv, Info, Dices, Send, Trash2, HelpCircle, Square } from 'lucide-react'
+import { Bot, RefreshCw, AlertCircle, Clapperboard, Lightbulb, ArrowRight, CornerDownLeft, Film, Tv, Info, Dices, Send, Trash2, HelpCircle, Square, Sliders } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
 import { recommendationService } from '@/services/recommendationService'
 import type { RecommendationResponse, RecommendationItem, ClarificationContext } from '@/services/recommendationService'
+import type { VarietyLevel } from '@/types/auth'
 import { catalogService } from '@/services/catalogService'
 import { TitleCard } from '@/components/common/TitleCard'
+
+const VARIETY_LEVELS: VarietyLevel[] = ['VERY_LOW', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH']
 
 interface PresetItem {
   badge: string
@@ -249,6 +252,19 @@ export const RecommendationsPage: React.FC = () => {
   })
   const [clarificationInput, setClarificationInput] = useState<string>('')
 
+  // Variedad y factor sorpresa
+  const [selectedVariety, setSelectedVariety] = useState<VarietyLevel>(() => {
+    return (user?.preferencia_variedad_ia as VarietyLevel) || (localStorage.getItem('cinetrack_variety_guest') as VarietyLevel) || 'MEDIUM'
+  })
+  const selectedVarietyRef = useRef<VarietyLevel>(selectedVariety)
+  selectedVarietyRef.current = selectedVariety
+
+  useEffect(() => {
+    if (user?.preferencia_variedad_ia) {
+      setSelectedVariety(user.preferencia_variedad_ia)
+    }
+  }, [user?.preferencia_variedad_ia])
+
   const lastExecutedPromptRef = useRef<string | null>(cached?.prompt || null)
   const requestIdRef = useRef<number>(0)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -335,7 +351,8 @@ export const RecommendationsPage: React.FC = () => {
           prompt: cleanQuery,
           tipo_filtro: 'all', // El prompt en lenguaje natural determina automáticamente el tipo
           language,
-          clarification_context: activeContext || undefined
+          clarification_context: activeContext || undefined,
+          variety_level: selectedVarietyRef.current
         },
         controller.signal
       )
@@ -661,6 +678,40 @@ export const RecommendationsPage: React.FC = () => {
           </div>
         )}
 
+        {/* Selector Rápido de Variedad / Factor Sorpresa */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-[#222222]">
+          <div className="flex items-center gap-2">
+            <Sliders className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="text-xs text-gray-400 font-medium">{t('aiVarietyQuickSelector')}</span>
+            <span className="text-xs text-amber-400 font-semibold">{t(`aiVarietyLevel_${selectedVariety}_name`)}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            {VARIETY_LEVELS.map((level) => {
+              const isSelected = selectedVariety === level
+              return (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setSelectedVariety(level)}
+                  title={t(`aiVarietyLevel_${level}_desc`)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap cursor-pointer border ${
+                    isSelected
+                      ? 'bg-amber-500/15 border-amber-500 text-amber-300 shadow-sm font-semibold'
+                      : 'bg-[#181818] border-[#2c2c2c] text-gray-400 hover:text-gray-200 hover:border-[#3d3d3d]'
+                  }`}
+                >
+                  {t(`aiVarietyLevel_${level}_name`).split(' ')[0]}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <p className="text-[11px] text-gray-400 italic">
+          {t(`aiVarietyLevel_${selectedVariety}_desc`)}
+        </p>
+
         {/* Formulario de prompt */}
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="relative">
@@ -807,7 +858,18 @@ export const RecommendationsPage: React.FC = () => {
                 </div>
                 <h2 className="text-sm font-bold text-white">{t('aiAssistant')}</h2>
               </div>
-              {getProviderBadge(result.provider_used, result.model_used)}
+              <div className="flex items-center gap-2 flex-wrap">
+                {result.variety_level && (
+                  <div
+                    title={t(`aiVarietyLevel_${result.variety_level}_desc`)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border bg-purple-500/10 text-purple-300 border-purple-500/30 cursor-help shadow-sm"
+                  >
+                    <Sliders className="w-3 h-3 text-purple-400 shrink-0" />
+                    <span>{t(`aiVarietyLevel_${result.variety_level}_name`)}</span>
+                  </div>
+                )}
+                {getProviderBadge(result.provider_used, result.model_used)}
+              </div>
             </div>
 
             <p className="text-sm text-gray-200 leading-relaxed font-medium">

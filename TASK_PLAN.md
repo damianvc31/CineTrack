@@ -347,9 +347,38 @@
     - [x] Incorporación de claves faltantes en `LanguageContext.tsx` y reemplazo de strings hardcodeados en `ReviewsPage.tsx`.
   - [x] **Paso 5: Calificaciones sin Texto (Rating Directo):**
     - [x] Soporte de texto opcional en modelo `Resena` y esquema `ReviewCreate` con validación estricta de presencia de texto o puntaje.
-    - [x] Migración Alembic `0006_nullable_review_text.py`.
+    - [x] Migración Alembic `0006_nullable_review_text.py` con `CheckConstraint` de integridad en base de datos.
     - [x] Soporte en interfaz de `ReviewsPage.tsx` y `TitleDetailPage.tsx`.
     - [x] Batería de pruebas automatizadas y verificación (106 tests pasando).
+
+- [x] **Fase 9: Factor Sorpresa y Variedad en Recomendador IA (v1.7.0):**
+  - [x] **Paso 9.1: Enum Normalizado y Configuración de Modelos (`config.py`):**
+    - [x] Definición de `VarietyLevel` (`VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`).
+    - [x] `AI_RECOMMENDER_DEFAULT_VARIETY: VarietyLevel = VarietyLevel.MEDIUM` en `config.py`, `.env.example`, `.env`, `.env.local`, `.env.prod` y `render.yaml`.
+    - [x] Actualización de fallbacks de modelos (`GEMINI_FALLBACK_MODELS` y `GROQ_FALLBACK_MODELS`).
+  - [x] **Paso 9.2: Persistencia de Preferencia de Usuario y Migración:**
+    - [x] Columna `preferencia_variedad_ia: Mapped[str]` en modelo `Usuario` (`default="MEDIUM"`).
+    - [x] Migración Alembic `0007_user_variety_preference.py` ejecutada en SQLite local, Neon Dev y Neon Prod.
+    - [x] Actualización de esquemas `UserResponse` y `UserUpdate` en backend.
+  - [x] **Paso 9.3: RAG Multi-Nivel con Modulación de Votos y Ordenamiento (`catalog_service.py`):**
+    - [x] `get_recommendation_candidates(..., variety_level: VarietyLevel = VarietyLevel.MEDIUM)`.
+    - [x] Modulación de umbrales sobre `settings.AI_RECOMMENDER_MIN_VOTES_*` ($\times 2.0$ a $\times 0.3$).
+    - [x] Restricción de rating crítico (`rating_unificado >= 7.5`) para `VERY_LOW` y ampliación de cupo a 25 candidatos.
+  - [x] **Paso 9.4: Despachador de LLM Dinámico y Seguro (`ai_recommender_service.py`):**
+    - [x] Mapeo de parámetros (`SLIDER_MAPPING`) para modelos Reasoning vs Standard.
+    - [x] Inyección de `reasoning_effort` condicionalmente **solo** para modelos `openai/gpt-oss-120b` y `openai/gpt-oss-20b` en Groq.
+    - [x] Calibración de `temperature` sin exceder los límites seguros.
+  - [x] **Paso 9.5: Endpoint de Recomendaciones:**
+    - [x] `POST /recommendations` aceptando y respondiendo `variety_level: Optional[VarietyLevel] = None` con fallback a preferencia de usuario o valor default.
+  - [x] **Paso 9.6: Frontend — UI de Configuración y Selector Rápido:**
+    - [x] Slider de 5 posiciones en `SettingsPage.tsx` con descripciones contextuales claras y guardado reactivo.
+    - [x] Selector interactivo directo y badge en `RecommendationsPage.tsx` para modular la variedad al vuelo.
+    - [x] Localización completa (ES/EN) en `LanguageContext.tsx`.
+  - [x] **Paso 9.7: Suite de Tests Automatizados y Verificación:**
+    - [x] Tests unitarios de modulación de candidatos en `test_recommendations.py`.
+    - [x] Tests de inyección de `reasoning_effort` en Groq según tipo de modelo y calibración de temperatura.
+    - [x] Tests de actualización de preferencia de variedad en `test_users.py`.
+    - [x] Verificación total de suite `pytest` (109/109 pasando) y build de `frontend` en verde.
 
 ---
 

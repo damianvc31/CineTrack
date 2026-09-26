@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.cache import cache
-from app.core.config import settings
+from app.core.config import VarietyLevel, settings
 from app.models import (
     Actor,
     Episodio,
@@ -2301,12 +2301,16 @@ async def get_user_recommendation_context(db: AsyncSession, usuario_id: int) -> 
     )
     top_genres = [r[0] for r in genre_freq_res.all()]
 
+    user_row = await db.execute(select(Usuario.preferencia_variedad_ia).where(Usuario.id == usuario_id))
+    pref_variedad = user_row.scalar_one_or_none() or "MEDIUM"
+
     return {
         "favorites": favorites,
         "high_rated": high_rated,
         "watched_ids": list(watched_ids),
         "top_genres": top_genres,
-        "has_history": bool(favorites or high_rated or watched_ids)
+        "has_history": bool(favorites or high_rated or watched_ids),
+        "preferencia_variedad_ia": pref_variedad
     }
 
 
@@ -2315,9 +2319,10 @@ async def get_recommendation_candidates(
     prompt: str,
     usuario_id: Optional[int] = None,
     tipo_filtro: Optional[str] = "all",
-    clarification_context: Optional[dict] = None
+    clarification_context: Optional[dict] = None,
+    variety_level: Optional[VarietyLevel | str] = None
 ) -> tuple[list[dict], Optional[dict]]:
-    """Selecciona un pool inteligente y acotado (35-45 títulos) de candidatos relevantes de PostgreSQL."""
+    """Selecciona un pool inteligente y acotado (20-25 títulos) de candidatos relevantes de PostgreSQL."""
     # Si hay contexto de aclaración, enriquecer términos de búsqueda para resolver respuestas relativas
     search_prompt = prompt
     if clarification_context:
@@ -2390,9 +2395,38 @@ async def get_recommendation_candidates(
 
     watched_ids = set(user_ctx.get("watched_ids", [])) if user_ctx else set()
 
+    # Determinar el nivel de variedad efectivo
+    active_variety = variety_level or (user_ctx.get("preferencia_variedad_ia") if user_ctx else None) or getattr(settings, "AI_RECOMMENDER_DEFAULT_VARIETY", VarietyLevel.MEDIUM)
+    if isinstance(active_variety, str):
+        try:
+            active_variety = VarietyLevel(active_variety)
+        except Exception:
+            active_variety = VarietyLevel.MEDIUM
+
     if user_ctx:
         user_ctx["only_watched"] = only_watched
         user_ctx["allow_rewatch"] = allow_rewatch
+        user_ctx["variety_level"] = active_variety.value
+    else:
+        user_ctx = {
+            "only_watched": only_watched,
+            "allow_rewatch": allow_rewatch,
+            "variety_level": active_variety.value,
+            "has_history": False
+        }
+
+    # Modulación de umbrales según el nivel de variedad (multiplicador sobre configuración base)
+    VARIETY_VOTE_MULTIPLIERS = {
+        VarietyLevel.VERY_LOW: 2.0,
+        VarietyLevel.LOW: 1.5,
+        VarietyLevel.MEDIUM: 1.0,
+        VarietyLevel.HIGH: 0.6,
+        VarietyLevel.VERY_HIGH: 0.3,
+    }
+    vote_mult = VARIETY_VOTE_MULTIPLIERS.get(active_variety, 1.0)
+    eff_votes_vector = max(5, int(settings.AI_RECOMMENDER_MIN_VOTES_VECTOR * vote_mult))
+    eff_votes_thematic = max(10, int(settings.AI_RECOMMENDER_MIN_VOTES_THEMATIC * vote_mult))
+    eff_votes_fallback = max(20, int(settings.AI_RECOMMENDER_MIN_VOTES_FALLBACK * vote_mult))
 
     # Detección de tipo en el prompt si no vino impuesto por tipo_filtro
     effective_tipo = tipo_filtro
@@ -2560,6 +2594,8 @@ async def get_recommendation_candidates(
                 .scalar_subquery()
             )
             query = query.where(Titulo.id.notin_(ex_subq))
+        if active_variety == VarietyLevel.VERY_LOW:
+            query = query.where(Titulo.rating_unificado >= 7.5)
         return query
 
     entity_titles: dict[int, Titulo] = {}
@@ -2716,10 +2752,10 @@ async def get_recommendation_candidates(
                     .where(Titulo.embedding.isnot(None))
                 )
                 vector_q = apply_base_filters(vector_q)
-                # Exigir un piso razonable de votos o permitir estrenos recientes
+                # Exigir un piso razonable de votos modulado por variedad o permitir estrenos recientes
                 vector_q = vector_q.where(
                     or_(
-                        Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_VECTOR,
+                        Titulo.vote_count_tmdb >= eff_votes_vector,
                         and_(
                             Titulo.fecha_estreno.isnot(None),
                             Titulo.fecha_estreno >= recent_release_cutoff,
@@ -2728,7 +2764,8 @@ async def get_recommendation_candidates(
                     )
                 )
                 # Ordenar por distancia coseno de pgvector
-                vector_q = vector_q.order_by(Titulo.embedding.cosine_distance(user_vec).asc()).limit(25)
+                vector_limit = 35 if active_variety in (VarietyLevel.HIGH, VarietyLevel.VERY_HIGH) else 25
+                vector_q = vector_q.order_by(Titulo.embedding.cosine_distance(user_vec).asc()).limit(vector_limit)
                 v_res = await db.execute(vector_q)
                 for t in v_res.scalars().all():
                     vector_titles[t.id] = t
@@ -2757,7 +2794,7 @@ async def get_recommendation_candidates(
         theme_genre_q = theme_genre_q.where(
             Genero.nombre.in_(expanded_genres),
             or_(
-                Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_THEMATIC,
+                Titulo.vote_count_tmdb >= eff_votes_thematic,
                 and_(
                     Titulo.fecha_estreno.isnot(None),
                     Titulo.fecha_estreno >= recent_release_cutoff,
@@ -2778,7 +2815,7 @@ async def get_recommendation_candidates(
         theme_syn_q = apply_base_filters(theme_syn_q)
         theme_syn_q = theme_syn_q.where(
             or_(
-                Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_THEMATIC,
+                Titulo.vote_count_tmdb >= eff_votes_thematic,
                 and_(
                     Titulo.fecha_estreno.isnot(None),
                     Titulo.fecha_estreno >= recent_release_cutoff,
@@ -2811,7 +2848,7 @@ async def get_recommendation_candidates(
         g_q = apply_base_filters(g_q)
         g_q = g_q.where(
             Genero.nombre.in_(expanded_genres),
-            Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_FALLBACK
+            Titulo.vote_count_tmdb >= eff_votes_fallback
         )
         g_q = g_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(20)
         g_res = await db.execute(g_q)
@@ -2833,7 +2870,7 @@ async def get_recommendation_candidates(
         fill_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
         fill_q = apply_base_filters(fill_q)
         fill_q = fill_q.where(
-            Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_FALLBACK,
+            Titulo.vote_count_tmdb >= eff_votes_fallback,
             Titulo.rating_unificado >= 7.5
         )
         fill_q = fill_q.order_by(func.random()).limit(needed)
@@ -2849,6 +2886,8 @@ async def get_recommendation_candidates(
     #    4º Fallback de Género y Aclamadas
     # -------------------------------------------------------------------------
     max_candidates = getattr(settings, "RECOMMENDATION_CANDIDATES_LIMIT", 20)
+    if active_variety in (VarietyLevel.HIGH, VarietyLevel.VERY_HIGH):
+        max_candidates = max_candidates + 5  # Ampliar a 25 candidatos para mayor abanico creativo
     ordered_titles: dict[int, Titulo] = {}
 
     for t in entity_titles.values():
