@@ -11,6 +11,11 @@ on:
         required: false
         default: '7'
         type: string
+      releases_days_window:
+        description: 'Ventana en días hacia atrás para estrenos en cartelera (default: 15)'
+        required: false
+        default: '15'
+        type: string
       allow_unreleased:
         description: 'Permitir títulos no estrenados (default: false)'
         required: false
@@ -27,6 +32,7 @@ jobs:
           PROD_API_URL: ${{ secrets.PROD_API_URL }}
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
           CHANGES_DAYS: ${{ inputs.changes_days_window || '7' }}
+          RELEASES_DAYS: ${{ inputs.releases_days_window || '15' }}
           ALLOW_UNRELEASED: ${{ inputs.allow_unreleased || 'false' }}
         run: |
           if [ -z "$PROD_API_URL" ] || [ -z "$ADMIN_API_KEY" ]; then
@@ -42,7 +48,7 @@ jobs:
           HTTP_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$API_URL/api/v1/admin/sync/deep" \
             -H "X-Admin-Key: $ADMIN_API_KEY" \
             -H "Content-Type: application/json" \
-            -d "{\"changes_days_window\": $CHANGES_DAYS, \"allow_unreleased\": $ALLOW_UNRELEASED}")
+            -d "{\"changes_days_window\": $CHANGES_DAYS, \"releases_days_window\": $RELEASES_DAYS, \"allow_unreleased\": $ALLOW_UNRELEASED}")
 
           echo "Código HTTP recibido: $HTTP_CODE"
           echo "Respuesta del servidor:"

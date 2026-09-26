@@ -87,8 +87,8 @@ async def test_admin_sync_jobs_with_parameters(async_client: AsyncClient):
     assert resp_init.status_code == 202
     assert resp_init.json()["job"] == "initial_ingest"
 
-    # Daily sync con ventana personalizada de horas
-    daily_payload = {"hours_window": 72}
+    # Daily sync con ventana personalizada de cartelera
+    daily_payload = {"releases_days_window": 20}
     resp_daily = await async_client.post("/api/v1/admin/sync/daily", json=daily_payload, headers=headers)
     assert resp_daily.status_code == 202
     assert resp_daily.json()["job"] == "daily_sync"

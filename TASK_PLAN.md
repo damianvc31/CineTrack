@@ -324,6 +324,16 @@
   - [x] Desglose `created` y `updated` en `import_from_json_data` y en job `import_json`.
   - [x] Logs diferenciados `[CREADO]` vs `[ACTUALIZADO]` en CLI `sync_tmdb.py` para `--import-tmdb-id` y `--import-json`.
   - [x] Cobertura unitaria ampliada en `test_tmdb_sync.py` validando la detección precisa de títulos creados vs actualizados (105 tests pasando en verde).
+- [x] **Resiliencia ante Latencia de Episodios TMDB, Badges y Simplificación de Daily Sync (v1.6.2):**
+  - [x] Desacople de `isUnreleased` para que un episodio cuya fecha ya llegó (`ep.fecha_estreno <= todayStr`) siempre sea marcable como visto con el ojo, sin depender del avance del puntero de TMDB.
+  - [x] El filtro por `proximo_episodio_fecha` en episodios se restringe estrictamente a punteros futuros (`proximo_episodio_fecha > todayStr`).
+  - [x] Limpieza de badges en `TitleDetailPage.tsx`: omisión de coletillas de fechas pasadas en `Currently Airing`, `Coming Soon` y `Renewed` cuando el puntero no avanzó (`nextEpDate <= todayStr`).
+  - [x] Validación estricta en `isWithin15Days`: solo fechas futuras (`diffDays > 0 && diffDays <= 15`).
+  - [x] Aislamiento de `inProgressSeason`: requiere episodios pendientes en la misma temporada para no pisar el badge de renovación de entregas siguientes (*Los Simpsons*).
+  - [x] Soporte para temporadas incompletas recién estrenadas (*S.W.A.T.*): pulso `En Emisión` y exhibición de fecha de próximo episodio si el puntero a nivel de show es futuro (`nextDate > todayStr`).
+  - [x] Eliminación total de `changes_hours_window` y `hours_window` en `DailySyncRequest` y del mensaje de respuesta de la sync diaria (delegado a `deep_sync`).
+  - [x] Parametrización de `releases_days_window` (default: 15) en `workflow_dispatch` de `.github/workflows/daily_sync.yml` y `weekly_deep_sync.yml`.
+  - [x] Verificación completa: suite de 105 tests de backend en verde y build de frontend verificado.
 
 ---
 

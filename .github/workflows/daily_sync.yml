@@ -6,6 +6,11 @@ on:
     - cron: '0 3 * * 1-6'
   workflow_dispatch:
     inputs:
+      releases_days_window:
+        description: 'Ventana en días hacia atrás para estrenos en cartelera (default: 15)'
+        required: false
+        default: '15'
+        type: string
       allow_unreleased:
         description: 'Permitir títulos no estrenados (default: false)'
         required: false
@@ -21,6 +26,7 @@ jobs:
         env:
           PROD_API_URL: ${{ secrets.PROD_API_URL }}
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          RELEASES_DAYS: ${{ inputs.releases_days_window || '15' }}
           ALLOW_UNRELEASED: ${{ inputs.allow_unreleased || 'false' }}
         run: |
           if [ -z "$PROD_API_URL" ] || [ -z "$ADMIN_API_KEY" ]; then
@@ -36,7 +42,7 @@ jobs:
           HTTP_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$API_URL/api/v1/admin/sync/daily" \
             -H "X-Admin-Key: $ADMIN_API_KEY" \
             -H "Content-Type: application/json" \
-            -d "{\"allow_unreleased\": $ALLOW_UNRELEASED}")
+            -d "{\"releases_days_window\": $RELEASES_DAYS, \"allow_unreleased\": $ALLOW_UNRELEASED}")
 
           echo "Código HTTP recibido: $HTTP_CODE"
           echo "Respuesta del servidor:"

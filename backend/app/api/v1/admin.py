@@ -51,14 +51,8 @@ class InitialIngestRequest(BaseModel):
 
 
 class DailySyncRequest(BaseModel):
-    changes_hours_window: Optional[int] = Field(
-        default=None, ge=1, le=720, description="Ventana de horas hacia atrás para consultar /changes de TMDB en series y películas (default config: 48 hs)"
-    )
     releases_days_window: Optional[int] = Field(
         default=None, ge=1, le=90, description="Ventana de días hacia atrás para consultar estrenos recientes en cartelera (default config: 15 días)"
-    )
-    hours_window: Optional[int] = Field(
-        default=None, ge=1, le=720, description="Alias compatible de changes_hours_window"
     )
     allow_unreleased: Optional[bool] = Field(
         default=None, description="Permitir títulos no estrenados (default: False / según config)"
@@ -528,19 +522,16 @@ async def trigger_daily_sync(
     background_tasks: BackgroundTasks,
     _: Any = Depends(get_current_admin)
 ) -> JobResponse:
-    """Ejecuta la sincronización diaria de cambios TMDB y cartelera en background."""
-    changes_h = payload.changes_hours_window if payload.changes_hours_window is not None else payload.hours_window
+    """Ejecuta la sincronización diaria liviana (series activas, cartelera y métricas) en background."""
     background_tasks.add_task(
         _run_job_daily,
-        changes_hours_window=changes_h,
         releases_days_window=payload.releases_days_window,
         allow_unreleased=payload.allow_unreleased,
     )
-    changes_desc = f"{changes_h} hs" if changes_h is not None else "config default (48 hs)"
-    releases_desc = f"{payload.releases_days_window} días" if payload.releases_days_window else "config default (15 días)"
+    releases_desc = f"{payload.releases_days_window} días" if payload.releases_days_window else f"config default ({settings.TMDB_RELEASES_DAYS_WINDOW} días)"
     return JobResponse(
         job="daily_sync",
-        message=f"Sincronización diaria iniciada en segundo plano (cambios: {changes_desc}, cartelera: {releases_desc})."
+        message=f"Sincronización diaria iniciada en segundo plano (cartelera: {releases_desc})."
     )
 
 

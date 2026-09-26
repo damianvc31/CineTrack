@@ -378,11 +378,16 @@ export const TitleDetailPage: React.FC = () => {
       if (!prev || !prev.temporadas) return prev
       const updatedSeasons = prev.temporadas.map((s) => {
         if (s.numero !== seasonNum) return s
+        const isTitleEnded = !!(
+          title?.status_tmdb &&
+          (title.status_tmdb.toLowerCase().includes('ended') || title.status_tmdb.toLowerCase().includes('cancel'))
+        )
         const updatedEpisodes =
           s.episodios?.map((e) => {
-            const isUnreleased = !!(
-              (e.fecha_estreno && e.fecha_estreno > todayStr) ||
-              (title?.proximo_episodio_fecha && e.fecha_estreno && e.fecha_estreno >= title.proximo_episodio_fecha)
+            const isUnreleased = !isTitleEnded && !!(
+              !e.fecha_estreno ||
+              e.fecha_estreno > todayStr ||
+              (title?.proximo_episodio_fecha && title.proximo_episodio_fecha > todayStr && e.fecha_estreno && e.fecha_estreno >= title.proximo_episodio_fecha)
             )
             if (targetWatched && isUnreleased) return e
             return { ...e, visto: targetWatched }
@@ -582,14 +587,15 @@ export const TitleDetailPage: React.FC = () => {
   const seasonsCount = visibleSeasons.length || 1
   const seasonsLabel = `${seasonsCount} ${language === 'es' ? (seasonsCount === 1 ? 'temporada' : 'temporadas') : (seasonsCount === 1 ? 'season' : 'seasons')}`
 
-  // Helper to check if a date is between today and today + 15 days
+  // Helper to check if a date is strictly in the future within 15 days
   const isWithin15Days = (dStr?: string | null, todayStrVal?: string) => {
     if (!dStr) return false
     const nowStr = todayStrVal || new Date().toISOString().split('T')[0]
+    if (dStr <= nowStr) return false
     const target = new Date(dStr)
     const today = new Date(nowStr)
     const diffDays = (target.getTime() - today.getTime()) / (1000 * 3600 * 24)
-    return diffDays >= 0 && diffDays <= 15
+    return diffDays > 0 && diffDays <= 15
   }
 
   // Render semantic status badge based on season progress, release dates and TMDB status
@@ -686,6 +692,7 @@ export const TitleDetailPage: React.FC = () => {
     let upcomingSeasonWithDate: { seasonNum: number; startDate: string } | null = null
     let confirmedSeasonDateless: { seasonNum: number } | null = null
     let totalAiredEpisodesCount = 0
+    let latestAiredEpisodeDate: string | null = null
 
     if (title.temporadas && title.temporadas.length > 0) {
       const sortedSeasons = [...title.temporadas].sort((a, b) => a.numero - b.numero)
@@ -695,35 +702,49 @@ export const TitleDetailPage: React.FC = () => {
         const airedEpisodes = eps.filter(
           (ep) =>
             ep.fecha_estreno &&
-            (title.proximo_episodio_fecha
+            (title.proximo_episodio_fecha && title.proximo_episodio_fecha > todayStr
               ? ep.fecha_estreno < title.proximo_episodio_fecha && ep.fecha_estreno <= todayStr
               : ep.fecha_estreno <= todayStr)
         )
         totalAiredEpisodesCount += airedEpisodes.length
 
+        for (const ep of airedEpisodes) {
+          if (ep.fecha_estreno && (!latestAiredEpisodeDate || ep.fecha_estreno > latestAiredEpisodeDate)) {
+            latestAiredEpisodeDate = ep.fecha_estreno
+          }
+        }
+
         const unreleasedEpisodes = eps
           .filter(
             (ep) =>
-              (ep.fecha_estreno && ep.fecha_estreno > todayStr) ||
-              (title.proximo_episodio_fecha && ep.fecha_estreno && ep.fecha_estreno >= title.proximo_episodio_fecha)
+              !ep.fecha_estreno ||
+              ep.fecha_estreno > todayStr ||
+              (title.proximo_episodio_fecha && title.proximo_episodio_fecha > todayStr && ep.fecha_estreno && ep.fecha_estreno >= title.proximo_episodio_fecha)
           )
-          .sort((a, b) => (a.fecha_estreno! > b.fecha_estreno! ? 1 : -1))
+          .sort((a, b) => {
+            if (!a.fecha_estreno) return 1
+            if (!b.fecha_estreno) return -1
+            return a.fecha_estreno > b.fecha_estreno ? 1 : -1
+          })
 
         if (airedEpisodes.length > 0 && unreleasedEpisodes.length > 0) {
           inProgressSeason = {
             seasonNum: season.numero,
-            nextEpDate: unreleasedEpisodes[0]?.fecha_estreno || title.proximo_episodio_fecha || undefined,
+            nextEpDate: (unreleasedEpisodes[0]?.fecha_estreno && unreleasedEpisodes[0].fecha_estreno > todayStr)
+              ? unreleasedEpisodes[0].fecha_estreno
+              : (title.proximo_episodio_fecha && title.proximo_episodio_fecha > todayStr ? title.proximo_episodio_fecha : undefined),
           }
           break
         }
 
         // Temporada que aún no comenzó
         if (airedEpisodes.length === 0) {
-          if (unreleasedEpisodes.length > 0) {
+          const firstDated = unreleasedEpisodes.find((e) => e.fecha_estreno)
+          if (firstDated) {
             if (!upcomingSeasonWithDate) {
               upcomingSeasonWithDate = {
                 seasonNum: season.numero,
-                startDate: unreleasedEpisodes[0]!.fecha_estreno!,
+                startDate: firstDated.fecha_estreno!,
               }
             }
           } else if (season.fecha_estreno) {
@@ -762,7 +783,7 @@ export const TitleDetailPage: React.FC = () => {
     // State 2: La serie AÚN NO HA ESTRENADO ningún episodio (Season 1 o totalAiredEpisodesCount === 0)
     const isShowUnreleased = totalAiredEpisodesCount === 0 || (upcomingSeasonWithDate && upcomingSeasonWithDate.seasonNum === 1) || (title.fecha_estreno && title.fecha_estreno > todayStr)
     if (isShowUnreleased) {
-      const premiereDate = upcomingSeasonWithDate?.startDate || nextDate || title.fecha_estreno
+      const premiereDate = upcomingSeasonWithDate?.startDate || (nextDate && nextDate > todayStr ? nextDate : undefined) || title.fecha_estreno
       const isSoon = isWithin15Days(premiereDate, todayStr)
 
       // 2.a: Fecha confirmada en <= 15 días -> Muy Pronto / Coming Soon (Cian)
@@ -796,7 +817,7 @@ export const TitleDetailPage: React.FC = () => {
       }
 
       // 2.d: Fecha lejana (> 15 días)
-      if (premiereDate) {
+      if (premiereDate && premiereDate > todayStr) {
         return (
           <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/60 border border-amber-600/50 text-amber-300 text-xs font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
@@ -807,11 +828,9 @@ export const TitleDetailPage: React.FC = () => {
     }
 
     // State 3: Serie activa con temporadas previas que estrena NUEVA temporada en el calendario (Temporada > 1)
-    if (upcomingSeasonWithDate || nextDate) {
-      const dateStr = upcomingSeasonWithDate?.startDate || nextDate
-      const label = upcomingSeasonWithDate
-        ? (language === 'es' ? `Temporada ${upcomingSeasonWithDate.seasonNum}` : `Season ${upcomingSeasonWithDate.seasonNum}`)
-        : (language === 'es' ? 'Nueva Temporada' : 'New Season')
+    if (upcomingSeasonWithDate) {
+      const dateStr = upcomingSeasonWithDate.startDate
+      const label = language === 'es' ? `Temporada ${upcomingSeasonWithDate.seasonNum}` : `Season ${upcomingSeasonWithDate.seasonNum}`
 
       return (
         <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-950/80 border border-blue-500/60 text-blue-300 text-xs font-bold shadow-sm">
@@ -833,6 +852,49 @@ export const TitleDetailPage: React.FC = () => {
         <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-500/60 text-purple-300 text-xs font-bold shadow-sm">
           <span className="w-2 h-2 rounded-full bg-purple-400" />
           <span>{language === 'es' ? 'Renovada' : 'Renewed'} — {label} ({statusSuffix})</span>
+        </span>
+      )
+    }
+
+    // State 4.b: Tratamiento excepcional para temporadas incompletas en TMDB
+    // Solo aplica si la temporada más reciente tiene apenas 1 o 2 episodios cargados en total (ej. S.W.A.T. con solo el piloto),
+    // todos ya se emitieron, y el estreno del PRIMER episodio fue reciente (<= 14 días).
+    // Si la temporada tiene una grilla normal (>= 3 episodios) o si ya concluyó su ciclo, pasa de inmediato a Entre Temporadas.
+    const isRecentIncompleteSeasonPremiere = (() => {
+      if (st.includes('ended') || st.includes('cancel')) return false
+      if (!title.temporadas || title.temporadas.length === 0) return false
+      const sorted = [...title.temporadas].sort((a, b) => a.numero - b.numero)
+      const latestSeason = sorted[sorted.length - 1]
+      const eps = latestSeason?.episodios || []
+      // Solo para temporadas con grilla trunca o incompleta en TMDB (1 o 2 episodios cargados en total)
+      if (eps.length === 0 || eps.length > 2) return false
+
+      // Todos los episodios cargados (1 o 2) ya se emitieron
+      const aired = eps.filter((e) => e.fecha_estreno && e.fecha_estreno <= todayStr)
+      if (aired.length !== eps.length) return false
+
+      // La ventana de 14 días se cuenta estrictamente desde el PRIMER episodio de la temporada
+      const firstEp = eps[0]
+      const premiereDateStr = firstEp?.fecha_estreno || latestSeason.fecha_estreno
+      if (!premiereDateStr) return false
+
+      const premiereDate = new Date(premiereDateStr)
+      const today = new Date(todayStr)
+      const diffDays = (today.getTime() - premiereDate.getTime()) / (1000 * 3600 * 24)
+      return diffDays >= 0 && diffDays <= 14
+    })()
+
+    if (isRecentIncompleteSeasonPremiere) {
+      const nextDateStr =
+        nextDate && nextDate > todayStr
+          ? language === 'es'
+            ? ` — Próximo ep. el ${nextDate}`
+            : ` — Next ep on ${nextDate}`
+          : ''
+      return (
+        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 text-xs font-bold shadow-sm">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>{language === 'es' ? 'En Emisión' : 'Currently Airing'}{nextDateStr}</span>
         </span>
       )
     }
@@ -1412,9 +1474,14 @@ export const TitleDetailPage: React.FC = () => {
                   {currentSeasonData.episodios.map((ep) => {
                     const isEpWatched = !!ep.visto
                     const todayStr = new Date().toISOString().split('T')[0]
-                    const isUnreleased = !!(
-                      (ep.fecha_estreno && ep.fecha_estreno > todayStr) ||
-                      (title?.proximo_episodio_fecha && ep.fecha_estreno && ep.fecha_estreno >= title.proximo_episodio_fecha)
+                    const isTitleEnded = !!(
+                      title?.status_tmdb &&
+                      (title.status_tmdb.toLowerCase().includes('ended') || title.status_tmdb.toLowerCase().includes('cancel'))
+                    )
+                    const isUnreleased = !isTitleEnded && !!(
+                      !ep.fecha_estreno ||
+                      ep.fecha_estreno > todayStr ||
+                      (title?.proximo_episodio_fecha && title.proximo_episodio_fecha > todayStr && ep.fecha_estreno && ep.fecha_estreno >= title.proximo_episodio_fecha)
                     )
 
                     return (
@@ -1442,7 +1509,7 @@ export const TitleDetailPage: React.FC = () => {
                               isEpWatched
                                 ? (language === 'es' ? 'Marcar como no visto' : 'Mark as unwatched')
                                 : isUnreleased
-                                ? (language === 'es' ? `Sin estrenar (estreno: ${ep.fecha_estreno})` : `Unreleased (air date: ${ep.fecha_estreno})`)
+                                ? (language === 'es' ? (ep.fecha_estreno ? `Sin estrenar (estreno: ${ep.fecha_estreno})` : 'Sin estrenar (fecha por anunciar)') : (ep.fecha_estreno ? `Unreleased (air date: ${ep.fecha_estreno})` : 'Unreleased (TBA)'))
                                 : (language === 'es' ? 'Marcar como visto' : 'Mark as watched')
                             }
                             className={`mt-0.5 p-1 rounded-full transition-colors ${
@@ -1475,7 +1542,9 @@ export const TitleDetailPage: React.FC = () => {
                                   {language === 'es' ? 'Fecha de estreno:' : 'Air Date:'} {ep.fecha_estreno}
                                 </span>
                               ) : (
-                                <span>{language === 'es' ? 'Fecha de estreno: -' : 'Air Date: -'}</span>
+                                <span className={isUnreleased ? 'text-amber-400/80 italic font-medium' : 'text-gray-500'}>
+                                  {language === 'es' ? 'Fecha de estreno: Por anunciar (TBA)' : 'Air Date: TBA'}
+                                </span>
                               )}
                               <span>• {ep.duracion && ep.duracion > 0 ? `${ep.duracion} min` : '-'}</span>
                             </div>

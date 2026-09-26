@@ -148,10 +148,9 @@ Ingesta producciones cuyo estreno esté pautado dentro de los siguientes 3 meses
 ### 4. Sincronización Automatizada
 
 - **Sync Diaria Liviana (`POST /api/v1/admin/sync/daily`):**
-  Consulta cambios en TMDB (`/changes`), revisa estrenos recientes en cartelera y activa embeddings para títulos recién estrenados.
+  Sincroniza directamente series activas, consulta estrenos recientes en cartelera, refresca métricas y activa embeddings para títulos recién estrenados.
   ```json
   {
-    "changes_hours_window": 48,
     "releases_days_window": 15,
     "allow_unreleased": false
   }

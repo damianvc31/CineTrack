@@ -2,6 +2,26 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.6.2] - 2026-09-26
+### Corregido (Resiliencia ante Latencia de Episodios TMDB, Badges y Simplificación de Daily Sync)
+- **Desbloqueo Inmediato de Episodios Estrenados (`isUnreleased`):**
+  - Desacoplamiento de la condición de visionado en la interfaz respecto al puntero asíncrono de TMDB (`title.proximo_episodio_fecha`).
+  - Si la fecha de estreno del episodio ya llegó o pasó (`ep.fecha_estreno <= todayStr`), el episodio queda inmediatamente habilitado para marcarse como visto mediante el ícono del ojo, eliminando bloqueos indebidos causados por retrasos en las cachés o jobs nocturnos de TMDB.
+  - La restricción por `proximo_episodio_fecha` ahora solo aplica si dicho puntero es estrictamente futuro (`title.proximo_episodio_fecha > todayStr`).
+- **Limpieza y Perfeccionamiento de Badges Semánticos en Series:**
+  - Los badges de `En Emisión` (`Currently Airing`), `Muy Pronto` (`Coming Soon`) y `Renovada` (`Renewed`) ya no renderizan coletillas con fechas pasadas cuando el puntero de TMDB ha quedado desactualizado (`nextEpDate <= todayStr`).
+  - `isWithin15Days` ahora exige estrictamente que la fecha sea futura (`diffDays > 0 && diffDays <= 15`), evitando que obras con fecha de hoy o pasada permanezcan erróneamente con el badge "Muy Pronto".
+  - **Aislamiento de Temporadas en Progreso (*Los Simpsons*):** La evaluación de `inProgressSeason` ahora exige episodios no estrenados dentro de esa misma temporada, evitando que temporadas concluidas pisen el badge azul de renovación de la siguiente entrega.
+  - **Soporte para Temporadas Incompletas en TMDB (*S.W.A.T.*):** Si una temporada tiene 1 o 2 episodios cargados y se emitió en los últimos 14 días, mantiene el estado activo `En Emisión`, y si el puntero a nivel de serie ya conoce la fecha del próximo capítulo (`nextDate > todayStr`), la exhibe directamente en el badge aun si el episodio puntual no fue volcado aún a la grilla de TMDB.
+- **Simplificación Integral de la API de Sincronización Diaria (`POST /sync/daily`):**
+  - Eliminación definitiva de los parámetros `changes_hours_window` y `hours_window` de `DailySyncRequest`, delegando el procesamiento de `/changes` exclusivamente a la sincronización profunda (`deep_sync`).
+  - Limpieza del mensaje de respuesta del endpoint administrativo para reflejar únicamente la ventana de cartelera.
+- **Parametrización en Workflows de GitHub Actions (`daily_sync.yml` y `weekly_deep_sync.yml`):**
+  - Incorporación del input configurable `releases_days_window` (default: 15) en `workflow_dispatch` para permitir disparos manuales con ventanas de cartelera personalizadas tanto en la sincronización diaria como en la profunda semanal.
+- **Seguridad en Repositorio (`.gitignore`):**
+  - Exclusión explícita de `docs/postman/*.json` para impedir la persistencia o commit inadvertido de colecciones o entornos exportados en formato JSON.
+
+
 ## [v1.6.1] - 2026-09-26
 ### Agregado (Telemetría Granular de Ingesta: Títulos Creados vs. Actualizados)
 - **Detección Atómica de Altas vs. Modificaciones en Ingesta:**

@@ -10,9 +10,10 @@
 .env.*
 !.env.example
 
-# --- Postman — Secretos y configuraciones locales de entorno (YAML) ---
+# --- Postman — Secretos y configuraciones locales de entorno (YAML / JSON) ---
 docs/postman/*.environment.yaml
 !docs/postman/*.environment.example.yaml
+docs/postman/*.json
 docs/postman/.postman/
 docs/postman/postman/
 
