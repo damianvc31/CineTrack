@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Lock, User as UserIcon, MapPin, FileText, Image as ImageIcon, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useLanguage } from '@/context/LanguageContext'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -10,6 +11,7 @@ interface AuthModalProps {
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'login' }) => {
   const { login, register } = useAuth()
+  const { language } = useLanguage()
   const [isRegisterMode, setIsRegisterMode] = useState(initialMode === 'register')
   const [nombreUsuario, setNombreUsuario] = useState('')
   const [password, setPassword] = useState('')
@@ -34,11 +36,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
     setError(null)
 
     if (!nombreUsuario.trim()) {
-      setError('Username is required.')
+      setError(language === 'es' ? 'El nombre de usuario es requerido.' : 'Username is required.')
       return
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.')
+      setError(
+        language === 'es'
+          ? 'La contraseña debe tener al menos 6 caracteres.'
+          : 'Password must be at least 6 characters.'
+      )
       return
     }
 
@@ -64,7 +70,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
       if (err instanceof Error) {
         setError(err.message)
       } else {
-        setError('Authentication error. Please try again.')
+        setError(
+          language === 'es'
+            ? 'Error de autenticación. Por favor, reintenta.'
+            : 'Authentication error. Please try again.'
+        )
       }
     } finally {
       setLoading(false)
@@ -77,6 +87,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
         {/* Close Button */}
         <button
           onClick={onClose}
+          aria-label={language === 'es' ? 'Cerrar' : 'Close'}
           className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#202020] transition-colors"
         >
           <X className="w-5 h-5" />
@@ -85,12 +96,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
         {/* Title */}
         <div className="text-center">
           <h3 className="text-2xl font-bold text-white tracking-tight">
-            {isRegisterMode ? 'Create an Account' : 'Sign In'}
+            {isRegisterMode
+              ? (language === 'es' ? 'Crear una Cuenta' : 'Create an Account')
+              : (language === 'es' ? 'Iniciar Sesión' : 'Sign In')}
           </h3>
           <p className="text-xs text-gray-400 mt-1">
             {isRegisterMode
-              ? 'Join CineTrack to save favorites, track episodes, and write reviews'
-              : 'Enter your credentials to access your personal watchlist and profile'}
+              ? (language === 'es'
+                  ? 'Únete a CineTrack para guardar favoritos, seguir episodios y escribir reseñas'
+                  : 'Join CineTrack to save favorites, track episodes, and write reviews')
+              : (language === 'es'
+                  ? 'Ingresa tus credenciales para acceder a tu watchlist y perfil personal'
+                  : 'Enter your credentials to access your personal watchlist and profile')}
           </p>
         </div>
 
@@ -104,7 +121,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">Username</label>
+            <label className="block text-xs font-medium text-gray-300 mb-1">
+              {language === 'es' ? 'Nombre de Usuario' : 'Username'}
+            </label>
             <div className="relative">
               <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input
@@ -113,14 +132,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
                 autoFocus
                 value={nombreUsuario}
                 onChange={(e) => setNombreUsuario(e.target.value)}
-                placeholder="e.g. damian, cinephile99"
+                placeholder={language === 'es' ? 'ej. damian, cinefilo99' : 'e.g. damian, cinephile99'}
                 className="w-full pl-9 pr-3 py-2 bg-[#181818] border border-[#333333] rounded-xl text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">Password</label>
+            <label className="block text-xs font-medium text-gray-300 mb-1">
+              {language === 'es' ? 'Contraseña' : 'Password'}
+            </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input
@@ -128,7 +149,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimum 6 characters"
+                placeholder={language === 'es' ? 'Mínimo 6 caracteres' : 'Minimum 6 characters'}
                 className="w-full pl-9 pr-3 py-2 bg-[#181818] border border-[#333333] rounded-xl text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60"
               />
             </div>
@@ -138,28 +159,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-300 mb-1">Country</label>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
+                    {language === 'es' ? 'País' : 'Country'}
+                  </label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                     <input
                       type="text"
                       value={pais}
                       onChange={(e) => setPais(e.target.value)}
-                      placeholder="e.g. Argentina"
+                      placeholder={language === 'es' ? 'ej. Argentina' : 'e.g. Argentina'}
                       className="w-full pl-9 pr-3 py-2 bg-[#181818] border border-[#333333] rounded-xl text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-300 mb-1">City</label>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
+                    {language === 'es' ? 'Ciudad' : 'City'}
+                  </label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                     <input
                       type="text"
                       value={ciudad}
                       onChange={(e) => setCiudad(e.target.value)}
-                      placeholder="e.g. Córdoba"
+                      placeholder={language === 'es' ? 'ej. Córdoba' : 'e.g. Córdoba'}
                       className="w-full pl-9 pr-3 py-2 bg-[#181818] border border-[#333333] rounded-xl text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60"
                     />
                   </div>
@@ -167,21 +192,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-300 mb-1">Bio / About You</label>
+                <label className="block text-xs font-medium text-gray-300 mb-1">
+                  {language === 'es' ? 'Biografía / Sobre ti' : 'Bio / About You'}
+                </label>
                 <div className="relative">
                   <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
                   <textarea
                     rows={2}
                     value={descripcion}
                     onChange={(e) => setDescripcion(e.target.value)}
-                    placeholder="Short bio about your movie taste"
+                    placeholder={language === 'es' ? 'Breve biografía sobre tus gustos de cine' : 'Short bio about your movie taste'}
                     className="w-full pl-9 pr-3 py-2 bg-[#181818] border border-[#333333] rounded-xl text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60 resize-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-300 mb-1">Avatar URL</label>
+                <label className="block text-xs font-medium text-gray-300 mb-1">
+                  {language === 'es' ? 'URL de Avatar' : 'Avatar URL'}
+                </label>
                 <div className="relative">
                   <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                   <input
@@ -204,9 +233,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
             {loading ? (
               <span className="inline-block w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
             ) : isRegisterMode ? (
-              'Create Account'
+              language === 'es' ? 'Crear Cuenta' : 'Create Account'
             ) : (
-              'Sign In'
+              language === 'es' ? 'Iniciar Sesión' : 'Sign In'
             )}
           </button>
         </form>
@@ -214,7 +243,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
         <div className="pt-3 border-t border-[#262626] text-center text-xs text-gray-400">
           {isRegisterMode ? (
             <p>
-              Already have an account?{' '}
+              {language === 'es' ? '¿Ya tienes una cuenta?' : 'Already have an account?'}{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -223,12 +252,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
                 }}
                 className="text-amber-400 hover:text-amber-300 font-bold ml-1"
               >
-                Sign in here
+                {language === 'es' ? 'Inicia sesión aquí' : 'Sign in here'}
               </button>
             </p>
           ) : (
             <p>
-              Don't have an account yet?{' '}
+              {language === 'es' ? '¿Aún no tienes una cuenta?' : "Don't have an account yet?"}{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -237,7 +266,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
                 }}
                 className="text-amber-400 hover:text-amber-300 font-bold ml-1"
               >
-                Create an account
+                {language === 'es' ? 'Crea una cuenta' : 'Create an account'}
               </button>
             </p>
           )}

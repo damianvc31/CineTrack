@@ -305,11 +305,15 @@
   - [x] Utilidad centralizada `releaseUtils.ts` (`isTitleUnreleased`) con suite de 5 tests unitarios en Vitest (7 tests frontend pasando).
   - [x] Blindaje e invariante de dominio en backend (`state_service.toggle_watched`) con HTTP 400 Bad Request y 2 tests unitarios en `test_state_machine.py` (111 tests backend pasando al 100%).
   - [x] Exposición de `status_tmdb` y `proximo_episodio_fecha` en `TitleCardResponse`.
-- [x] **Paso 11.10: Consolidación de Modelo de Datos y Diagramas Vectoriales de Alta Legibilidad:**
+- [x] **Paso 11.10: Consolidación de Modelo de Datos y Diagramas Vectoriales de Alta Legibilidad (v1.7.2):**
   - [x] Unificación del modelo de datos de producción en un único diagrama canónico (`docs/UML/modelo_datos/modelo_datos.mmd` y `docs/diagrams/modelo_datos.svg`), retirando las versiones disjuntas mínimas/superiores.
   - [x] Actualización de la máquina de estados de usuario (`docs/UML/estados/maquina_estados_usuario.mmd` y `docs/diagrams/maquina_estados_usuario.svg`) reflejando los guards de estreno en películas y series con 0 episodios emitidos.
   - [x] Actualización del diagrama de arquitectura del recomendador (`docs/UML/recomendador/arquitectura_recomendador_hibrido.mmd` y `docs/diagrams/recomendador_hibrido_arquitectura.svg`) con el slider UX de 5 niveles, modulación RAG de votos, exención de entidades, guardrail de inanición y Reasoning Dispatcher con tolerancia a fallos multiclave.
   - [x] Diseño infográfico en formato SVG vectorial nativo de alto contraste y legibilidad humana en modo oscuro.
+- [x] **Paso 11.11: Localización Completa de Modales de Autenticación (v1.7.3):**
+  - [x] Localización de `AuthModal.tsx` mediante `useLanguage` de `@/context/LanguageContext` para soporte dinámico español e inglés.
+  - [x] Traducción completa de títulos, subtítulos, validaciones, etiquetas (labels), placeholders, botones submit y alternancia login/registro.
+  - [x] Verificación de suite de tests en frontend (`vitest`) y build de producción con Vite.
 
 ---
 

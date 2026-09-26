@@ -2,6 +2,15 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.7.3] - 2026-09-26
+### Corregido — Localización Completa de Modales de Autenticación (Login y Registro)
+- **Localización Dinámica en `AuthModal.tsx` con `useLanguage`:**
+  - Integración del hook `useLanguage` de `@/context/LanguageContext` para alternar fluidamente entre inglés y español según la preferencia de idioma del usuario.
+  - Traducción completa de títulos y subtítulos en ambos modos (`"Crear una Cuenta"` / `"Create an Account"`, `"Iniciar Sesión"` / `"Sign In"`).
+  - Traducción de validaciones de formulario (`"El nombre de usuario es requerido."`, `"La contraseña debe tener al menos 6 caracteres."`, `"Error de autenticación. Por favor, reintenta."`).
+  - Traducción de etiquetas (labels) y textos de marcador (placeholders) para todos los campos: Usuario, Contraseña, País, Ciudad, Biografía y Avatar URL.
+  - Traducción de botones de acción (`"Crear Cuenta"`, `"Iniciar Sesión"`) y enlaces de alternancia inferior (`"¿Ya tienes una cuenta? Inicia sesión aquí"`, `"¿Aún no tienes una cuenta? Crea una cuenta"`).
+
 ## [v1.7.2] - 2026-09-26
 ### Documentación — Consolidación de Modelo de Datos y Diagramas Vectoriales Legibles
 - **Modelo de Datos Unificado:**
