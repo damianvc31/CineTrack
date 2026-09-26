@@ -210,7 +210,7 @@ export const SettingsPage: React.FC = () => {
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs font-semibold text-gray-300">
               <span className="text-blue-400">{t('aiVarietyLevel_VERY_LOW_name')}</span>
-              <span className="text-amber-400 font-bold">{t(`aiVarietyLevel_${variety}_name`)}</span>
+              <span className="text-amber-400 font-bold">{t('aiVarietyLevel_MEDIUM_name')}</span>
               <span className="text-purple-400">{t('aiVarietyLevel_VERY_HIGH_name')}</span>
             </div>
 

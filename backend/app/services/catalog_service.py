@@ -44,14 +44,50 @@ from app.schemas.catalog import (
     UserStatsResponse,
 )
 
-# Mapeo canónico de géneros: expande géneros individuales a las duplas que TMDB asigna a series
+# Mapeo canónico de géneros: expande géneros individuales (inglés y español) a las variantes y duplas que TMDB asigna
 GENRE_EXPANSIONS: dict[str, list[str]] = {
-    "action": ["Action", "Action & Adventure"],
-    "adventure": ["Adventure", "Action & Adventure"],
-    "science fiction": ["Science Fiction", "Sci-Fi & Fantasy"],
-    "sci-fi": ["Science Fiction", "Sci-Fi & Fantasy"],
-    "fantasy": ["Fantasy", "Sci-Fi & Fantasy"],
-    "war": ["War", "War & Politics"],
+    "action": ["Action", "Action & Adventure", "Acción", "Acción y aventura"],
+    "acción": ["Acción", "Acción y aventura", "Action", "Action & Adventure"],
+    "accion": ["Acción", "Acción y aventura", "Action", "Action & Adventure"],
+    "adventure": ["Adventure", "Action & Adventure", "Aventura", "Acción y aventura"],
+    "aventura": ["Aventura", "Acción y aventura", "Adventure", "Action & Adventure"],
+    "science fiction": ["Science Fiction", "Sci-Fi & Fantasy", "Ciencia ficción", "Ciencia ficción y fantasía"],
+    "sci-fi": ["Science Fiction", "Sci-Fi & Fantasy", "Ciencia ficción", "Ciencia ficción y fantasía"],
+    "scifi": ["Science Fiction", "Sci-Fi & Fantasy", "Ciencia ficción", "Ciencia ficción y fantasía"],
+    "ciencia ficción": ["Ciencia ficción", "Ciencia ficción y fantasía", "Science Fiction", "Sci-Fi & Fantasy"],
+    "ciencia ficcion": ["Ciencia ficción", "Ciencia ficción y fantasía", "Science Fiction", "Sci-Fi & Fantasy"],
+    "fantasy": ["Fantasy", "Sci-Fi & Fantasy", "Fantasía", "Ciencia ficción y fantasía"],
+    "fantasía": ["Fantasía", "Ciencia ficción y fantasía", "Fantasy", "Sci-Fi & Fantasy"],
+    "fantasia": ["Fantasía", "Ciencia ficción y fantasía", "Fantasy", "Sci-Fi & Fantasy"],
+    "war": ["War", "War & Politics", "Bélica", "Guerra", "Guerra y política"],
+    "bélica": ["Bélica", "Guerra", "Guerra y política", "War", "War & Politics"],
+    "belica": ["Bélica", "Guerra", "Guerra y política", "War", "War & Politics"],
+    "guerra": ["Bélica", "Guerra", "Guerra y política", "War", "War & Politics"],
+    "comedy": ["Comedy", "Comedia"],
+    "comedia": ["Comedia", "Comedy"],
+    "drama": ["Drama"],
+    "horror": ["Horror", "Terror"],
+    "terror": ["Terror", "Horror"],
+    "thriller": ["Thriller", "Suspenso"],
+    "suspenso": ["Suspenso", "Thriller"],
+    "mystery": ["Mystery", "Misterio"],
+    "misterio": ["Misterio", "Mystery"],
+    "crime": ["Crime", "Crimen"],
+    "crimen": ["Crimen", "Crime"],
+    "animation": ["Animation", "Animación"],
+    "animación": ["Animación", "Animation"],
+    "animacion": ["Animación", "Animation"],
+    "family": ["Family", "Familia"],
+    "familia": ["Familia", "Family"],
+    "music": ["Music", "Música"],
+    "música": ["Música", "Music"],
+    "musica": ["Música", "Music"],
+    "history": ["History", "Historia"],
+    "historia": ["Historia", "History"],
+    "documentary": ["Documentary", "Documental"],
+    "documental": ["Documental", "Documentary"],
+    "western": ["Western"],
+    "romance": ["Romance"],
 }
 
 EXCLUDED_GENRE_NAMES: set[str] = {"Action & Adventure", "Sci-Fi & Fantasy", "War & Politics"}
@@ -2559,7 +2595,7 @@ async def get_recommendation_candidates(
     today = date.today()
     recent_release_cutoff = today - timedelta(days=settings.AI_RECOMMENDER_NEW_RELEASE_DAYS)
 
-    def apply_base_filters(query):
+    def apply_base_filters(query, apply_variety_rating_filter: bool = True):
         # Excluir estrictamente obras no estrenadas / próximas
         query = query.where(get_released_filter_condition(today))
         if effective_tipo in ("movie", "tv"):
@@ -2594,7 +2630,7 @@ async def get_recommendation_candidates(
                 .scalar_subquery()
             )
             query = query.where(Titulo.id.notin_(ex_subq))
-        if active_variety == VarietyLevel.VERY_LOW:
+        if apply_variety_rating_filter and active_variety == VarietyLevel.VERY_LOW:
             query = query.where(Titulo.rating_unificado >= 7.5)
         return query
 
@@ -2637,7 +2673,7 @@ async def get_recommendation_candidates(
         for bg in valid_bigrams:
             # Director por nombre completo
             dir_bg_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-            dir_bg_q = apply_base_filters(dir_bg_q).where(Titulo.director.ilike(f"%{bg}%"))
+            dir_bg_q = apply_base_filters(dir_bg_q, apply_variety_rating_filter=False).where(Titulo.director.ilike(f"%{bg}%"))
             dir_bg_res = await db.execute(dir_bg_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15))
             for t in dir_bg_res.scalars().all():
                 entity_titles[t.id] = t
@@ -2663,7 +2699,7 @@ async def get_recommendation_candidates(
                     )
                     for r in f_dir.all():
                         d_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-                        d_q = apply_base_filters(d_q).where(Titulo.director == r[0])
+                        d_q = apply_base_filters(d_q, apply_variety_rating_filter=False).where(Titulo.director == r[0])
                         d_res = await db.execute(d_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15))
                         for t in d_res.scalars().all():
                             entity_titles[t.id] = t
@@ -2677,7 +2713,7 @@ async def get_recommendation_candidates(
         for t in long_terms:
             # Directores por término exacto
             dir_t_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-            dir_t_q = apply_base_filters(dir_t_q).where(Titulo.director.ilike(f"%{t}%"))
+            dir_t_q = apply_base_filters(dir_t_q, apply_variety_rating_filter=False).where(Titulo.director.ilike(f"%{t}%"))
             dir_t_res = await db.execute(dir_t_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15))
             for tit in dir_t_res.scalars().all():
                 entity_titles[tit.id] = tit
@@ -2696,7 +2732,7 @@ async def get_recommendation_candidates(
                     )
                     for r in f_single_dir.all():
                         d_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-                        d_q = apply_base_filters(d_q).where(Titulo.director == r[0])
+                        d_q = apply_base_filters(d_q, apply_variety_rating_filter=False).where(Titulo.director == r[0])
                         d_res = await db.execute(d_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15))
                         for tit in d_res.scalars().all():
                             entity_titles[tit.id] = tit
@@ -2716,7 +2752,7 @@ async def get_recommendation_candidates(
         title_terms = [t for t in search_terms if len(t) >= 4]
         if title_terms:
             name_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-            name_q = apply_base_filters(name_q).where(or_(*[Titulo.nombre.ilike(f"%{t}%") for t in title_terms]))
+            name_q = apply_base_filters(name_q, apply_variety_rating_filter=False).where(or_(*[Titulo.nombre.ilike(f"%{t}%") for t in title_terms]))
             name_q = name_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15)
             name_res = await db.execute(name_q)
             for tit in name_res.scalars().all():
@@ -2730,7 +2766,7 @@ async def get_recommendation_candidates(
             .join(titulos_elenco, titulos_elenco.c.titulo_id == Titulo.id)
             .where(titulos_elenco.c.actor_id.in_(list(matched_actor_ids)))
         )
-        act_titles_q = apply_base_filters(act_titles_q)
+        act_titles_q = apply_base_filters(act_titles_q, apply_variety_rating_filter=False)
         act_titles_res = await db.execute(
             act_titles_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(20)
         )
@@ -2876,6 +2912,16 @@ async def get_recommendation_candidates(
         fill_q = fill_q.order_by(func.random()).limit(needed)
         fill_res = await db.execute(fill_q)
         for t in fill_res.scalars().all():
+            fallback_titles[t.id] = t
+
+    # Red de seguridad: si tras todos los filtros no se alcanzaron al menos 3 candidatos, relajar rating para garantizar respuesta
+    if (total_accumulated + len(fallback_titles)) < 3 and not only_watched:
+        needed = 5 - (total_accumulated + len(fallback_titles))
+        safety_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+        safety_q = apply_base_filters(safety_q, apply_variety_rating_filter=False)
+        safety_q = safety_q.order_by(desc(Titulo.popularidad)).limit(needed)
+        safety_res = await db.execute(safety_q)
+        for t in safety_res.scalars().all():
             fallback_titles[t.id] = t
 
     # -------------------------------------------------------------------------

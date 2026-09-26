@@ -820,23 +820,45 @@ class AIRecommenderService:
                 logger.info("Cliente canceló la solicitud durante la cascada. Deteniendo ejecución.")
                 break
 
-            if prov == "gemini" and settings.GEMINI_API_KEY:
-                try:
-                    raw_result = await self._call_gemini(user_message, model_override=model, variety_level=active_variety)
-                    provider_used = "gemini"
-                    model_used = model
-                    break
-                except Exception as e:
-                    logger.warning("Falla en Gemini API con modelo '%s': %s", model, e)
+            if prov == "gemini" and self.gemini_api_keys:
+                for key_idx, key in enumerate(self.gemini_api_keys):
+                    if is_cancelled and await is_cancelled():
+                        break
+                    try:
+                        raw_result = await self._call_gemini(
+                            user_message,
+                            model_override=model,
+                            api_key_override=key,
+                            variety_level=active_variety
+                        )
+                        provider_used = "gemini"
+                        model_used = model
+                        break
+                    except Exception as e:
+                        logger.warning(
+                            "Falla en Gemini API (modelo '%s', key #%d ending in '...%s'): %s",
+                            model, key_idx + 1, key[-6:] if len(key) >= 6 else key, e
+                        )
 
-            elif prov == "groq" and settings.GROQ_API_KEY:
-                try:
-                    raw_result = await self._call_groq(user_message, model_override=model, variety_level=active_variety)
-                    provider_used = "groq"
-                    model_used = model
-                    break
-                except Exception as e:
-                    logger.warning("Falla en Groq API con modelo '%s': %s", model, e)
+            elif prov == "groq" and self.groq_api_keys:
+                for key_idx, key in enumerate(self.groq_api_keys):
+                    if is_cancelled and await is_cancelled():
+                        break
+                    try:
+                        raw_result = await self._call_groq(
+                            user_message,
+                            model_override=model,
+                            api_key_override=key,
+                            variety_level=active_variety
+                        )
+                        provider_used = "groq"
+                        model_used = model
+                        break
+                    except Exception as e:
+                        logger.warning(
+                            "Falla en Groq API (modelo '%s', key #%d ending in '...%s'): %s",
+                            model, key_idx + 1, key[-6:] if len(key) >= 6 else key, e
+                        )
 
         # Si el cliente canceló durante la cascada, retornar de inmediato
         if is_cancelled and await is_cancelled():

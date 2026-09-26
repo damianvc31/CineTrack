@@ -663,7 +663,7 @@ async def test_candidates_variety_modulation(db_session: AsyncSession, sample_ca
         id=99,
         tmdb_id=9999,
         tipo="movie",
-        nombre="Robot Indie Explora Marte",
+        nombre="Exploración Solitaria",
         sinopsis="Un pequeño robot explora marte en una misión solitaria.",
         fecha_estreno=date(2018, 5, 20),
         popularidad=50.0,
@@ -671,6 +671,9 @@ async def test_candidates_variety_modulation(db_session: AsyncSession, sample_ca
         vote_count_tmdb=300,
         rating_unificado=7.1
     )
+    g_sci_fi = await db_session.get(Genero, 878)
+    if g_sci_fi:
+        low_rated.generos.append(g_sci_fi)
     db_session.add(low_rated)
     await db_session.commit()
 
