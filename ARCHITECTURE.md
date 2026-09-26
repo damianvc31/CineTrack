@@ -26,7 +26,7 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 - **Beneficio:** Elimina `JOINs` costosos en las pantallas principales y de exploración ("Todos", "Trending", "Estrenos") donde se presentan películas y series de forma unificada.
 
 ### 2.2. Esquema Relacional Principal
-1. **`usuarios`**: Autenticación mínima (login/password con hash `bcrypt`/`argon2`), perfil (país, ciudad, biografía, `avatar_url`, `avatar_binario` para persistencia nativa de imagen recortada, fecha_registro, flag `es_admin`).
+1. **`usuarios`**: Autenticación mínima (login/password con hash `bcrypt`/`argon2`), perfil (país, ciudad, biografía, `avatar_url`, `avatar_binario` para persistencia nativa de imagen recortada, `preferencia_variedad_ia` para recomendador IA, fecha_registro, flag `es_admin`).
 2. **`titulos`**: Catálogo de películas y series con metadatos técnicos y de TMDB. Utiliza campos exactos tipo `Date` (`fecha_estreno` y `fecha_fin`), exponiendo propiedades calculadas `@property anio_estreno` y `anio_fin` con setters para retrocompatibilidad total. Columna indexada y persistida `rating_unificado`.
 3. **`generos`** & **`titulos_generos`**: Clasificación N:M (un título pertenece a múltiples géneros).
 4. **`actores`** & **`titulos_elenco`**: Reparto principal N:M con columnas `foto_url` (imagen oficial TMDB `w185`), `personaje` y `orden`.
@@ -397,4 +397,45 @@ Para mitigar la latencia de red entre servicios de nube en tiers gratuitos (Fast
   - `upcoming_days = 0`: Desactiva la fecha tope (`release_date_lte = None`), permitiendo capturar los títulos más esperados del horizonte infinito futuro hasta completar el cupo.
   - `limit = 0` (o `target_per_genre = 0`): Desactiva el tope de cantidad (`target = None`), procesando todos los títulos que califiquen en la ventana temporal hasta que la popularidad decreciente caiga por debajo de 10.0.
   - Operación por defecto: 10 títulos globales dentro de una ventana de 365 días.
+ 
+---
+ 
+## 10. Factor Sorpresa y Variedad en Recomendaciones IA — Fase 11 (v1.7.0)
+ 
+### 10.1. Clasificación Dinámica de Modelos (`AI_REASONING_MODELS`)
+Para permitir cambiar, alternar o agregar modelos en Groq o Gemini libremente desde variables de entorno sin tocar el código fuente, el sistema desacopla la clasificación mediante `AI_REASONING_MODELS`:
+1. **Modelos de Razonamiento (Configurados vía `AI_REASONING_MODELS`):**
+   - Modelos por defecto: `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`.
+   - Adopta `temperature` en rango 0.7 a 1.2 e inyecta el parámetro `reasoning_effort` (`"low"`, `"medium"`, `"high"`).
+2. **Modelos Estándar (Gemini Flash, Llama, etc.):**
+   - Cualquier modelo no presente en `AI_REASONING_MODELS` se gestiona automáticamente como estándar.
+   - Adopta `temperature` calibrada (0.1 a 0.9) y **nunca** envía `reasoning_effort` (evitando errores `HTTP 400 Bad Request` en APIs que no soportan este parámetro).
+
+### 10.2. Directivas Semánticas Explícitas en el Prompt
+Los modelos de razonamiento tienden por inercia analítica a seleccionar las obras más masivas y consagradas. Para sincronizar su razonamiento con el nivel de variedad elegido, el generador de prompts (`_build_user_message`) inyecta directivas de comportamiento inequívocas:
+- `VERY_LOW` (Clásica): Exige exclusivamente títulos universalmente aclamados, multipremiados y consolidados, vetando propuestas divisivas o de culto menor.
+- `MEDIUM` (Balanceada): Ofrece un balance natural entre títulos reconocidos y alternativas afines a la temática.
+- `VERY_HIGH` (Creativa / Factor Sorpresa): Prohíbe explícitamente seleccionar los títulos más obvios o comerciales si hay alternativas fascinantes, ordenando buscar activamente joyas ocultas, cine de autor o culto internacional.
+
+### 10.3. Modulación Multi-Nivel de Candidatos en RAG y Guardrails
+El RAG híbrido modula los umbrales de votos configurados en `.env` mediante multiplicadores dinámicos según el `VarietyLevel`:
+- `VERY_LOW` ($\times 1.8$): Exige obras con piso alto de votos y aplica filtro estricto `rating_unificado >= 7.5`.
+- `LOW` ($\times 1.4$): Enfoque familiar con sólido consenso crítico.
+- `MEDIUM` ($\times 1.0$): Punto medio calibrado (25 votos vectoriales, 80 temáticos, 150 de respaldo).
+- `HIGH` ($\times 0.6$): Relaja el filtro de votos para incluir cine de culto y títulos independientes.
+- `VERY_HIGH` ($\times 0.3$): Máxima audacia, habilitando gemas ocultas y rarezas temáticas, expandiendo el pool de candidatos a 25.
+
+**Guardrails de Seguridad:**
+1. **Exención de Entidades Directas:** Si el usuario busca un director, actor o título específico (ej: *"películas dirigidas por Ricardo Darín"* o *"David Lynch"*), el filtro de rating >= 7.5 se desactiva para no podar la única obra que coincide con la búsqueda aunque tenga calificación modesta (como *La señal*, 5.92★, 25 votos).
+2. **Salvaguarda de Inanición (Starvation Protection):** Si tras aplicar los filtros de variedad los candidatos disponibles son menos de 3, el RAG relaja automáticamente las restricciones de votos y rating para garantizar que nunca se entreguen 0 resultados si el catálogo cuenta con obras afines.
+
+### 10.4. Resiliencia Multiclave en Cascada Jerárquica
+- La cascada recorre todas las API keys configuradas (ej: Key 1 y Key 2 separadas por comas) para cada modelo antes de descender al siguiente nivel.
+- Si Gemini Key 1 satura cuota (429), prueba de inmediato Gemini Key 2; si ambas fallan o están no disponibles (503), conmuta a Groq Insignia (`openai/gpt-oss-120b`).
+- Si Groq alcanza límites de velocidad por ráfagas de consultas, la cascada conmuta hacia los fallbacks de Gemini (`gemini-3.8-flash`, `gemini-3.5-flash-lite`) y Groq (`openai/gpt-oss-20b`, `qwen/qwen3.8-27b`), con fallback heurístico local determinista como red de seguridad final.
+
+### 10.5. Persistencia y Experiencia de Usuario
+- **Nivel Normalizado (`VarietyLevel`):** `VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.
+- **Preferencia de Usuario:** Columna `Usuario.preferencia_variedad_ia` (default `"MEDIUM"`) persistida con migración Alembic `0007_user_variety_preference.py`. El backend la lee automáticamente si no se envía override en la petición.
+- **UI:** Slider de 5 pasos en `SettingsPage.tsx` con guía central fija (*Balanceada*) y selector rápido en `RecommendationsPage.tsx` con badge de resultado visual.
 

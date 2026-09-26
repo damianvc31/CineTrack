@@ -272,8 +272,9 @@ Todos los jobs de sincronización pueden dispararse de forma remota vía HTTP (`
 - **Perfil y Métricas del Usuario:**
   - `GET /api/v1/users/me/library`: Biblioteca del usuario dividida en `following`, `favorites`, `watchlist` y `recently_watched`.
   - `GET /api/v1/users/me/stats`: Estadísticas de tiempo invertido (horas en cine vs TV), conteos y Top 5.
-- **Recomendador Asistido por IA (Motor Híbrido Resiliente):**
-  - `POST /api/v1/recommendations`: Búsqueda y recomendación inteligente con grounding estricto sobre el catálogo local. Procesa prompts libres en lenguaje natural con soporte para usuarios invitados y autenticados (personalizado según historial de vistos y favoritos), cascada de reintentos resiliente (Gemini -> Groq -> Heurístico local) y explicación contextual (`why_recommended`).
+  - `PATCH /api/v1/users/me`: Actualización de biografía, país, ciudad, avatar y preferencia de variedad IA (`preferencia_variedad_ia`).
+- **Recomendador Asistido por IA (Motor Híbrido Resiliente con Factor Sorpresa):**
+  - `POST /api/v1/recommendations`: Búsqueda y recomendación inteligente con grounding estricto sobre el catálogo local. Procesa prompts libres en lenguaje natural con soporte para usuarios invitados y autenticados (personalizado según historial de vistos y favoritos), cascada de reintentos resiliente (Gemini -> Groq -> Heurístico local), modulación RAG y factor sorpresa configurable mediante `variety_level` (`VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`) y explicación contextual (`why_recommended`).
 
 #### Tareas Programadas y Automatización (Cron Jobs)
 Para mantener actualizado el catálogo continuamente en producción sin intervención manual, CineTrack cuenta con flujos automatizados en **GitHub Actions** con sondeo activo (`keep-alive`) contra Render:
@@ -374,7 +375,7 @@ flowchart TD
    - `GEMINI_API_KEY`: tu API Key de Google AI Studio
    - `GROQ_API_KEY`: tu API Key de Groq Cloud
 4. Desplegar el servicio y copiar la URL pública asignada (ej. `https://cinetrack-api-zsen.onrender.com`).
-   *Verificar salud en `https://cinetrack-api-zsen.onrender.com/health` $\rightarrow$ `{"status": "ok", "version": "1.6.0"}`.*
+   *Verificar salud en `https://cinetrack-api-zsen.onrender.com/health` $\rightarrow$ `{"status": "ok", "version": "1.7.0"}`.*
 
 ### Paso 3: Frontend en Vercel (SPA React 19)
 1. Crear una cuenta en [Vercel](https://vercel.com) e importar el repositorio.

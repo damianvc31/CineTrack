@@ -87,7 +87,7 @@
   - Rollback transparente con notificaciones flotantes amigables (`ToastContext`) ante errores de red.
   - Suite de 81 tests de backend y pruebas de frontend en verde.
 
-### Fase 10: Robustecimiento del Pipeline de Sincronización TMDB y Rendimiento WAN (v1.2.1 - v1.2.2)
+### Fase 10: Robustecimiento del Pipeline TMDB, Ciclo de Vida de Estrenos y Cierre Pre-Entrega (v1.2.1 - v1.6.3)
 - [x] **Paginación Exhaustiva de `/changes` y Seguimiento Activo de Series (v1.2.1):**
   - Paginación dinámica hasta `total_pages` eliminando la pérdida silenciosa de modificaciones globales.
   - Tracking directo de series `Returning Series`, `In Production` y `Planned` desduplicadas de changes, garantizando la actualización determinística de estados y fechas de emisión.
@@ -131,7 +131,23 @@
   - Transición automática de estrenos en `refresh_catalog_metrics`: actualización liviana de `status_tmdb` y `duracion`, permitiendo que títulos recién estrenados sean detectados y vectorizados en la sync diaria.
   - Blindaje estricto de candidatos en el recomendador con IA (`apply_base_filters` con `get_released_filter_condition(today)`).
   - Umbrales de votos mínimos y excepción de estreno reciente desacoplados a variables operativas (`AI_RECOMMENDER_MIN_VOTES_VECTOR=25`, `AI_RECOMMENDER_MIN_VOTES_THEMATIC=80`, `AI_RECOMMENDER_MIN_VOTES_FALLBACK=150`, `AI_RECOMMENDER_NEW_RELEASE_DAYS=30`).
-  - Suite ampliada a 104 tests unitarios e integración pasando en verde (100%).
+- [x] **Pulido de Interfaz y Cierre de Calidad Pre-Entrega (v1.6.3):**
+  - Barra de búsqueda expandida y botón interactivo de lupa en Header y Catálogo.
+  - Reparto principal expandible ("Ver más / Ver menos") en detalle de título.
+  - Coherencia de temporadas con episodios ya emitidos a la fecha para series en emisión.
+  - Localización completa de reseñas y claves de interfaz.
+  - Reseñas con calificación directa opcional sin comentario de texto obligatorio, con restricción `CheckConstraint` de base de datos.
+  - Suite de 106 tests unitarios e integración en verde.
+- [x] **Fase 11: Factor Sorpresa y Variedad en Recomendador IA (v1.7.0):**
+  - Enum normalizado `VarietyLevel` (`VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`) y variable global `AI_RECOMMENDER_DEFAULT_VARIETY`.
+  - Persistencia de `preferencia_variedad_ia` en modelo `Usuario` y migración Alembic `0007_user_variety_preference.py` ejecutada en SQLite local, Neon Dev y Neon Prod.
+  - Modulación RAG de umbrales de votos ($\times 1.8$ a $\times 0.3$), filtro crítico `rating_unificado >= 7.5` para `VERY_LOW`, salvaguarda contra inanición (< 3 candidatos relaja filtro), y exención de entidad directa (director, actor, título explícito no se podan).
+  - Despachador dinámico de LLM desacoplado vía variable de entorno `AI_REASONING_MODELS` con inyección segura de `reasoning_effort` para modelos de razonamiento (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`) y exclusión en modelos estándar (Gemini Flash, Llama).
+  - Directivas semánticas explícitas inyectadas en el prompt para alinear el esfuerzo de razonamiento del LLM con el nivel de variedad elegido.
+  - Calibración de temperatura (`0.7` a `1.2` para reasoning; `0.1` a `0.9` para estándar).
+  - Resiliencia multiclave exhaustiva con iteración de todas las API keys por modelo en la cascada.
+  - Frontend: Slider interactivo de 5 pasos en `SettingsPage.tsx` con guía central fija (*Balanceada*) y selector rápido con badge en `RecommendationsPage.tsx`.
+  - Cobertura ampliada a 109 tests unitarios e integración en verde y batería de pruebas en dos fases (sin autenticar y con usuario real) verificada al 100%.
 
 ---
 
@@ -144,6 +160,11 @@
 - [x] Selector de idioma de interfaz y diccionario de géneros *(Completado en v0.8.0 - v0.8.1)*.
 - [x] Ingesta de fotos de actores y sección Top Cast *(Completado en v0.8.0 - v0.8.1)*.
 - [x] Carga de avatar desde archivo local con centrado y zoom *(Completado en v0.8.0 - v0.8.1)*.
+- [x] **Control de Variabilidad / Factor Sorpresa del Recomendador IA (Slider UX):** *(Completado en v1.7.0)*
+  - Configuración normalizada de variedad (`VarietyLevel`) en 5 niveles con descripciones pedagógicas claras.
+  - Modulación multi-nivel de candidatos RAG (votos mínimos y filtro de rating crítico).
+  - Despacho armónico de LLM con inyección segura de `reasoning_effort` en Groq y calibración de temperatura.
+  - Slider interactivo en Settings y selector rápido al vuelo en el asistente IA.
 - [ ] **Sistema de notificaciones activas por panel in-app:**
   - Avisos informativos por cambio de status de series en cualquier lista del usuario (renovación con/sin fecha, cancelación, finalización, hiatus entre temporadas o reboots sin alterar el estado del usuario).
   - Alertas automáticas cuando una serie en estado "Vista" estrena nueva temporada/episodios, pasando automáticamente a "Siguiendo".
@@ -159,14 +180,4 @@
   - Job CLI `python -m app.jobs.sync_tmdb --expand` con filtro por género (individual o masivo), tipo de medio (`both`, `movie`, `tv`) y umbrales configurables de votos (`min_vote_count`) y calificación (`min_vote_average`) sin duplicar títulos existentes ni rehacer la ingesta inicial completa.
 - [x] **Recomendador avanzado (RAG Híbrido):** *(Completado en Fase 8)*
   - Búsqueda semántica vectorial con embeddings de 768 dimensiones vía Google AI Studio y `pgvector` en PostgreSQL Neon con índice HNSW, filtrado negativo estricto y fallback léxico.
-- [ ] **Control de Variabilidad / Temperatura del Recomendador IA (Slider UX):**
-  - Configuración personalizada del parámetro `temperature` del LLM en el asistente de recomendaciones.
-  - Control en frontend mediante un slider semántico intuitivo en Settings o en el panel de IA:
-    - *Nula* (`0.0`): Determinismo total, devuelve siempre los mismos títulos y orden ante idéntico prompt.
-    - *Muy Baja* (`0.15`): Mínima oscilación.
-    - *Baja / Default actual* (`0.3`): Rigor temático estricto con leve frescura entre consultas repetidas.
-    - *Media* (`0.5`): Mayor variedad y alternancia de títulos del pool.
-    - *Alta* (`0.7`): Hallazgos más diversos y combinaciones creativas.
-    - *Muy Alta* (`0.9`): Máxima exploración y sorpresa dentro del pool recuperado.
-  - Persistencia en preferencias de usuario para cuentas autenticadas y valor por defecto configurable vía variable de entorno (`AI_RECOMMENDER_DEFAULT_TEMPERATURE=0.3`) para usuarios invitados.
 - [ ] Posible refinamiento UX en desmarques de episodios: diálogo opcional para advertir al usuario o resetear progreso posterior al desmarcar un episodio intermedio.

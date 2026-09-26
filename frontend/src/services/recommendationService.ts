@@ -1,5 +1,8 @@
 import { api } from './api'
 import type { TitleCard } from '@/types/catalog'
+import type { VarietyLevel } from '@/types/auth'
+
+export type { VarietyLevel }
 
 export interface RecommendationItem {
   title_id: number
@@ -14,6 +17,7 @@ export interface RecommendationResponse {
   clarification_suggestions: string[]
   provider_used: string
   model_used?: string
+  variety_level?: VarietyLevel
 }
 
 export interface ClarificationContext {
@@ -27,6 +31,7 @@ export interface RecommendationParams {
   tipo_filtro?: 'all' | 'movie' | 'tv'
   language?: 'es' | 'en'
   clarification_context?: ClarificationContext | null
+  variety_level?: VarietyLevel
 }
 
 export const recommendationService = {
@@ -36,6 +41,7 @@ export const recommendationService = {
       tipo_filtro: params.tipo_filtro || 'all',
       language: params.language || 'es',
       clarification_context: params.clarification_context || undefined,
+      variety_level: params.variety_level || undefined,
     }, { signal })
   }
 }

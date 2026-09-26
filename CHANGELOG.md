@@ -2,6 +2,35 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.7.0] - 2026-09-26
+### Agregado y Mejorado — Fase 11 (Factor Sorpresa y Variedad en Recomendador IA)
+- **Enum Normalizado y Configuración de Modelos (`VarietyLevel`):**
+  - Mapeo normalizado de 5 niveles de variedad: `VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.
+  - Configuración global `AI_RECOMMENDER_DEFAULT_VARIETY: VarietyLevel = VarietyLevel.MEDIUM` en backend, `.env.example`, `.env`, `.env.local`, `.env.prod` y `render.yaml`.
+  - Actualización de fallbacks de modelos en Groq incorporando `qwen/qwen3.8-27b` (`GROQ_FALLBACK_MODELS=openai/gpt-oss-20b,qwen/qwen3.8-27b`).
+  - **Desacople Dinámico de Modelos de Razonamiento (`AI_REASONING_MODELS`):** Variable de entorno para clasificar dinámicamente qué modelos reciben `reasoning_effort` y temperatura adaptativa sin tocar el código fuente.
+- **Directivas Semánticas Explícitas en el Prompt:**
+  - Inyección en `_build_user_message` de pautas claras de comportamiento según el nivel de variedad para alinear el esfuerzo cognitivo de los modelos de razonamiento (ej: prohibición de elegir títulos obvios en `VERY_HIGH` y exigencia de clásicos indiscutidos en `VERY_LOW`).
+- **Persistencia de Preferencia de Usuario y Migración de Base de Datos:**
+  - Nueva columna indexada `preferencia_variedad_ia: Mapped[str]` en modelo `Usuario` (`default="MEDIUM"`).
+  - Migración Alembic `0007_user_variety_preference.py` ejecutada y sincronizada en SQLite local, Neon PostgreSQL desarrollo y Neon PostgreSQL producción.
+  - Endpoints `GET /api/v1/auth/me` y `PATCH /api/v1/users/me` adaptados con validación Pydantic estricta.
+- **RAG Multi-Nivel, Exención de Entidad y Guardrails de Inanición (`catalog_service.py`):**
+  - Aplicación de multiplicadores dinámicos sobre los umbrales base (`AI_RECOMMENDER_MIN_VOTES_*`): $\times 1.8$ para `VERY_LOW`, $\times 1.4$ para `LOW`, $\times 1.0$ para `MEDIUM`, $\times 0.6$ para `HIGH`, y $\times 0.3$ para `VERY_HIGH`.
+  - Restricción estricta de rating crítico (`Titulo.rating_unificado >= 7.5`) en modo `VERY_LOW`.
+  - **Exención de Entidades Directas:** Las búsquedas que nombran explícitamente a un director, actor o título no son descartadas por el filtro de rating >= 7.5 ni por pocos votos (verificado con *La señal*, 5.92★, 25 votos).
+  - **Guardrail de Inanición (Starvation Protection):** Si los candidatos disponibles tras los filtros son menos de 3, relaja automáticamente las restricciones para no devolver 0 resultados si hay títulos afines en catálogo.
+  - Expansión bilingüe completa (ES/EN) en `GENRE_EXPANSIONS` asegurando cruces perfectos entre etiquetas de TMDB y nombres en español de la base de datos.
+- **Resiliencia Multiclave en Cascada (`ai_recommender_service.py`):**
+  - Iteración exhaustiva de todas las API keys configuradas (Key 1 y Key 2) por cada modelo en la cascada antes de pasar al siguiente proveedor, conmutando fluidamente ante errores 429 (quota) o 503 (servidor).
+- **Frontend — Slider en Configuración y Selector Rápido:**
+  - Slider interactivo de 5 pasos en `SettingsPage.tsx` con guía central fija (*Balanceada (Recomendado)*), tarjeta descriptiva contextual y persistencia en perfil.
+  - Selector rápido de variedad con chips interactivos y badge en `RecommendationsPage.tsx` para alternar la audacia del recomendador al vuelo.
+  - Localización bilingüe completa (ES/EN) en `LanguageContext.tsx`.
+- **Suite de Pruebas y Batería Integral en Vivo:**
+  - Cobertura ampliada a 109 tests unitarios e integración en backend (`pytest`) y build de frontend verificado.
+  - Batería de pruebas integral en 2 fases ejecutada con 100% de éxito contra Neon Dev (Fase 1: 11 escenarios de contraste y casos extremos; Fase 2: usuario real `damianvc31` con 49 vistos y 24 favoritos).
+
 ## [v1.6.3] - 2026-09-26
 ### Corregido y Mejorado (Pulido de Interfaz y Cierre de Calidad Pre-Entrega)
 - **Barra de Búsqueda y Botón Interactivo de Lupa:**

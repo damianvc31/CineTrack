@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.cache import cache
-from app.core.config import settings
+from app.core.config import VarietyLevel, settings
 from app.models import (
     Actor,
     Episodio,
@@ -44,14 +44,50 @@ from app.schemas.catalog import (
     UserStatsResponse,
 )
 
-# Mapeo canónico de géneros: expande géneros individuales a las duplas que TMDB asigna a series
+# Mapeo canónico de géneros: expande géneros individuales (inglés y español) a las variantes y duplas que TMDB asigna
 GENRE_EXPANSIONS: dict[str, list[str]] = {
-    "action": ["Action", "Action & Adventure"],
-    "adventure": ["Adventure", "Action & Adventure"],
-    "science fiction": ["Science Fiction", "Sci-Fi & Fantasy"],
-    "sci-fi": ["Science Fiction", "Sci-Fi & Fantasy"],
-    "fantasy": ["Fantasy", "Sci-Fi & Fantasy"],
-    "war": ["War", "War & Politics"],
+    "action": ["Action", "Action & Adventure", "Acción", "Acción y aventura"],
+    "acción": ["Acción", "Acción y aventura", "Action", "Action & Adventure"],
+    "accion": ["Acción", "Acción y aventura", "Action", "Action & Adventure"],
+    "adventure": ["Adventure", "Action & Adventure", "Aventura", "Acción y aventura"],
+    "aventura": ["Aventura", "Acción y aventura", "Adventure", "Action & Adventure"],
+    "science fiction": ["Science Fiction", "Sci-Fi & Fantasy", "Ciencia ficción", "Ciencia ficción y fantasía"],
+    "sci-fi": ["Science Fiction", "Sci-Fi & Fantasy", "Ciencia ficción", "Ciencia ficción y fantasía"],
+    "scifi": ["Science Fiction", "Sci-Fi & Fantasy", "Ciencia ficción", "Ciencia ficción y fantasía"],
+    "ciencia ficción": ["Ciencia ficción", "Ciencia ficción y fantasía", "Science Fiction", "Sci-Fi & Fantasy"],
+    "ciencia ficcion": ["Ciencia ficción", "Ciencia ficción y fantasía", "Science Fiction", "Sci-Fi & Fantasy"],
+    "fantasy": ["Fantasy", "Sci-Fi & Fantasy", "Fantasía", "Ciencia ficción y fantasía"],
+    "fantasía": ["Fantasía", "Ciencia ficción y fantasía", "Fantasy", "Sci-Fi & Fantasy"],
+    "fantasia": ["Fantasía", "Ciencia ficción y fantasía", "Fantasy", "Sci-Fi & Fantasy"],
+    "war": ["War", "War & Politics", "Bélica", "Guerra", "Guerra y política"],
+    "bélica": ["Bélica", "Guerra", "Guerra y política", "War", "War & Politics"],
+    "belica": ["Bélica", "Guerra", "Guerra y política", "War", "War & Politics"],
+    "guerra": ["Bélica", "Guerra", "Guerra y política", "War", "War & Politics"],
+    "comedy": ["Comedy", "Comedia"],
+    "comedia": ["Comedia", "Comedy"],
+    "drama": ["Drama"],
+    "horror": ["Horror", "Terror"],
+    "terror": ["Terror", "Horror"],
+    "thriller": ["Thriller", "Suspenso"],
+    "suspenso": ["Suspenso", "Thriller"],
+    "mystery": ["Mystery", "Misterio"],
+    "misterio": ["Misterio", "Mystery"],
+    "crime": ["Crime", "Crimen"],
+    "crimen": ["Crimen", "Crime"],
+    "animation": ["Animation", "Animación"],
+    "animación": ["Animación", "Animation"],
+    "animacion": ["Animación", "Animation"],
+    "family": ["Family", "Familia"],
+    "familia": ["Familia", "Family"],
+    "music": ["Music", "Música"],
+    "música": ["Música", "Music"],
+    "musica": ["Música", "Music"],
+    "history": ["History", "Historia"],
+    "historia": ["Historia", "History"],
+    "documentary": ["Documentary", "Documental"],
+    "documental": ["Documental", "Documentary"],
+    "western": ["Western"],
+    "romance": ["Romance"],
 }
 
 EXCLUDED_GENRE_NAMES: set[str] = {"Action & Adventure", "Sci-Fi & Fantasy", "War & Politics"}
@@ -2301,12 +2337,16 @@ async def get_user_recommendation_context(db: AsyncSession, usuario_id: int) -> 
     )
     top_genres = [r[0] for r in genre_freq_res.all()]
 
+    user_row = await db.execute(select(Usuario.preferencia_variedad_ia).where(Usuario.id == usuario_id))
+    pref_variedad = user_row.scalar_one_or_none() or "MEDIUM"
+
     return {
         "favorites": favorites,
         "high_rated": high_rated,
         "watched_ids": list(watched_ids),
         "top_genres": top_genres,
-        "has_history": bool(favorites or high_rated or watched_ids)
+        "has_history": bool(favorites or high_rated or watched_ids),
+        "preferencia_variedad_ia": pref_variedad
     }
 
 
@@ -2315,9 +2355,10 @@ async def get_recommendation_candidates(
     prompt: str,
     usuario_id: Optional[int] = None,
     tipo_filtro: Optional[str] = "all",
-    clarification_context: Optional[dict] = None
+    clarification_context: Optional[dict] = None,
+    variety_level: Optional[VarietyLevel | str] = None
 ) -> tuple[list[dict], Optional[dict]]:
-    """Selecciona un pool inteligente y acotado (35-45 títulos) de candidatos relevantes de PostgreSQL."""
+    """Selecciona un pool inteligente y acotado (20-25 títulos) de candidatos relevantes de PostgreSQL."""
     # Si hay contexto de aclaración, enriquecer términos de búsqueda para resolver respuestas relativas
     search_prompt = prompt
     if clarification_context:
@@ -2390,9 +2431,38 @@ async def get_recommendation_candidates(
 
     watched_ids = set(user_ctx.get("watched_ids", [])) if user_ctx else set()
 
+    # Determinar el nivel de variedad efectivo
+    active_variety = variety_level or (user_ctx.get("preferencia_variedad_ia") if user_ctx else None) or getattr(settings, "AI_RECOMMENDER_DEFAULT_VARIETY", VarietyLevel.MEDIUM)
+    if isinstance(active_variety, str):
+        try:
+            active_variety = VarietyLevel(active_variety)
+        except Exception:
+            active_variety = VarietyLevel.MEDIUM
+
     if user_ctx:
         user_ctx["only_watched"] = only_watched
         user_ctx["allow_rewatch"] = allow_rewatch
+        user_ctx["variety_level"] = active_variety.value
+    else:
+        user_ctx = {
+            "only_watched": only_watched,
+            "allow_rewatch": allow_rewatch,
+            "variety_level": active_variety.value,
+            "has_history": False
+        }
+
+    # Modulación de umbrales según el nivel de variedad (multiplicador sobre configuración base)
+    VARIETY_VOTE_MULTIPLIERS = {
+        VarietyLevel.VERY_LOW: 2.0,
+        VarietyLevel.LOW: 1.5,
+        VarietyLevel.MEDIUM: 1.0,
+        VarietyLevel.HIGH: 0.6,
+        VarietyLevel.VERY_HIGH: 0.3,
+    }
+    vote_mult = VARIETY_VOTE_MULTIPLIERS.get(active_variety, 1.0)
+    eff_votes_vector = max(5, int(settings.AI_RECOMMENDER_MIN_VOTES_VECTOR * vote_mult))
+    eff_votes_thematic = max(10, int(settings.AI_RECOMMENDER_MIN_VOTES_THEMATIC * vote_mult))
+    eff_votes_fallback = max(20, int(settings.AI_RECOMMENDER_MIN_VOTES_FALLBACK * vote_mult))
 
     # Detección de tipo en el prompt si no vino impuesto por tipo_filtro
     effective_tipo = tipo_filtro
@@ -2525,7 +2595,7 @@ async def get_recommendation_candidates(
     today = date.today()
     recent_release_cutoff = today - timedelta(days=settings.AI_RECOMMENDER_NEW_RELEASE_DAYS)
 
-    def apply_base_filters(query):
+    def apply_base_filters(query, apply_variety_rating_filter: bool = True):
         # Excluir estrictamente obras no estrenadas / próximas
         query = query.where(get_released_filter_condition(today))
         if effective_tipo in ("movie", "tv"):
@@ -2560,6 +2630,8 @@ async def get_recommendation_candidates(
                 .scalar_subquery()
             )
             query = query.where(Titulo.id.notin_(ex_subq))
+        if apply_variety_rating_filter and active_variety == VarietyLevel.VERY_LOW:
+            query = query.where(Titulo.rating_unificado >= 7.5)
         return query
 
     entity_titles: dict[int, Titulo] = {}
@@ -2601,7 +2673,7 @@ async def get_recommendation_candidates(
         for bg in valid_bigrams:
             # Director por nombre completo
             dir_bg_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-            dir_bg_q = apply_base_filters(dir_bg_q).where(Titulo.director.ilike(f"%{bg}%"))
+            dir_bg_q = apply_base_filters(dir_bg_q, apply_variety_rating_filter=False).where(Titulo.director.ilike(f"%{bg}%"))
             dir_bg_res = await db.execute(dir_bg_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15))
             for t in dir_bg_res.scalars().all():
                 entity_titles[t.id] = t
@@ -2627,7 +2699,7 @@ async def get_recommendation_candidates(
                     )
                     for r in f_dir.all():
                         d_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-                        d_q = apply_base_filters(d_q).where(Titulo.director == r[0])
+                        d_q = apply_base_filters(d_q, apply_variety_rating_filter=False).where(Titulo.director == r[0])
                         d_res = await db.execute(d_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15))
                         for t in d_res.scalars().all():
                             entity_titles[t.id] = t
@@ -2641,7 +2713,7 @@ async def get_recommendation_candidates(
         for t in long_terms:
             # Directores por término exacto
             dir_t_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-            dir_t_q = apply_base_filters(dir_t_q).where(Titulo.director.ilike(f"%{t}%"))
+            dir_t_q = apply_base_filters(dir_t_q, apply_variety_rating_filter=False).where(Titulo.director.ilike(f"%{t}%"))
             dir_t_res = await db.execute(dir_t_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15))
             for tit in dir_t_res.scalars().all():
                 entity_titles[tit.id] = tit
@@ -2660,7 +2732,7 @@ async def get_recommendation_candidates(
                     )
                     for r in f_single_dir.all():
                         d_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-                        d_q = apply_base_filters(d_q).where(Titulo.director == r[0])
+                        d_q = apply_base_filters(d_q, apply_variety_rating_filter=False).where(Titulo.director == r[0])
                         d_res = await db.execute(d_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15))
                         for tit in d_res.scalars().all():
                             entity_titles[tit.id] = tit
@@ -2680,7 +2752,7 @@ async def get_recommendation_candidates(
         title_terms = [t for t in search_terms if len(t) >= 4]
         if title_terms:
             name_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
-            name_q = apply_base_filters(name_q).where(or_(*[Titulo.nombre.ilike(f"%{t}%") for t in title_terms]))
+            name_q = apply_base_filters(name_q, apply_variety_rating_filter=False).where(or_(*[Titulo.nombre.ilike(f"%{t}%") for t in title_terms]))
             name_q = name_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).limit(15)
             name_res = await db.execute(name_q)
             for tit in name_res.scalars().all():
@@ -2694,7 +2766,7 @@ async def get_recommendation_candidates(
             .join(titulos_elenco, titulos_elenco.c.titulo_id == Titulo.id)
             .where(titulos_elenco.c.actor_id.in_(list(matched_actor_ids)))
         )
-        act_titles_q = apply_base_filters(act_titles_q)
+        act_titles_q = apply_base_filters(act_titles_q, apply_variety_rating_filter=False)
         act_titles_res = await db.execute(
             act_titles_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(20)
         )
@@ -2716,10 +2788,10 @@ async def get_recommendation_candidates(
                     .where(Titulo.embedding.isnot(None))
                 )
                 vector_q = apply_base_filters(vector_q)
-                # Exigir un piso razonable de votos o permitir estrenos recientes
+                # Exigir un piso razonable de votos modulado por variedad o permitir estrenos recientes
                 vector_q = vector_q.where(
                     or_(
-                        Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_VECTOR,
+                        Titulo.vote_count_tmdb >= eff_votes_vector,
                         and_(
                             Titulo.fecha_estreno.isnot(None),
                             Titulo.fecha_estreno >= recent_release_cutoff,
@@ -2728,7 +2800,8 @@ async def get_recommendation_candidates(
                     )
                 )
                 # Ordenar por distancia coseno de pgvector
-                vector_q = vector_q.order_by(Titulo.embedding.cosine_distance(user_vec).asc()).limit(25)
+                vector_limit = 35 if active_variety in (VarietyLevel.HIGH, VarietyLevel.VERY_HIGH) else 25
+                vector_q = vector_q.order_by(Titulo.embedding.cosine_distance(user_vec).asc()).limit(vector_limit)
                 v_res = await db.execute(vector_q)
                 for t in v_res.scalars().all():
                     vector_titles[t.id] = t
@@ -2757,7 +2830,7 @@ async def get_recommendation_candidates(
         theme_genre_q = theme_genre_q.where(
             Genero.nombre.in_(expanded_genres),
             or_(
-                Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_THEMATIC,
+                Titulo.vote_count_tmdb >= eff_votes_thematic,
                 and_(
                     Titulo.fecha_estreno.isnot(None),
                     Titulo.fecha_estreno >= recent_release_cutoff,
@@ -2778,7 +2851,7 @@ async def get_recommendation_candidates(
         theme_syn_q = apply_base_filters(theme_syn_q)
         theme_syn_q = theme_syn_q.where(
             or_(
-                Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_THEMATIC,
+                Titulo.vote_count_tmdb >= eff_votes_thematic,
                 and_(
                     Titulo.fecha_estreno.isnot(None),
                     Titulo.fecha_estreno >= recent_release_cutoff,
@@ -2811,7 +2884,7 @@ async def get_recommendation_candidates(
         g_q = apply_base_filters(g_q)
         g_q = g_q.where(
             Genero.nombre.in_(expanded_genres),
-            Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_FALLBACK
+            Titulo.vote_count_tmdb >= eff_votes_fallback
         )
         g_q = g_q.order_by(desc(Titulo.rating_unificado), desc(Titulo.popularidad)).distinct().limit(20)
         g_res = await db.execute(g_q)
@@ -2833,12 +2906,22 @@ async def get_recommendation_candidates(
         fill_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
         fill_q = apply_base_filters(fill_q)
         fill_q = fill_q.where(
-            Titulo.vote_count_tmdb >= settings.AI_RECOMMENDER_MIN_VOTES_FALLBACK,
+            Titulo.vote_count_tmdb >= eff_votes_fallback,
             Titulo.rating_unificado >= 7.5
         )
         fill_q = fill_q.order_by(func.random()).limit(needed)
         fill_res = await db.execute(fill_q)
         for t in fill_res.scalars().all():
+            fallback_titles[t.id] = t
+
+    # Red de seguridad: si tras todos los filtros no se alcanzaron al menos 3 candidatos, relajar rating para garantizar respuesta
+    if (total_accumulated + len(fallback_titles)) < 3 and not only_watched:
+        needed = 5 - (total_accumulated + len(fallback_titles))
+        safety_q = select(Titulo).options(selectinload(Titulo.generos), selectinload(Titulo.actores))
+        safety_q = apply_base_filters(safety_q, apply_variety_rating_filter=False)
+        safety_q = safety_q.order_by(desc(Titulo.popularidad)).limit(needed)
+        safety_res = await db.execute(safety_q)
+        for t in safety_res.scalars().all():
             fallback_titles[t.id] = t
 
     # -------------------------------------------------------------------------
@@ -2849,6 +2932,8 @@ async def get_recommendation_candidates(
     #    4º Fallback de Género y Aclamadas
     # -------------------------------------------------------------------------
     max_candidates = getattr(settings, "RECOMMENDATION_CANDIDATES_LIMIT", 20)
+    if active_variety in (VarietyLevel.HIGH, VarietyLevel.VERY_HIGH):
+        max_candidates = max_candidates + 5  # Ampliar a 25 candidatos para mayor abanico creativo
     ordered_titles: dict[int, Titulo] = {}
 
     for t in entity_titles.values():

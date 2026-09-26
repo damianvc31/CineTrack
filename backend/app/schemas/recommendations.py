@@ -1,6 +1,7 @@
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
+from app.core.config import VarietyLevel
 from app.schemas.catalog import TitleCardResponse
 
 
@@ -29,6 +30,10 @@ class RecommendationRequest(BaseModel):
         default=None,
         description="Contexto previo si el usuario está respondiendo a una solicitud de aclaración del asistente"
     )
+    variety_level: Optional[VarietyLevel] = Field(
+        default=None,
+        description="Nivel opcional de variedad / factor sorpresa ('VERY_LOW', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH')"
+    )
 
 
 class RecommendationItem(BaseModel):
@@ -44,6 +49,7 @@ class RecommendationResponse(BaseModel):
     clarification_suggestions: list[str] = Field(default_factory=list)
     provider_used: str = "gemini"
     model_used: Optional[str] = None
+    variety_level: Optional[VarietyLevel] = None
 
 
 class CandidateTitle(BaseModel):

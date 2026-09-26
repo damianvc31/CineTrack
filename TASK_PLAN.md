@@ -1,6 +1,6 @@
 # TASK_PLAN.md — Plan de Trabajo Activo: CineTrack
 
-## Hito Actual: Fase 8 — Robustecimiento y Calidad del Recomendador con IA (Pre-Entrega)
+## Estado General: Fase 11 Completada (v1.7.0)
 
 - [x] **Fase 1:** Scaffolding inicial y smoke tests en verde (v0.1.0).
 - [x] **Fase 2:** Persistencia y modelos relacionales completos en SQLAlchemy 2.0 (v0.2.0).
@@ -146,7 +146,7 @@
 
 ---
 
-## Hito Actual: Fase 8 — Robustecimiento y Calidad del Recomendador con IA (RAG Híbrido)
+## Fase 8: Robustecimiento y Calidad del Recomendador con IA (RAG Híbrido) (v1.1.0)
 - [x] **Paso 8.1: Calibración del Validador Previo (`is_unintelligible_prompt`):**
   - Rediseñar el validador para que solo filtre basura extrema (teclado machacado sin vocales, strings cortísimos) sin rechazar oraciones naturales ni mezclas de números/letras (ej. "80s").
 - [x] **Paso 8.2: Preparación de la Base de Datos (Neon Dev):**
@@ -173,7 +173,7 @@
 
 ---
 
-## Hito Actual: Fase 9 — Optimización de Rendimiento y Latencia Cross-Web (v1.2.0)
+## Fase 9: Optimización de Rendimiento y Latencia Cross-Web (v1.2.0)
 - [x] **Paso 9.1: Motor de Caché en Memoria en Backend (FastAPI)**
   - [x] Implementar gestor de caché con TTL en memoria (`backend/app/core/cache.py`) sin dependencias externas pesadas.
   - [x] Refactorizar `get_home_sections` en `catalog_service.py`: cachear los pools de títulos (Trending, Classics, Top Rated, New Releases, By Genre) en memoria.
@@ -205,7 +205,9 @@
 
 ---
 
-## Hito Actual: Robustecimiento de Sincronizaciones TMDB y Coherencia Temporal (v1.2.1)
+## Fase 10: Robustecimiento del Pipeline TMDB, Ciclo de Vida de Estrenos y Cierre Pre-Entrega (v1.2.1 - v1.6.3)
+
+### 10.1: Paginación Exhaustiva de Changes, Active Series Sync y Refresco Diario de Métricas (v1.2.1)
 - [x] **Paginación Exhaustiva de `/changes`:** Paginación dinámica hasta `total_pages` (eliminando el bug de solo leer página 1, recuperando el 100% de cambios de TMDB).
 - [x] **Seguimiento Activo de Series (`Active Series Sync`):** Consulta activa de las series locales en `Returning Series`, `In Production` y `Planned` desduplicadas contra changes para actualizar transiciones a Ended/Canceled y temporadas futuras.
 - [x] **Refresco Masivo de Métricas Diarias (`refresh_catalog_metrics`):** Actualización de popularidad y conteo de votos de los 3.864 títulos en la sync diaria mediante consultas ultraligeras, evitando el estancamiento de percentiles y rankings.
@@ -216,140 +218,87 @@
 - [x] **Coherencia Temporal en Frontend (MobLand):** Ajuste de `isUnreleased` en `TitleDetailPage.tsx` considerando `proximo_episodio_fecha` para que episodios estrenando en el día permanezcan bloqueados hasta que el puntero avance.
 - [x] **Verificación y Tests:** Suite de backend ampliada a 83 tests (100% en verde) y build limpio de frontend. Verificación exitosa en local de *Snowy Mountain* (TMDB ID 319562).
 
----
-
-## Hito Completado: Soporte Multi-País, Banderas Históricas y Purga de Calidad (v1.2.3)
+### 10.2: Soporte Multi-País, Banderas Históricas y Purga de Calidad (v1.2.3)
 - [x] **Soporte Multi-País y Coproducciones:** Delimitación por comas en `Titulo.pais`, extracción con fallback `origin_country` -> `production_countries`, campo computado `paises: list[str]`.
 - [x] **Banderas Vectoriales SVG y Países Históricos:** Banderas SVG inline para `SU`, `YU` y `CS`, y diccionario de nombres sin anacronismos en frontend.
 - [x] **Blindaje Preventivo de Ingesta:** Módulo `is_latin_legible()` y descarte de obras sin fecha, país, idioma o no latinas.
 - [x] **Backfill y Purga en Neon Prod:** 256 títulos enriquecidos y 7 inválidos purgados. Catálogo 100% íntegro.
 
----
-
-## Hito Completado: Resiliencia PaaS, Keep-Alive y Concurrencia de Sincronización (v1.3.0)
+### 10.3: Resiliencia PaaS, Keep-Alive y Concurrencia de Sincronización (v1.3.0)
 - [x] **Prefetching Concurrente en Lotes (`asyncio.gather`):** Concurrencia de 10 peticiones simultáneas en `run_daily_sync`.
 - [x] **Endpoints Administrativos de Estado de Jobs:** `/api/v1/admin/sync/jobs/{job_name}/status` y `/api/v1/admin/sync/jobs/status` respaldados por `ACTIVE_JOBS`.
 - [x] **Keep-Alive en Workflows:** Polling cada 15 segundos en `daily_sync.yml`, `monthly_actor_photos.yml` y `monthly_reviews_sync.yml`.
 
----
+### 10.4: Desacople de Sincronización Diaria Liviana y Sincronización Profunda Semanal (v1.4.0)
+- [x] **Sincronización Diaria Liviana (`run_daily_sync`):** Retirar la consulta de `/changes` del flujo diario. Enfocar exclusivamente en series activas de CineTrack (`Returning Series`, `In Production`, `Planned`) con lotes concurrentes y Season Skipping. Cartelera simétrica centrada de 30 días y refresco masivo de métricas.
+- [x] **Sincronización Profunda Semanal (`run_deep_sync`):** Implementar `run_deep_sync(changes_days_window=7, releases_days_window=15, allow_unreleased=False)` los domingos recorriendo exhaustivamente `/changes` de TMDB contra el catálogo completo.
+- [x] **Endpoint Administrativo y CLI:** Registro de job `deep_sync` en `ACTIVE_JOBS`, endpoint `POST /api/v1/admin/sync/deep` y CLI `--deep`.
+- [x] **Workflows de GitHub Actions Sin Colisiones:** `daily_sync.yml` lun-sáb 03:00 UTC y `weekly_deep_sync.yml` dom 02:00 UTC.
 
-## Hito Completado: Desacople de Sincronización Diaria Liviana y Sincronización Profunda Semanal (v1.4.0)
-- [x] **Paso 1: Sincronización Diaria Liviana (`run_daily_sync`):**
-  - [x] Retirar la consulta de `/changes` del flujo diario.
-  - [x] Enfocar exclusivamente en series activas de CineTrack (`Returning Series`, `In Production`, `Planned`) con lotes concurrentes y Season Skipping.
-  - [x] Nuevos releases: ventana retrospectiva de 15 días si `allow_unreleased=False`, o simétrica centrada de 30 días (`[hoy-15d, hoy+15d]`) si `allow_unreleased=True`, con filtro `popularidad >= 10.0`.
-  - [x] Refresco masivo de métricas (`refresh_catalog_metrics`), percentiles, ratings unificados, embeddings y purga de caché.
-- [x] **Paso 2: Sincronización Profunda Semanal (`run_deep_sync`):**
-  - [x] Implementar `run_deep_sync(changes_days_window=7, releases_days_window=15, allow_unreleased=False)`.
-  - [x] Recorrer exhaustivamente `/movie/changes` y `/tv/changes` de los últimos 7 días contra todo el catálogo local de CineTrack.
-  - [x] Incluir verificación de series activas, releases y refresco de métricas completo.
-- [x] **Paso 3: Endpoint Administrativo y CLI:**
-  - [x] Registrar job `deep_sync` en `ACTIVE_JOBS`.
-  - [x] Endpoint `POST /api/v1/admin/sync/deep` con `DeepSyncRequest` y worker en background.
-  - [x] CLI `sync_tmdb.py`: agregar flags `--deep` y `--changes-days`.
-- [x] **Paso 4: Workflows de GitHub Actions (Cero Colisiones):**
-  - [x] Ajustar `daily_sync.yml` para correr de Lunes a Sábado a las 03:00 UTC (`0 3 * * 1-6`).
-  - [x] Crear `weekly_deep_sync.yml` para correr los Domingos a las 02:00 UTC (`0 2 * * 0`) con bucle keep-alive.
-- [x] **Paso 5: Pruebas Automatizadas y Verificación:**
-  - [x] Tests unitarios con mocks para `run_daily_sync` (ventana simétrica y sin changes), `run_deep_sync` y nuevo endpoint.
-  - [x] Ejecutar suite completa (95/95 tests en verde).
-- [x] **Paso 6: Documentación y Versionado:**
-  - [x] Actualizar `ARCHITECTURE.md`, `CHANGELOG.md`, `ROADMAP.md` y elevar a `v1.4.0`.
+### 10.5: Modo Upcoming en Expansión, Ingesta Manual Desbloqueada y Badges Visuales (v1.5.0)
+- [x] **Expansión de Catálogo en Modo Próximos Estrenos (`--expand --upcoming`):** Búsqueda de títulos futuros (`primary_release_date.gte = hoy`) con ventana temporal configurable (`--upcoming-days`, default 365 días), sin filtros de votos y popularidad $\ge 10.0$. Target de 10 títulos por género o global.
+- [x] **Desbloqueo de Ingesta Manual:** `allow_unreleased: true` por defecto en endpoints y flags CLI para importar obras no estrenadas.
+- [x] **Refinamiento Visual de Badges en Detalle de Título:** Desambiguación cromática ("Renewed TBA" púrpura, "En Producción" Teal, "Estrenada" verde esmeralda).
+- [x] **Corrección de Series Estreno Mismo Día:** Clasificación estricta en Upcoming vs Released y descarte seguro en carruseles de Home (`_apply_base_filters`). Chips de sección en Catálogo (`CatalogPage.tsx`).
+- [x] **Desacoplamiento de Límites en Expansión Upcoming:** Flags `--upcoming-days 0` (horizonte infinito) y `--limit 0` (sin tope).
 
----
+### 10.6: Ciclo de Vida de Próximos Estrenos, Embeddings Selectivos y Umbrales del Recomendador (v1.6.0)
+- [x] **Configuración Operativa:** `AI_RECOMMENDER_MIN_VOTES_VECTOR`, `AI_RECOMMENDER_MIN_VOTES_THEMATIC`, `AI_RECOMMENDER_MIN_VOTES_FALLBACK`, `AI_RECOMMENDER_NEW_RELEASE_DAYS`.
+- [x] **Blindaje y Filtros Base:** `apply_base_filters` con `get_released_filter_condition(today)` y soporte de estrenos recientes sin piso de votos.
+- [x] **Generación Selectiva de Embeddings:** Exclusión estricta de obras no estrenadas en `sync_embeddings.py` para preservar cuota de Gemini. Sincronización automática de embeddings post-expansión.
+- [x] **Calidad e Integridad de Ingesta:** Exigencia de póster oficial en ingesta y purga de incompletos.
 
-## Hito Completado: Modo Upcoming en Expansión, Ingesta Manual Desbloqueada y Badges Visuales (v1.5.0)
-- [x] **Expansión de Catálogo en Modo Próximos Estrenos (`--expand --upcoming`):**
-  - [x] Búsqueda enfocada exclusivamente en títulos futuros/no emitidos (`primary_release_date.gte = hoy`).
-  - [x] Ventana temporal configurable (`--upcoming-days`, default 365 días / `TMDB_EXPAND_UPCOMING_DAYS`).
-  - [x] Relajación de filtros de votos (`vote_count = None`, `vote_average = None`).
-  - [x] Umbral de popularidad mínima basado en la variable existente `TMDB_DAILY_SYNC_POP_THRESHOLD` (10.0), sin crear variables redundantes.
-  - [x] Target de 10 títulos por defecto para un género específico, o 10 títulos en total global si no se especifica género (`TMDB_EXPAND_UPCOMING_TARGET`).
-  - [x] Soporte en CLI `sync_tmdb.py` y endpoint administrativo `POST /api/v1/admin/sync/expand`.
-- [x] **Desbloqueo de Ingesta Manual con `--allow-unreleased`:**
-  - [x] `import_from_json_data` y `--import-tmdb-id` / `--import-json` ahora admiten `--allow-unreleased` independientemente de `TMDB_ALLOW_UNRELEASED=false` en el entorno.
-  - [x] Endpoint `POST /api/v1/admin/sync/import-tmdb` con `allow_unreleased: true` por defecto.
-- [x] **Refinamiento Visual de Badges en Detalle de Título (`TitleDetailPage.tsx`):**
-  - [x] Desambiguación cromática: "Renewed TBA" preserva su púrpura original (`purple-950`), mientras "En Producción" adopta tono **Teal** (`teal-950/80`, borde `teal-500/60`, texto `teal-300`).
-  - [x] Badge "Estrenada" (`Released`) en verde esmeralda (`emerald-950/80`, borde `emerald-500/60`, texto `emerald-300`) para películas estrenadas.
-- [x] **Variables de Entorno y Configuración:**
-  - [x] `TMDB_EXPAND_UPCOMING_TARGET=10` y `TMDB_EXPAND_UPCOMING_DAYS=365` incorporadas en `config.py`, `.env`, `.env.local`, `.env.example` y `render.yaml`.
-- [x] **Pruebas y Verificación:**
-  - [x] 2 nuevos tests unitarios en `test_tmdb_sync.py` (`test_expand_catalog_by_genres_upcoming_single_genre` y `test_expand_catalog_by_genres_upcoming_global_no_genre`).
-  - [x] Suite completa de backend (97/97 tests pasando en verde), frontend (2 tests y build de Vite impecable).
-  - [x] Ejecución validada con base local SQLite (`cinetrack.db`).
+### 10.7: Suite de Postman, Telemetría de Ingesta y Resiliencia de Episodios (v1.6.2)
+- [x] **Suite de Postman y Operaciones Administrativas:** Colección modular YAML (`docs/postman/`) con 5 carpetas y 20 requests completas y seguras.
+- [x] **Telemetría Granular de Ingesta:** Discriminación de creados vs actualizados (`_is_new`, `created_count`, `updated_count`) en jobs de sync y logs de CLI.
+- [x] **Resiliencia ante Latencia de Episodios TMDB:** Desacople de `isUnreleased` para permitir marcar visto a episodios cuya fecha ya llegó sin depender del avance del puntero de TMDB. Simplificación de `DailySyncRequest`.
+
+### 10.8: Pulido de Interfaz, Calificaciones sin Texto y Cierre de Calidad Pre-Entrega (v1.6.3)
+- [x] **Header y Búsqueda Interactiva:** Ampliación del input y botones interactivos de lupa con hover dorado.
+- [x] **Reparto Principal Expandible:** Selector "Ver más / Ver menos" en `TitleDetailPage.tsx` para elencos de más de 12 actores.
+- [x] **Coherencia de Temporadas:** Cálculo optimista comparando contra episodios emitidos a la fecha.
+- [x] **Localización Completa de Reseñas:** Claves traducidas en `LanguageContext.tsx` y eliminación de cadenas hardcodeadas.
+- [x] **Calificaciones sin Texto (Rating Directo):** Reseñas con puntaje opcional o reseña sin texto mediante `CheckConstraint` en base de datos (migración Alembic `0006_nullable_review_text.py`).
 
 ---
 
-## Hito Completado: Corrección de Series Estreno Mismo Día en Upcoming/New Releases y Chips de Catálogo
-- [x] **Clasificación Estricta de Series con Estreno el Mismo Día:**
-  - [x] Series cuyo episodio 1 estrena en la fecha actual (`fecha_estreno == today`) y cuyo episodio aún no fue transmitido (`proximo_episodio_fecha >= today` o `None`) ahora se clasifican como **Próximos Estrenos (`upcoming=true`)** y se excluyen de **New Releases** y catálogo regular hasta que la sincronización diaria o cambio de fecha registre el estreno.
-  - [x] Lógica booleana SQL `NULL-safe` en `get_released_filter_condition(today)` para evitar el descarte accidental de títulos con fechas nulas bajo lógica trivaluada de SQL.
-  - [x] Aplicación de `get_released_filter_condition(today)` a través de `_apply_base_filters` en `_fetch_and_cache_home_pools` para limpiar todos los carruseles de la Home (New Releases, Trending, Classics, Top Rated, By Genre).
-  - [x] Limpieza de defaults de ordenamiento en `/api/v1/titles` para no forzar `popularity desc` cuando el usuario solicita ordenamientos específicos.
-  - [x] Test unitario específico `test_catalog_same_day_premiere_tv_series_upcoming_vs_released` en `test_catalog.py` (99/99 tests backend pasando en verde).
-- [x] **Corrección Visual de Chips de Filtro en Catálogo (`CatalogPage.tsx`):**
-  - [x] Función `getSectionLabel(sec)` para mapear adecuadamente `new_releases` -> `🕒 New Releases` y `top_rated` -> `⭐ Top Rated`.
-  - [x] Resolución del bug de traducción que buscaba claves inexistentes `sectionNew_releases` y `sectionTop_rated`.
-  - [x] Verificación de suite de frontend y compilación de producción con Vite exitosa.
-- [x] **Desacoplamiento de Límites en Expansión Upcoming (`--expand --upcoming`):**
-  - [x] Soporte para `--upcoming-days 0`: omite `release_date_lte` para buscar sin fecha tope hacia el futuro infinito hasta completar el target.
-  - [x] Soporte para `--limit 0` (o `--target-per-genre 0`): omite el tope de cantidad para ingestar todos los títulos con popularidad $\ge 10.0$ en la ventana de días indicada.
-  - [x] Aliases `--limit` y `--target` en CLI `sync_tmdb.py` y esquema `ExpandCatalogRequest` en API administrativa.
-  - [x] Tests unitarios `test_expand_catalog_by_genres_upcoming_infinite_days` y `test_expand_catalog_by_genres_upcoming_unlimited_target` (101/101 tests backend en verde).
-  - [x] Documentación exhaustiva en `README.md`.
-- [x] **Renombrado y Consolidación de Variables de Entorno Operativas:**
-  - [x] Sustitución de `TMDB_CHANGES_HOURS_WINDOW=48` por `TMDB_CHANGES_DAYS_WINDOW=7` (alineado a la rutina semanal de /changes).
-  - [x] Renombrado de `TMDB_DAILY_SYNC_DAYS_WINDOW=15` a `TMDB_RELEASES_DAYS_WINDOW=15` (ventana común de estrenos para jobs diario y semanal).
-  - [x] Soporte de retrocompatibilidad en `config.py` con `@property` y `@model_validator` para entornos existentes.
-  - [x] Actualización de `.env.example`, `render.yaml`, `.env`, `.env.local` y documentación.
+## Fase 11: Factor Sorpresa y Variedad en Recomendador IA (v1.7.0)
 
-- [x] **Ciclo de Vida de Próximos Estrenos, Embeddings Selectivos y Umbrales del Recomendador (v1.6.0):**
-  - [x] Paso 1: Configuración en `backend/app/core/config.py`, `.env`, `.env.example` y `render.yaml` (`AI_RECOMMENDER_MIN_VOTES_VECTOR`, `AI_RECOMMENDER_MIN_VOTES_THEMATIC`, `AI_RECOMMENDER_MIN_VOTES_FALLBACK`, `AI_RECOMMENDER_NEW_RELEASE_DAYS`).
-  - [x] Paso 2: Blindaje y umbrales en `backend/app/services/catalog_service.py` (`apply_base_filters` con `get_released_filter_condition(today)` y soporte de estrenos recientes sin piso de votos).
-  - [x] Paso 3: Generación selectiva de embeddings en `backend/app/jobs/sync_embeddings.py` (excluir unreleased/upcoming para no gastar cuota de API).
-  - [x] Paso 4: Invocación de `sync_pending_embeddings()` tras `expand_catalog_by_genres()` y persistencia de `status_tmdb` en `refresh_catalog_metrics()`.
-  - [x] Paso 5: Suite de tests automatizados unitarios y de integración para validar candidatos y embeddings selectivos.
-  - [x] Paso 6: Exigencia de póster oficial en ingesta (`upsert_movie`/`upsert_series`) e inclusión de "sin póster" en purga (`purge_invalid_or_incomplete_titles`) con suite ampliada a 105 tests en verde.
-  - [x] Paso 7: Actualización de documentación viva (`ARCHITECTURE.md`, `README.md`, `CHANGELOG.md`, `ROADMAP.md`).
-- [x] **Suite de Postman y Documentación de Operaciones Administrativas:**
-  - [x] Estructuración modular en formato YAML (`docs/postman/CineTrack - Admin & Sync API/`) con 5 carpetas y 20 requests completas.
-  - [x] Protección de secretos: `.gitignore` para entornos reales locales (`*.environment.yaml`, `.postman/`) y plantillas públicas sanitizadas (`.example.yaml`).
-  - [x] Documentación exhaustiva en `docs/postman/README.md` y simplificación de endpoints administrativos y fórmulas en `README.md` de raíz.
-  - [x] Verificación de conectividad en producción contra Render (`https://cinetrack-api-zsen.onrender.com`).
-  - [x] Commit `52c3327` y push a `origin/main`.
-- [x] **Telemetría Granular de Ingesta (Creados vs. Actualizados):**
-  - [x] Flag `_is_new` en `upsert_movie` y `upsert_series` para discriminar altas de modificaciones.
-  - [x] Desglose `created_count` y `updated_count` en resultado del job `import_tmdb` de la API de administración.
-  - [x] Desglose `created` y `updated` en `import_from_json_data` y en job `import_json`.
-  - [x] Logs diferenciados `[CREADO]` vs `[ACTUALIZADO]` en CLI `sync_tmdb.py` para `--import-tmdb-id` y `--import-json`.
-  - [x] Cobertura unitaria ampliada en `test_tmdb_sync.py` validando la detección precisa de títulos creados vs actualizados (105 tests pasando en verde).
-- [x] **Resiliencia ante Latencia de Episodios TMDB, Badges y Simplificación de Daily Sync (v1.6.2):**
-  - [x] Desacople de `isUnreleased` para que un episodio cuya fecha ya llegó (`ep.fecha_estreno <= todayStr`) siempre sea marcable como visto con el ojo, sin depender del avance del puntero de TMDB.
-  - [x] El filtro por `proximo_episodio_fecha` en episodios se restringe estrictamente a punteros futuros (`proximo_episodio_fecha > todayStr`).
-  - [x] Limpieza de badges en `TitleDetailPage.tsx`: omisión de coletillas de fechas pasadas en `Currently Airing`, `Coming Soon` y `Renewed` cuando el puntero no avanzó (`nextEpDate <= todayStr`).
-  - [x] Validación estricta en `isWithin15Days`: solo fechas futuras (`diffDays > 0 && diffDays <= 15`).
-  - [x] Aislamiento de `inProgressSeason`: requiere episodios pendientes en la misma temporada para no pisar el badge de renovación de entregas siguientes (*Los Simpsons*).
-  - [x] Soporte para temporadas incompletas recién estrenadas (*S.W.A.T.*): pulso `En Emisión` y exhibición de fecha de próximo episodio si el puntero a nivel de show es futuro (`nextDate > todayStr`).
-  - [x] Eliminación total de `changes_hours_window` y `hours_window` en `DailySyncRequest` y del mensaje de respuesta de la sync diaria (delegado a `deep_sync`).
-  - [x] Parametrización de `releases_days_window` (default: 15) en `workflow_dispatch` de `.github/workflows/daily_sync.yml` y `weekly_deep_sync.yml`.
-  - [x] Verificación completa: suite de 105 tests de backend en verde y build de frontend verificado.
-
-- [x] **Pulido de Interfaz y Cierre de Calidad Pre-Entrega (v1.6.3):**
-  - [x] **Paso 1: Header y Búsqueda Interactiva:**
-    - [x] Ampliación de ancho de contenedor de búsqueda en `Header.tsx` (`max-w-md lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl`) para albergar placeholders completos en todos los idiomas.
-    - [x] Botones de lupa interactivos con `type="submit"` y hover dorado tanto en Header como en Catálogo.
-  - [x] **Paso 2: Reparto Principal Expandible:**
-    - [x] Selector interactivo "Ver más / Ver menos" en `TitleDetailPage.tsx` para mostrar más de 12 actores cuando el reparto exceda las 2 filas base.
-  - [x] **Paso 3: Coherencia de Temporadas con Episodios Emitidos:**
-    - [x] Ajuste en `TitleDetailPage.tsx` para que el cálculo optimista de temporada vista compare contra los episodios emitidos a la fecha (`!isUnreleased(e.fecha_estreno)`).
-  - [x] **Paso 4: Localización Completa de Reseñas:**
-    - [x] Incorporación de claves faltantes en `LanguageContext.tsx` y reemplazo de strings hardcodeados en `ReviewsPage.tsx`.
-  - [x] **Paso 5: Calificaciones sin Texto (Rating Directo):**
-    - [x] Soporte de texto opcional en modelo `Resena` y esquema `ReviewCreate` con validación estricta de presencia de texto o puntaje.
-    - [x] Migración Alembic `0006_nullable_review_text.py`.
-    - [x] Soporte en interfaz de `ReviewsPage.tsx` y `TitleDetailPage.tsx`.
-    - [x] Batería de pruebas automatizadas y verificación (106 tests pasando).
+- [x] **Paso 11.1: Enum Normalizado y Configuración de Modelos (`config.py`):**
+  - [x] Definición de `VarietyLevel` (`VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`).
+  - [x] `AI_RECOMMENDER_DEFAULT_VARIETY: VarietyLevel = VarietyLevel.MEDIUM` en `config.py`, `.env.example`, `.env`, `.env.local`, `.env.prod` y `render.yaml`.
+  - [x] Actualización de fallbacks de modelos (`GEMINI_FALLBACK_MODELS` y `GROQ_FALLBACK_MODELS` con incorporación de `qwen/qwen3.8-27b`).
+  - [x] Desacople dinámico de modelos de razonamiento vía `AI_REASONING_MODELS` configurable por entorno.
+- [x] **Paso 11.2: Persistencia de Preferencia de Usuario y Migración:**
+  - [x] Columna `preferencia_variedad_ia: Mapped[str]` en modelo `Usuario` (`default="MEDIUM"`).
+  - [x] Migración Alembic `0007_user_variety_preference.py` ejecutada en SQLite local, Neon Dev y Neon Prod.
+  - [x] Actualización de esquemas `UserResponse` y `UserUpdate` en backend.
+- [x] **Paso 11.3: RAG Multi-Nivel con Modulación de Votos, Exención de Entidad y Guardrails (`catalog_service.py`):**
+  - [x] `get_recommendation_candidates(..., variety_level: VarietyLevel = VarietyLevel.MEDIUM)`.
+  - [x] Modulación de umbrales sobre `settings.AI_RECOMMENDER_MIN_VOTES_*` ($\times 1.8$ a $\times 0.3$).
+  - [x] Restricción de rating crítico (`rating_unificado >= 7.5`) para `VERY_LOW`.
+  - [x] Exención de entidades directas (director, actor, título explícito no se descartan por rating bajo o pocos votos).
+  - [x] Salvaguarda contra inanición (si los candidatos son < 3, relaja filtros automáticamente).
+- [x] **Paso 11.4: Despachador de LLM Dinámico, Directivas Semánticas y Resiliencia Multiclave (`ai_recommender_service.py`):**
+  - [x] Mapeo de parámetros (`SLIDER_MAPPING`) para modelos Reasoning vs Standard.
+  - [x] Inyección segura de `reasoning_effort` para modelos clasificados dinámicamente en `AI_REASONING_MODELS`.
+  - [x] Inyección de directivas semánticas explícitas por nivel de variedad en `_build_user_message`.
+  - [x] Iteración exhaustiva de todas las API keys configuradas por modelo antes de descender en la cascada.
+- [x] **Paso 11.5: Endpoint de Recomendaciones:**
+  - [x] `POST /recommendations` aceptando y respondiendo `variety_level: Optional[VarietyLevel] = None` con fallback automático a la preferencia de usuario de la BD o valor default.
+- [x] **Paso 11.6: Frontend — UI de Configuración y Selector Rápido:**
+  - [x] Slider de 5 posiciones en `SettingsPage.tsx` con guía central fija (*Balanceada (Recomendado)*) y tarjeta descriptiva dinámica.
+  - [x] Selector interactivo directo y badge visual en `RecommendationsPage.tsx` para modular la variedad al vuelo.
+  - [x] Localización completa (ES/EN) en `LanguageContext.tsx`.
+- [x] **Paso 11.7: Suite de Tests Automatizados y Verificación:**
+  - [x] Tests unitarios de modulación de candidatos en `test_recommendations.py`.
+  - [x] Tests de inyección de `reasoning_effort` en Groq según tipo de modelo y calibración de temperatura.
+  - [x] Tests de actualización de preferencia de variedad en `test_users.py`.
+  - [x] Verificación total de suite `pytest` (109/109 pasando) y build de `frontend` en verde.
+- [x] **Paso 11.8: Batería de Pruebas Integral en Vivo (Neon Dev):**
+  - [x] Fase 1 (11 escenarios sin usuario autenticado: G1, G2, G3, G4 y G5 transversal).
+  - [x] Fase 2 (Usuario real `damianvc31`: lectura automática de preferencia de variedad e interacción con 49 títulos vistos y favoritos).
+  - [x] Prueba desafiante de nicho con baja calificación (*La señal*, 5.92★, 25 votos) verificada en `VERY_LOW`.
 
 ---
 

@@ -6,7 +6,7 @@ import re
 from typing import Any, Dict, List, Optional
 import httpx
 
-from app.core.config import settings
+from app.core.config import VarietyLevel, settings
 from app.schemas.recommendations import (
     RecommendationItem,
     RecommendationResponse,
@@ -14,6 +14,44 @@ from app.schemas.recommendations import (
 from app.services.catalog_service import THEME_EXPANSION_MAP
 
 logger = logging.getLogger(__name__)
+
+# Clasificación de modelos según capacidades de inferencia y razonamiento
+REASONING_MODELS = {
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.8-27b"
+}
+
+STANDARD_MODELS = {
+    "gemini-3.6-flash",
+    "gemini-3.8-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest"
+}
+
+# Mapeo de variedad/factor sorpresa a parámetros LLM
+SLIDER_MAPPING = {
+    VarietyLevel.VERY_LOW: {
+        "reasoning": {"temperature": 0.7, "reasoning_effort": "low"},
+        "standard": {"temperature": 0.1}
+    },
+    VarietyLevel.LOW: {
+        "reasoning": {"temperature": 0.8, "reasoning_effort": "low"},
+        "standard": {"temperature": 0.3}
+    },
+    VarietyLevel.MEDIUM: {
+        "reasoning": {"temperature": 1.0, "reasoning_effort": "medium"},
+        "standard": {"temperature": 0.5}
+    },
+    VarietyLevel.HIGH: {
+        "reasoning": {"temperature": 1.1, "reasoning_effort": "medium"},
+        "standard": {"temperature": 0.7}
+    },
+    VarietyLevel.VERY_HIGH: {
+        "reasoning": {"temperature": 1.2, "reasoning_effort": "high"},
+        "standard": {"temperature": 0.9}
+    }
+}
 
 SYSTEM_PROMPT = """Eres el Asistente Cinematográfico Inteligente de CineTrack.
 Tu objetivo es recomendar entre 2 y 5 títulos de películas o series al usuario, basándote en su pedido (prompt) y en su perfil de preferencias.
@@ -85,7 +123,8 @@ def _build_user_message(
     user_context: Optional[Dict[str, Any]],
     candidates: List[Dict[str, Any]],
     language: Optional[str] = None,
-    clarification_context: Optional[Dict[str, Any]] = None
+    clarification_context: Optional[Dict[str, Any]] = None,
+    variety_level: Optional[VarietyLevel | str] = None
 ) -> str:
     """Construye el payload de contexto y candidatos que se envía al modelo."""
     lang = language or _detect_language(prompt)
@@ -116,6 +155,47 @@ Perfil del usuario:
         candidates_summary.append(
             f"- ID {c['id']}: \"{c['nombre']}\" ({c['tipo']}, {c.get('anio') or 'N/A'}{watched_text}){pais_text}{idioma_text} - Géneros: {', '.join(c.get('generos', []))} | Puntaje: {c.get('vote_average', 0.0)}★ ({c.get('vote_count', 0)} votos){director_text}{actors_text} | Sinopsis: {c.get('sinopsis_corta', '')}{snippet_text}"
         )
+
+    # Directivas semánticas explícitas de variedad para orientar la selección del modelo (especialmente modelos de razonamiento)
+    norm_variety = variety_level
+    if isinstance(norm_variety, str):
+        try:
+            norm_variety = VarietyLevel(norm_variety)
+        except Exception:
+            norm_variety = VarietyLevel.MEDIUM
+    elif not norm_variety:
+        norm_variety = VarietyLevel.MEDIUM
+
+    variety_directives = {
+        VarietyLevel.VERY_LOW: (
+            "\nDIRECTIVA DE SELECCIÓN DE VARIEDAD (CLÁSICA / CONSERVADORA):\n"
+            "- El usuario exige recomendaciones 'seguras', prestigiosas y consagradas.\n"
+            "- Elige EXCLUSIVAMENTE los títulos más aclamados, premiados y universalmente reconocidos del pool de candidatos.\n"
+            "- Evita obras experimentales, títulos de culto poco conocidos o propuestas de nicho divisivas."
+        ),
+        VarietyLevel.LOW: (
+            "\nDIRECTIVA DE SELECCIÓN DE VARIEDAD (MODERADA):\n"
+            "- Prioriza títulos consolidados y con sólida reputación crítica dentro del pool.\n"
+            "- Mantén la recomendación centrada en lo más representativo del género o temática."
+        ),
+        VarietyLevel.MEDIUM: (
+            "\nDIRECTIVA DE SELECCIÓN DE VARIEDAD (EQUILIBRADA):\n"
+            "- Proporciona una selección balanceada y variada.\n"
+            "- Combina obras reconocidas con alternativas interesantes y afines a la temática."
+        ),
+        VarietyLevel.HIGH: (
+            "\nDIRECTIVA DE SELECCIÓN DE VARIEDAD (EXPLORATORIA / AMPLIA):\n"
+            "- El usuario desea expandir horizontes más allá de lo evidente.\n"
+            "- Explora títulos menos trillados, propuestas independientes o alternativas creativas del pool."
+        ),
+        VarietyLevel.VERY_HIGH: (
+            "\nDIRECTIVA DE SELECCIÓN DE VARIEDAD (CREATIVA / MÁXIMO FACTOR SORPRESA):\n"
+            "- El usuario busca activamente DESCUBRIMIENTOS AUDACES, JOYAS OCULTAS, CINE DE AUTOR, CULTO O PROPUESTAS INTERNACIONALES SINGULARES.\n"
+            "- NO elijas los títulos más obvios, comerciales o ultra-famosos del pool si dispones de alternativas fascinantes y menos conocidas que encajen con la búsqueda.\n"
+            "- Sorprende al usuario con recomendaciones memorables y fuera del radar masivo."
+        )
+    }
+    variety_instruction = variety_directives.get(norm_variety, variety_directives[VarietyLevel.MEDIUM])
 
     instructions_extra = ""
     if user_context and user_context.get("only_watched"):
@@ -150,6 +230,7 @@ El usuario está respondiendo a la repregunta previa del asistente. Si su respue
 
 IDIOMA OBLIGATORIO DE RESPUESTA: {lang_name} ({lang.upper()})
 DIRECTIVA CRÍTICA: Debes redactar el mensaje de apertura ('message') y ABSOLUTAMENTE TODAS las justificaciones ('reason') en {lang_name}. NO uses otro idioma bajo ninguna circunstancia.
+{variety_instruction}
 
 CONTEXTO DEL USUARIO:
 {context_text}{instructions_extra}
@@ -340,9 +421,10 @@ class AIRecommenderService:
         self,
         user_message: str,
         model_override: Optional[str] = None,
-        api_key_override: Optional[str] = None
+        api_key_override: Optional[str] = None,
+        variety_level: VarietyLevel = VarietyLevel.MEDIUM
     ) -> Dict[str, Any]:
-        """Llamada directa asíncrona a Google Gemini API."""
+        """Llamada directa asíncrona a Google Gemini API calibrada según variedad."""
         keys = self.gemini_api_keys
         if not keys:
             raise ValueError("GEMINI_API_KEY no configurada")
@@ -350,6 +432,10 @@ class AIRecommenderService:
         api_key = api_key_override or keys[0]
         gemini_model = model_override or getattr(settings, "GEMINI_MODEL", "gemini-3.6-flash")
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
+        
+        mapping = SLIDER_MAPPING.get(variety_level, SLIDER_MAPPING[VarietyLevel.MEDIUM])
+        temp = mapping["standard"]["temperature"]
+
         payload = {
             "system_instruction": {
                 "parts": [{"text": SYSTEM_PROMPT}]
@@ -359,7 +445,7 @@ class AIRecommenderService:
             ],
             "generationConfig": {
                 "response_mime_type": "application/json",
-                "temperature": 0.3
+                "temperature": temp
             }
         }
 
@@ -379,9 +465,10 @@ class AIRecommenderService:
         self,
         user_message: str,
         model_override: Optional[str] = None,
-        api_key_override: Optional[str] = None
+        api_key_override: Optional[str] = None,
+        variety_level: VarietyLevel = VarietyLevel.MEDIUM
     ) -> Dict[str, Any]:
-        """Llamada directa asíncrona a Groq API."""
+        """Llamada directa asíncrona a Groq API con inyección segura de reasoning_effort."""
         keys = self.groq_api_keys
         if not keys:
             raise ValueError("GROQ_API_KEY no configurada")
@@ -392,15 +479,25 @@ class AIRecommenderService:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
+        
+        mapping = SLIDER_MAPPING.get(variety_level, SLIDER_MAPPING[VarietyLevel.MEDIUM])
         payload = {
             "model": groq_model,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_message}
             ],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.3
+            "response_format": {"type": "json_object"}
         }
+
+        # Modelos de razonamiento: inyectar reasoning_effort y temperatura adecuada según configuración
+        reasoning_set = getattr(settings, "reasoning_models_set", REASONING_MODELS)
+        if groq_model in reasoning_set:
+            payload["temperature"] = mapping["reasoning"]["temperature"]
+            payload["reasoning_effort"] = mapping["reasoning"]["reasoning_effort"]
+        else:
+            # Modelos estándar en Groq (ej: Llama): temperatura estándar y NUNCA enviar reasoning_effort (evita HTTP 400)
+            payload["temperature"] = mapping["standard"]["temperature"]
 
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(self.groq_url, headers=headers, json=payload)
@@ -639,10 +736,19 @@ class AIRecommenderService:
         candidates: List[Dict[str, Any]],
         language: Optional[str] = "es",
         clarification_context: Optional[Dict[str, Any]] = None,
-        is_cancelled: Optional[Any] = None
+        is_cancelled: Optional[Any] = None,
+        variety_level: Optional[VarietyLevel | str] = None
     ) -> RecommendationResponse:
         """Punto de entrada principal: orquesta llamada con reintentos antes de caer en heurístico."""
-        # 0. Si el cliente ya canceló la petición en vuelo, salir inmediatamente
+        # 0. Determinar nivel de variedad activo
+        active_variety = variety_level or (user_context.get("variety_level") if user_context else None) or getattr(settings, "AI_RECOMMENDER_DEFAULT_VARIETY", VarietyLevel.MEDIUM)
+        if isinstance(active_variety, str):
+            try:
+                active_variety = VarietyLevel(active_variety)
+            except Exception:
+                active_variety = VarietyLevel.MEDIUM
+
+        # Si el cliente ya canceló la petición en vuelo, salir inmediatamente
         if is_cancelled and await is_cancelled():
             return RecommendationResponse(
                 status="clarification_needed",
@@ -717,7 +823,8 @@ class AIRecommenderService:
             user_context,
             candidates,
             language=language,
-            clarification_context=clarification_context
+            clarification_context=clarification_context,
+            variety_level=active_variety
         )
         candidate_ids = {c["id"] for c in candidates}
 
@@ -730,9 +837,9 @@ class AIRecommenderService:
 
         # Modelos principales y fallbacks configurados
         gemini_primary = getattr(settings, "GEMINI_MODEL", "gemini-3.6-flash")
-        gemini_fallbacks = _parse_model_list(getattr(settings, "GEMINI_FALLBACK_MODELS", "gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.8-flash"))
+        gemini_fallbacks = _parse_model_list(getattr(settings, "GEMINI_FALLBACK_MODELS", "gemini-3.8-flash,gemini-3.5-flash-lite,gemini-flash-lite-latest"))
         groq_primary = getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
-        groq_fallbacks = _parse_model_list(getattr(settings, "GROQ_FALLBACK_MODELS", "openai/gpt-oss-20b,groq/compound-mini,qwen/qwen3.8-27b"))
+        groq_fallbacks = _parse_model_list(getattr(settings, "GROQ_FALLBACK_MODELS", "openai/gpt-oss-20b,meta-llama/llama-3.3-70b-specdec"))
 
         models_by_prov = {
             "gemini": (gemini_primary, gemini_fallbacks),
@@ -758,23 +865,45 @@ class AIRecommenderService:
                 logger.info("Cliente canceló la solicitud durante la cascada. Deteniendo ejecución.")
                 break
 
-            if prov == "gemini" and settings.GEMINI_API_KEY:
-                try:
-                    raw_result = await self._call_gemini(user_message, model_override=model)
-                    provider_used = "gemini"
-                    model_used = model
-                    break
-                except Exception as e:
-                    logger.warning("Falla en Gemini API con modelo '%s': %s", model, e)
+            if prov == "gemini" and self.gemini_api_keys:
+                for key_idx, key in enumerate(self.gemini_api_keys):
+                    if is_cancelled and await is_cancelled():
+                        break
+                    try:
+                        raw_result = await self._call_gemini(
+                            user_message,
+                            model_override=model,
+                            api_key_override=key,
+                            variety_level=active_variety
+                        )
+                        provider_used = "gemini"
+                        model_used = model
+                        break
+                    except Exception as e:
+                        logger.warning(
+                            "Falla en Gemini API (modelo '%s', key #%d ending in '...%s'): %s",
+                            model, key_idx + 1, key[-6:] if len(key) >= 6 else key, e
+                        )
 
-            elif prov == "groq" and settings.GROQ_API_KEY:
-                try:
-                    raw_result = await self._call_groq(user_message, model_override=model)
-                    provider_used = "groq"
-                    model_used = model
-                    break
-                except Exception as e:
-                    logger.warning("Falla en Groq API con modelo '%s': %s", model, e)
+            elif prov == "groq" and self.groq_api_keys:
+                for key_idx, key in enumerate(self.groq_api_keys):
+                    if is_cancelled and await is_cancelled():
+                        break
+                    try:
+                        raw_result = await self._call_groq(
+                            user_message,
+                            model_override=model,
+                            api_key_override=key,
+                            variety_level=active_variety
+                        )
+                        provider_used = "groq"
+                        model_used = model
+                        break
+                    except Exception as e:
+                        logger.warning(
+                            "Falla en Groq API (modelo '%s', key #%d ending in '...%s'): %s",
+                            model, key_idx + 1, key[-6:] if len(key) >= 6 else key, e
+                        )
 
         # Si el cliente canceló durante la cascada, retornar de inmediato
         if is_cancelled and await is_cancelled():

@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, get_optional_current_user
+from app.core.config import VarietyLevel
 from app.models.usuario import Usuario
 from app.schemas.recommendations import RecommendationRequest, RecommendationResponse
 from app.services import catalog_service
@@ -47,7 +48,8 @@ async def get_recommendations(
         prompt=request.prompt,
         usuario_id=usuario_id,
         tipo_filtro=request.tipo_filtro or "all",
-        clarification_context=clarification_dict
+        clarification_context=clarification_dict,
+        variety_level=request.variety_level
     )
 
     # 2. Invocar el servicio de IA (Gemini con fallback a Groq / heurístico)
@@ -57,8 +59,14 @@ async def get_recommendations(
         candidates=candidates,
         language=request.language or "es",
         clarification_context=clarification_dict,
-        is_cancelled=http_request.is_disconnected
+        is_cancelled=http_request.is_disconnected,
+        variety_level=request.variety_level
     )
+    if user_ctx and "variety_level" in user_ctx:
+        try:
+            ai_response.variety_level = VarietyLevel(user_ctx["variety_level"])
+        except Exception:
+            ai_response.variety_level = VarietyLevel.MEDIUM
 
     # 3. Si se generaron recomendaciones, hidratar las TitleCard completas
     if ai_response.status == "recommended" and ai_response.recommendations:

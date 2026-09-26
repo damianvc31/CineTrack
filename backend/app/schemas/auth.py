@@ -16,6 +16,9 @@ class UserLogin(BaseModel):
     password: str = Field(..., description="Contraseña")
 
 
+from app.core.config import VarietyLevel
+
+
 class UserResponse(BaseModel):
     id: int
     nombre_usuario: str
@@ -25,6 +28,7 @@ class UserResponse(BaseModel):
     avatar_url: str | None = None
     es_admin: bool = False
     fecha_registro: datetime
+    preferencia_variedad_ia: VarietyLevel = VarietyLevel.MEDIUM
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -40,6 +44,7 @@ class UserUpdate(BaseModel):
     ciudad: str | None = Field(default=None, max_length=100)
     descripcion: str | None = Field(default=None, max_length=500)
     avatar_url: str | None = Field(default=None, max_length=500)
+    preferencia_variedad_ia: VarietyLevel | None = Field(default=None)
 
 
 class PasswordChangeRequest(BaseModel):

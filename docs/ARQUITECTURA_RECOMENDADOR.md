@@ -1,6 +1,6 @@
-# Arquitectura del Recomendador Inteligente (RAG Híbrido) - Fase 8
+# Arquitectura del Recomendador Inteligente (RAG Híbrido & Factor Sorpresa) — Fase 11
 
-Este documento detalla la arquitectura, el flujo de datos y las decisiones de diseño del sistema de recomendaciones de CineTrack, implementado en la Fase 8 hacia un enfoque **Híbrido (Vectorial + SQL)** para solucionar las deficiencias semánticas y de filtrado negativo del recomendador inicial.
+Este documento detalla la arquitectura, el flujo de datos, los modelos matemáticos y las decisiones de diseño del sistema de recomendaciones de CineTrack, consolidado en la **Fase 11** con un enfoque **Híbrido (Vectorial + SQL + Heurístico)**, orquestación de **Modelos de Razonamiento (Reasoning Models)**, **Resiliencia Multiclave** y **Modulación por Variedad / Factor Sorpresa**.
 
 ---
 
@@ -16,10 +16,10 @@ Si un usuario pide: *"Películas de robos, pero NO quiero comedias"*, un modelo 
 Para resolver esto de forma óptima en latencia, cuota y precisión, el Recomendador opera como un pipeline de 5 etapas:
 
 ```
-[Prompt Usuario] 
+[Prompt Usuario + Nivel Variedad] 
    ➔ 1. Validación y Sanitización (0ms / 0 llamadas)
    ➔ 2. Extracción Determinista de Filtros Duros (0ms / 0 llamadas)
-   ➔ 3. Búsqueda Híbrida: pgvector (Neon) ó Léxica (SQLite) (1 llamada embedding)
+   ➔ 3. Búsqueda Híbrida Modulada por Variedad: pgvector (Neon) ó Léxica (SQLite) (1 llamada embedding)
    ➔ 4. Grounding & Justificación con Cascada Multi-Nivel y Multi-Key (1 llamada LLM)
    ➔ 5. Hidratación de TitleCards & Respuesta UI
 ```
@@ -36,82 +36,122 @@ Para resolver esto de forma óptima en latencia, cuota y precisión, el Recomend
   2. **Rangos Temporales y Décadas:** Mapea menciones como *"ochentas"*, *"80s"*, *"años 90"*, *"clásicos"* o *"estrenos"* a rangos de años sobre `fecha_estreno`.
   3. **Tipo de Título:** Detecta intenciones de series vs películas (`tipo == 'movie'` o `'tv'`).
   4. **Biblioteca de Vistas del Usuario:** Detecta si el usuario pide *"solo vistas"*, *"ya vistas"* o si deben excluirse por defecto sus títulos marcados como `'vista'`.
-- **Ventaja Técnica:** Ejecución instantánea (**0 milisegundos**) y cero consumo de cuota de API.
+  5. **Setting Intent vs Origin Intent:** Distingue entre ambientación geográfica (ej: *"ambientada en Buenos Aires"*) y país de producción (ej: *"cine argentino"*).
 
-### Paso 3: Búsqueda Híbrida (SQL + pgvector / SQLite)
+### Paso 3: Búsqueda Híbrida Modulada por Variedad (SQL + pgvector / SQLite)
 - **Generación del Embedding:**
   Se invoca a la API de **Google Embeddings (`gemini-embedding-001`)** fijando `outputDimensionality: 768` para vectorizar la intención semántica del prompt.
+- **Modulación por Variedad en el RAG:**
+  Los umbrales de votos mínimos y filtros de calidad se ajustan dinámicamente según el nivel de variedad (`VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`):
+  - **Multiplicador de Votos:** Escala los umbrales base (`MIN_VOTES_THEMATIC=80`, `MIN_VOTES_FALLBACK=150`, `MIN_VOTES_VECTOR=25`) desde **1.8x** en `VERY_LOW` (exige alta popularidad masiva) hasta **0.3x** en `VERY_HIGH` (abre la puerta a obras de nicho poco conocidas).
+  - **Filtro de Rating Estricto (`VERY_LOW`):** Exige `rating_unificado >= 7.5` para garantizar solo clásicos consagrados.
+  - **Exención de Entidades Directas:** Si el usuario busca un director, actor o título específico (ej: *"películas dirigidas por Ricardo Darín"* o *"David Lynch"*), este filtro de rating se desactiva para evitar que obras singulares queden fuera.
+  - **Guardrail de Inanición (Starvation Protection):** Si la cantidad de candidatos tras aplicar los filtros de variedad es inferior a 3, el sistema relaja automáticamente las restricciones para asegurar que nunca se devuelvan 0 recomendaciones.
 - **Bifurcación por Dialecto de Base de Datos:**
   - **En PostgreSQL (Neon Dev / Producción):**
-    Aplica una consulta dinámica en SQLAlchemy que primero ejecuta las restricciones duras del `WHERE` (géneros excluidos, películas vistas, décadas, tipo), y luego ordena los candidatos por **distancia coseno** con el índice HNSW:
-    ```sql
-    SELECT titulos.*, (titulos.embedding <=> user_vector) AS distancia
-    FROM titulos
-    WHERE titulos.tipo = 'movie'
-      AND titulos.fecha_estreno BETWEEN '1980-01-01' AND '1989-12-31'
-      AND titulos.id NOT IN (SELECT titulo_id FROM titulos_generos WHERE genero_id = :animacion_id)
-      AND titulos.id NOT IN (SELECT titulo_id FROM estados_usuarios_titulos WHERE usuario_id = :uid AND estado = 'vista')
-    ORDER BY titulos.embedding <=> user_vector ASC
-    LIMIT 30;
-    ```
-    Se combina con una búsqueda temática léxica complementaria (sinopsis, géneros detectados, director) para consolidar un **pool curado de ~35 candidatos**.
+    Aplica una consulta dinámica en SQLAlchemy con índice HNSW (`vector_cosine_ops`), ordenando los candidatos por distancia coseno y combinándolos con búsquedas léxicas temáticas para un pool curado de **20 a 35 candidatos**.
   - **En SQLite Local (`.env.local` / Offline):**
-    Detecta automáticamente que el dialecto no es PostgreSQL. **Omite el 100% de la vectorización** (cero consumo de cuota) y utiliza búsqueda temática léxica y ponderación por popularidad TMDB.
+    Detecta automáticamente que el dialecto no es PostgreSQL, omitiendo la vectorización y utilizando búsqueda temática léxica y ponderación por popularidad TMDB.
 
-### Paso 4: Grounding y Justificación (Cascada Multi-Nivel y Multi-Key)
-Con los ~35 candidatos preseleccionados, se invoca al modelo de lenguaje para seleccionar entre 2 y 5 títulos definitivos y redactar la justificación en lenguaje natural.
+### Paso 4: Grounding y Justificación (Cascada Multi-Nivel, Multi-Key y Modelos de Razonamiento)
+Con los candidatos preseleccionados, se invoca al LLM para seleccionar entre 2 y 5 títulos y redactar la justificación.
 
-Para garantizar máxima resiliencia ante límites de cuota (HTTP 429), la orquestación sigue este orden jerárquico estricto:
-
-1. **Nivel 1: Modelos Insignia Principales**
-   - **Google Gemini Principal (`gemini-3.6-flash`):**
-     - Evalúa la primera clave (`GEMINI_API_KEY[0]`).
-     - Si recibe 429 o saturación, rota de inmediato a la segunda clave (`GEMINI_API_KEY[1]`).
-   - **Groq Cloud Principal (`openai/gpt-oss-120b`):**
-     - Si Gemini agota sus claves en el modelo insignia, pasa al modelo insignia de Groq.
-     - Rota entre las claves configuradas en `GROQ_API_KEY` ante rate limits.
-2. **Nivel 2: Modelos de Respaldo Ligeros (Fallbacks)**
-   - Si los dos modelos líderes están saturados, se desciende al Nivel 2:
-   - **Fallbacks de Gemini (con multi-clave):** `gemini-flash-lite-latest` ➔ `gemini-3.5-flash-lite` ➔ `gemini-3.8-flash`.
-   - **Fallbacks de Groq (con multi-clave):** `openai/gpt-oss-20b` ➔ `groq/compound-mini` ➔ `qwen/qwen3.8-27b`.
-3. **Nivel 3: Fallback Heurístico Offline (Garantía 100%)**
-   - Si no hay conexión o todos los proveedores externos fallan, un algoritmo matemático determinístico local puntúa los candidatos por coincidencias de texto, afinidad de géneros y popularidad, devolviendo recomendaciones válidas y estructuradas sin fallar nunca.
+1. **Clasificación Dinámica de Modelos (`AI_REASONING_MODELS`):**
+   A través de la variable de entorno `AI_REASONING_MODELS` (por defecto: `openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.8-27b`), el sistema clasifica dinámicamente qué modelos son de razonamiento:
+   - **Modelos de Razonamiento:** Reciben `reasoning_effort` ("low", "medium", "high") y una temperatura calibrada en el rango 0.7–1.2 para armonizar con el esfuerzo cognitivo.
+   - **Modelos Estándar (Gemini, Llama):** Reciben únicamente temperatura en el rango 0.1–0.9 sin el parámetro `reasoning_effort`, evitando errores HTTP 400.
+2. **Directivas Semánticas Explícitas en el Prompt:**
+   Para evitar que los modelos de razonamiento elijan siempre los títulos más populares por inercia, el prompt inyecta directivas de comportamiento claras:
+   - `VERY_LOW`: Exige exclusivamente obras universalmente aclamadas y premiadas, vetando propuestas divisivas o de culto menor.
+   - `VERY_HIGH`: Prohíbe explícitamente elegir títulos obvios o comerciales si hay alternativas fascinantes, ordenando buscar joyas ocultas, cine de autor o culto internacional.
+3. **Cascada Jerárquica y Resiliencia Multiclave:**
+   - **Nivel 1 (Modelos Insignia):**
+     1. Gemini Insignia (`gemini-3.6-flash`): Prueba todas las API Keys configuradas (`GEMINI_API_KEY`) rotando ante 429/503.
+     2. Groq Insignia (`openai/gpt-oss-120b`): Si Gemini falla en todas sus claves, prueba todas las API Keys de Groq (`GROQ_API_KEY`).
+   - **Nivel 2 (Modelos de Respaldo / Fallbacks):**
+     1. Fallbacks de Gemini: `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-flash-lite-latest` (iterando todas las claves).
+     2. Fallbacks de Groq: `openai/gpt-oss-20b`, `qwen/qwen3.8-27b` (iterando todas las claves).
+   - **Nivel 3 (Fallback Heurístico Offline):**
+     Si todos los proveedores externos fallan o hay corte total de internet, un motor determinístico local puntúa los candidatos por coincidencias de texto, afinidad de géneros y popularidad, garantizando una tasa de disponibilidad del **100%**.
 
 ### Paso 5: Hidratación de TitleCards y Respuesta UI
-- El endpoint toma los IDs de los títulos recomendados por el LLM, los hidrata con la metadata completa desde la base de datos (posters, directores, rating unificado, votos) y los devuelve a la interfaz junto al metadato `model_used` para auditoría y trazabilidad.
+- El endpoint toma los IDs de los títulos recomendados por el LLM, los hidrata con la metadata completa desde la base de datos (posters, directores, rating unificado, votos) y los devuelve a la interfaz junto a los metadatos `provider_used` y `model_used` para auditoría y trazabilidad.
 
 ---
 
-## 3. Composición de los Embeddings
+## 3. Matriz de Modulación por Variedad (Slider Factor Sorpresa)
 
-Para que el modelo vectorial no se contamine con "ruido" estadístico, los vectores pre-calculados de cada título se construyen usando **únicamente metadatos conceptuales fuertes**:
-
-**✅ Datos Incluidos en el Vector Base:**
-- Título
-- Géneros
-- Sinopsis principal
-- Director o Creadores de TV (aporta peso estilístico)
-
-**❌ Datos Excluidos (y justificación):**
-- **Sinopsis de temporadas/episodios:** Diluyen el concepto de la serie con micro-tramas puntuales.
-- **Elenco principal:** Engaña al modelo. Si Adam Sandler está en el vector, sus comedias (*Click*) y dramas (*Uncut Gems*) quedarían pegados matemáticamente arruinando la precisión de género. (La búsqueda por actores se filtra vía cláusula SQL exacta).
-- **Reseñas:** Altamente subjetivas. Hablan de aspectos técnicos (CGI, ritmo, dirección de cámara) y no del concepto temático u ontológico de la obra.
+| Nivel UI | Clave Enum | Multiplicador Votos RAG | Filtro Rating RAG | Temp Reasoning | Reasoning Effort | Temp Standard | Enfoque Semántico |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Clásica** | `VERY_LOW` | 1.8x | $\ge 7.5$ obligatorio | 0.7 | low | 0.1 | Apuestas seguras, obras consagradas y premiadas. |
+| **Moderada** | `LOW` | 1.4x | Sin corte duro | 0.8 | low | 0.3 | Obras consolidadas con sólida reputación crítica. |
+| **Balanceada** | `MEDIUM` | 1.0x | Sin corte duro | 1.0 | medium | 0.5 | Equilibrio entre títulos célebres y afines interesantes. |
+| **Exploratoria**| `HIGH` | 0.6x | Sin corte duro | 1.1 | medium | 0.7 | Búsqueda amplia más allá de lo evidente; propuestas indie. |
+| **Creativa** | `VERY_HIGH` | 0.3x | Sin corte duro | 1.2 | high | 0.9 | Máximo factor sorpresa; joyas ocultas, cine de autor y culto. |
 
 ---
 
-## 4. Manejo de Idioma y Ambigüedad
+## 4. Persistencia e Interacción con el Perfil de Usuario
 
-- **Barrera Multilingüe:** Los prompts en español no requieren traducción. El modelo `gemini-embedding-001` es nativamente multilingüe y mapea conceptos (ej. "películas de robos" y "heist movies") al mismo espacio vectorial con distancia nula.
-- **Ambigüedad y Conversación (Clarification Needed):** Si el usuario ingresa un prompt extremadamente vago (ej. *"recomiéndame algo bueno"*), el LLM detecta la falta de intención específica y devuelve `status="clarification_needed"` con preguntas interactivas y sugerencias contrastantes (ej. *"¿Prefieres acción trepidante o un drama para reflexionar?"*) para iniciar un flujo conversacional guiado.
+- **Columna en Base de Datos:** Campo `preferencia_variedad_ia` en la tabla `usuarios` (Alembic `0007_user_variety_preference.py`).
+- **Configuración Global por Entorno:** `AI_RECOMMENDER_DEFAULT_VARIETY=MEDIUM` en archivos `.env` y Render para usuarios invitados o sin preferencia explícita.
+- **Interfaz de Usuario:**
+  - **Ajustes (`SettingsPage.tsx`):** Slider continuo de 5 puntos con guías fijas (*Clásica* en el extremo izquierdo, *Balanceada (Recomendado)* fija en el centro, y *Creativa* en el extremo derecho) y tarjeta descriptiva dinámica.
+  - **Recomendador (`RecommendationsPage.tsx`):** Selector rápido en barra superior con badge visual en las tarjetas de recomendación indicando el nivel activo.
+- **Interacción con Historial:**
+  - **Exclusión Automática:** Por defecto, los 49+ títulos vistos se excluyen del pool de candidatos para priorizar descubrimiento.
+  - **Inclusión Mixta (`allow_rewatch`):** Si el prompt contiene frases como *"puedes incluir vistas"*, combina armónicamente obras no vistas para descubrir con obras vistas para revivir.
+  - **Exclusivo de Vistas (`only_watched`):** Si el prompt contiene frases como *"solo de las que ya vi"*, filtra candidatos exclusivamente entre sus obras vistas.
 
 ---
 
 ## 5. Costos, Cuotas y Operatoria de Infraestructura
 
-- **Motor Vectorial:** Extensión nativa `pgvector` sobre Neon Serverless Postgres (`CREATE EXTENSION vector`), con índice HNSW (`vector_cosine_ops`) sobre 3.864 títulos.
+- **Motor Vectorial:** Extensión nativa `pgvector` sobre Neon Serverless Postgres (`CREATE EXTENSION vector`), con índice HNSW (`vector_cosine_ops`) sobre 3.945 títulos.
 - **Cuota de Embeddings:**
   - Google AI Studio Free Tier impone un límite de **1.000 embeddings/día por clave** y **15 requests/minuto**.
   - Los scripts de sincronización (`sync_embeddings.py`) implementan una cadencia de 4.0 segundos y enfriamiento automático de 20s para no disparar errores 429.
-  - Las claves que agotan su cuota diaria (`PerDay`) son desactivadas dinámicamente de la rotación activa para permitir que las claves secundarias continúen.
 - **Desacoplamiento para Desarrollo Local:**
   - La base de datos local SQLite opera 100% desacoplada: tanto el recomendador como los jobs diarios de TMDB ignoran las operaciones vectoriales cuando detectan `sqlite`, permitiendo trabajar offline sin gastar cuotas de APIs externas.
+
+---
+
+## 6. Cuotas de Uso por Proveedor, Claves y Capacidad Diaria Estimada
+
+CineTrack utiliza el tier gratuito (*Free Tier*) de los proveedores externos de IA, maximizando la disponibilidad y eliminando cualquier costo de operación mediante una arquitectura multiclave y una cascada de tolerancia a fallos.
+
+### 6.1. Límites Operativos por Proveedor y API Key
+
+| Proveedor | Modelo(s) | Claves Configuradas | Requests por Minuto (RPM) por clave | Requests por Día (RPD) por clave | Límite Tokens por Minuto (TPM) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Google AI Studio** | `gemini-3.6-flash`, `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-flash-lite-latest` | 2 claves (`GEMINI_API_KEY`) | 15 RPM | 1.500 RPD *(~20-50 RPD en previews rate-limitadas)* | 1.000.000 TPM |
+| **Groq Cloud** | `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b` | 2 claves (`GROQ_API_KEY`) | 30 RPM | 1.000 a 14.400 RPD *(1.000 RPD en modelos de razonamiento de 120b)* | 7.000 a 100.000 TPM |
+
+### 6.2. Estrategia de Rotación Multiclave y Mitigación de Errores
+
+1. **Rotación Secuencial Exhaustiva:**
+   Tanto `GEMINI_API_KEY` como `GROQ_API_KEY` admiten listas separadas por comas. El despachador (`ai_recommender_service.py`) itera todas las claves disponibles para el modelo activo antes de intentar el siguiente modelo en la jerarquía:
+   $$\text{Modelo } M \longrightarrow \text{Key}_1 \xrightarrow{429/503} \text{Key}_2 \xrightarrow{429/503} \text{Siguiente Modelo}$$
+2. **Fallo Rápido (Fail-Fast):**
+   Ante un código HTTP 429 (*Rate Limit Exceeded*) o 503 (*Service Unavailable*), no se introducen retardos bloqueantes (`sleep`); el recomendador conmuta instantáneamente a la siguiente clave o al siguiente modelo en menos de **300 ms**.
+3. **Desacople de Embeddings vs Chat:**
+   La cuota de embeddings (`gemini-embedding-001`, 1.000 requests/día) solo se consume una vez por título en la ingesta o sincronización diaria. En tiempo de recomendación del usuario, solo se genera **1 embedding de 768 float por consulta**, protegiendo la cuota global.
+
+### 6.3. Estimación de Capacidad Diaria Total
+
+La capacidad diaria de recomendaciones antes de que el sistema agote los proveedores de nube y recaiga en el Fallback Heurístico Local determinístico se calcula como la suma de las cuotas efectivas de los proveedores configurados:
+
+$$\text{Capacidad Diaria Total} = \sum (\text{RPD}_{\text{Gemini}} \times N_{\text{keys}}) + \sum (\text{RPD}_{\text{Groq}} \times N_{\text{keys}})$$
+
+- **Escenario Nominal (Disponibilidad Estándar de Previews):**
+  - Google Gemini (2 claves): $2 \times 1.500 = 3.000$ consultas/día.
+  - Groq Cloud (2 claves): $2 \times 1.000 = 2.000$ consultas/día (en razonamiento `gpt-oss-120b`).
+  - **Capacidad estimada:** **~5.000 recomendaciones con IA por día**.
+- **Escenario Restringido (Preview de Gemini bajo rate limit severo de 20-50 RPD):**
+  - Google Gemini (2 claves): $2 \times 50 = 100$ consultas/día.
+  - Groq Cloud (2 claves): $2 \times 1.000 = 2.000$ consultas/día.
+  - **Capacidad estimada:** **~2.100 recomendaciones con IA por día**.
+- **Escenario Extremo (Agotamiento Total o Caída Global de APIs):**
+  - Si ambas claves de Gemini y ambas claves de Groq agotan su cuota diaria, el **Nivel 3: Fallback Heurístico Local** asume el 100% de la carga sin interrupción.
+  - **Capacidad heurística:** **Ilimitada** (ejecución determinista en memoria/PostgreSQL con 0 dependencias externas).
+
