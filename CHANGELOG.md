@@ -18,6 +18,7 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
   - Modificación del modelo `Resena.texto` a campo nullable (`Mapped[str | None] = mapped_column(Text, nullable=True)`) con migración Alembic `0006_nullable_review_text.py`.
   - Validación de dominio en esquema Pydantic `ReviewCreate` y `ReviewUpdate`: el usuario debe proveer al menos `puntaje` o `texto` (no pueden estar ambos vacíos). Si no envía puntaje, el texto debe contener al menos 5 caracteres.
   - Adecuación en frontend (`ReviewsPage.tsx` y `TitleDetailPage.tsx`) para habilitar el guardado con rating directo y renderizar un mensaje de respaldo accesible (`t('noCommentWritten')`) en reseñas sin comentario.
+  - Incorporación de `CheckConstraint("(puntaje IS NOT NULL) OR (texto IS NOT NULL)", name="chk_resena_puntaje_o_texto")` a nivel de base de datos en modelo y migración Alembic `0006`, blindando la integridad referencial frente a filas huérfanas sin calificación ni comentario.
   - Cobertura de tests ampliada a 106 pruebas en backend (`test_review_score_only_without_text`).
 
 ## [v1.6.2] - 2026-09-26

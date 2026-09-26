@@ -28,4 +28,5 @@ class Resena(Base):
 
     __table_args__ = (
         CheckConstraint("(usuario_id IS NOT NULL) OR (autor_tmdb IS NOT NULL)", name="chk_resena_autor_presente"),
+        CheckConstraint("(puntaje IS NOT NULL) OR (texto IS NOT NULL)", name="chk_resena_puntaje_o_texto"),
     )
