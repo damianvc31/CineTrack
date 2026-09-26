@@ -2,6 +2,19 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.7.1] - 2026-09-26
+### Corregido — Bloqueo de Marcado como Visto para Títulos No Estrenados
+- **Ocultamiento del Botón de Visto (👁) en Títulos No Estrenados:**
+  - En `TitleCard.tsx`: Se oculta el botón del ojo para películas no estrenadas (fecha futura o status de producción/planificación) y para series que aún no cuentan con episodios emitidos a la fecha, preservando los botones de Favorito (♥) y Lista de Seguimiento (🔖).
+  - En `TitleDetailPage.tsx`: Se retira el botón de "Vista / No vista" en la botonera principal para títulos no estrenados, y se condiciona el botón "Marcar Temporada Completa" para que solo aparezca si la temporada tiene al menos un episodio emitido a la fecha actual.
+  - Utilidad centralizada `frontend/src/utils/releaseUtils.ts` (`isTitleUnreleased`) para evaluación consistente y unificada en toda la aplicación.
+- **Blindaje e Invariante de Dominio en Backend (`state_service.py`):**
+  - Validación defensiva en `toggle_watched`: rechaza con `HTTP 400 Bad Request` cualquier intento de marcar como vista una película no estrenada (`"No se puede marcar como vista una película no estrenada."`) o una serie sin episodios emitidos a la fecha (`"No se puede marcar como vista una serie que aún no tiene episodios estrenados."`).
+  - Exposición de campos `status_tmdb` y `proximo_episodio_fecha` en `TitleCardResponse` para que el catálogo provea la metadata de estreno directamente en las tarjetas.
+- **Suite de Pruebas Ampliada:**
+  - 2 nuevos tests unitarios en backend (`tests/test_state_machine.py`) alcanzando 111 tests pasando en verde (`pytest`).
+  - 5 nuevos tests unitarios en frontend (`frontend/src/utils/releaseUtils.test.ts`) pasando en verde (`vitest`).
+
 ## [v1.7.0] - 2026-09-26
 ### Agregado y Mejorado — Fase 11 (Factor Sorpresa y Variedad en Recomendador IA)
 - **Enum Normalizado y Configuración de Modelos (`VarietyLevel`):**

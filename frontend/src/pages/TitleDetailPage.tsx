@@ -35,6 +35,7 @@ import { useToast } from '@/context/ToastContext'
 import posterFallback from '@/assets/placeholders/poster-empty.svg'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { getLanguageName } from '@/utils/countryUtils'
+import { isTitleUnreleased } from '@/utils/releaseUtils'
 
 interface OutletContextType {
   openAuth: (mode?: 'login' | 'register') => void
@@ -77,8 +78,10 @@ export const TitleDetailPage: React.FC = () => {
   const { openAuth } = useOutletContext<OutletContextType>()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
 
   const [title, setTitle] = useState<TitleDetail | null>(null)
+  const isUnreleased = isTitleUnreleased(title)
   const [reviews, setReviews] = useState<ReviewItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1112,46 +1115,48 @@ export const TitleDetailPage: React.FC = () => {
                       <span>{language === 'es' ? 'Favorito' : 'Favorite'}</span>
                     </button>
 
-                    {/* 2. Watched button (muestra Not Watched en reposo si no está vista, Vista al posar el mouse) */}
-                    <button
-                      onClick={handleWatchedToggle}
-                      onMouseEnter={() => setIsWatchedHovered(true)}
-                      onMouseLeave={() => {
-                        setIsWatchedHovered(false)
-                        setJustToggledWatched(false)
-                      }}
-                      title={
-                        isWatched
-                          ? (language === 'es' ? 'Marcar como no vista' : 'Mark as unwatched')
-                          : (language === 'es' ? 'Marcar como vista' : 'Mark as watched')
-                      }
-                      className={`flex items-center justify-center gap-1.5 min-w-[124px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                        showingWatched
-                          ? 'bg-emerald-900/40 border-emerald-500 text-emerald-300 shadow-md'
-                          : isWatched && effectiveHoverWatched
-                          ? 'bg-[#18261e] border-emerald-600/70 text-emerald-300 shadow-sm'
-                          : effectiveHoverWatched
-                          ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300'
-                          : 'bg-[#141414] border-[#262626] text-gray-400 hover:border-emerald-500/40'
-                      }`}
-                    >
-                      {showingWatched ? (
-                        <Eye className="w-4 h-4 text-emerald-300 transition-colors" />
-                      ) : (
-                        <EyeOff
-                          className={`w-4 h-4 transition-colors ${
-                            isWatched && effectiveHoverWatched
-                              ? 'text-emerald-400'
-                              : 'text-gray-400'
-                          }`}
-                        />
-                      )}
-                      <span>
-                        {showingWatched
-                          ? (language === 'es' ? 'Vista' : 'Watched')
-                          : (language === 'es' ? 'No vista' : 'Not watched')}
-                      </span>
-                    </button>
+                    {/* 2. Watched button (oculto para títulos no estrenados) */}
+                    {!isUnreleased && (
+                      <button
+                        onClick={handleWatchedToggle}
+                        onMouseEnter={() => setIsWatchedHovered(true)}
+                        onMouseLeave={() => {
+                          setIsWatchedHovered(false)
+                          setJustToggledWatched(false)
+                        }}
+                        title={
+                          isWatched
+                            ? (language === 'es' ? 'Marcar como no vista' : 'Mark as unwatched')
+                            : (language === 'es' ? 'Marcar como vista' : 'Mark as watched')
+                        }
+                        className={`flex items-center justify-center gap-1.5 min-w-[124px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                          showingWatched
+                            ? 'bg-emerald-900/40 border-emerald-500 text-emerald-300 shadow-md'
+                            : isWatched && effectiveHoverWatched
+                            ? 'bg-[#18261e] border-emerald-600/70 text-emerald-300 shadow-sm'
+                            : effectiveHoverWatched
+                            ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300'
+                            : 'bg-[#141414] border-[#262626] text-gray-400 hover:border-emerald-500/40'
+                        }`}
+                      >
+                        {showingWatched ? (
+                          <Eye className="w-4 h-4 text-emerald-300 transition-colors" />
+                        ) : (
+                          <EyeOff
+                            className={`w-4 h-4 transition-colors ${
+                              isWatched && effectiveHoverWatched
+                                ? 'text-emerald-400'
+                                : 'text-gray-400'
+                            }`}
+                          />
+                        )}
+                        <span>
+                          {showingWatched
+                            ? (language === 'es' ? 'Vista' : 'Watched')
+                            : (language === 'es' ? 'No vista' : 'Not watched')}
+                        </span>
+                      </button>
+                    )}
 
                 {/* 3 & 4. Series Logic: Following / Drop Series vs Watchlist */}
                 {title.tipo === 'tv' ? (
@@ -1485,22 +1490,24 @@ export const TitleDetailPage: React.FC = () => {
                     )}
                   </button>
 
-                  <button
-                    onClick={() => handleToggleSeasonWatched(currentSeasonData.numero)}
-                    disabled={seasonWatchLoading}
-                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      currentSeasonData.temporada_vista
-                        ? 'bg-emerald-950/80 border-emerald-500/70 text-emerald-300'
-                        : 'bg-gray-800/80 border-gray-700 text-gray-300 hover:bg-emerald-950/40 hover:border-emerald-600 hover:text-emerald-300'
-                    }`}
-                  >
-                    <CheckCheck className="w-4 h-4" />
-                    <span>
-                      {currentSeasonData.temporada_vista
-                        ? (language === 'es' ? 'Temporada Vista' : 'Season Watched')
-                        : (language === 'es' ? 'Marcar Temporada Completa' : 'Mark Entire Season')}
-                    </span>
-                  </button>
+                  {currentSeasonData.episodios?.some((e) => e.fecha_estreno && e.fecha_estreno <= todayStr) && (
+                    <button
+                      onClick={() => handleToggleSeasonWatched(currentSeasonData.numero)}
+                      disabled={seasonWatchLoading}
+                      className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                        currentSeasonData.temporada_vista
+                          ? 'bg-emerald-950/80 border-emerald-500/70 text-emerald-300'
+                          : 'bg-gray-800/80 border-gray-700 text-gray-300 hover:bg-emerald-950/40 hover:border-emerald-600 hover:text-emerald-300'
+                      }`}
+                    >
+                      <CheckCheck className="w-4 h-4" />
+                      <span>
+                        {currentSeasonData.temporada_vista
+                          ? (language === 'es' ? 'Temporada Vista' : 'Season Watched')
+                          : (language === 'es' ? 'Marcar Temporada Completa' : 'Mark Entire Season')}
+                      </span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
