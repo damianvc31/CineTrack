@@ -18,15 +18,15 @@ logger = logging.getLogger(__name__)
 # Clasificación de modelos según capacidades de inferencia y razonamiento
 REASONING_MODELS = {
     "openai/gpt-oss-120b",
-    "openai/gpt-oss-20b"
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.8-27b"
 }
 
 STANDARD_MODELS = {
     "gemini-3.6-flash",
     "gemini-3.8-flash",
     "gemini-3.5-flash-lite",
-    "gemini-flash-lite-latest",
-    "meta-llama/llama-3.3-70b-specdec"
+    "gemini-flash-lite-latest"
 }
 
 # Mapeo de variedad/factor sorpresa a parámetros LLM
@@ -123,7 +123,8 @@ def _build_user_message(
     user_context: Optional[Dict[str, Any]],
     candidates: List[Dict[str, Any]],
     language: Optional[str] = None,
-    clarification_context: Optional[Dict[str, Any]] = None
+    clarification_context: Optional[Dict[str, Any]] = None,
+    variety_level: Optional[VarietyLevel | str] = None
 ) -> str:
     """Construye el payload de contexto y candidatos que se envía al modelo."""
     lang = language or _detect_language(prompt)
@@ -154,6 +155,47 @@ Perfil del usuario:
         candidates_summary.append(
             f"- ID {c['id']}: \"{c['nombre']}\" ({c['tipo']}, {c.get('anio') or 'N/A'}{watched_text}){pais_text}{idioma_text} - Géneros: {', '.join(c.get('generos', []))} | Puntaje: {c.get('vote_average', 0.0)}★ ({c.get('vote_count', 0)} votos){director_text}{actors_text} | Sinopsis: {c.get('sinopsis_corta', '')}{snippet_text}"
         )
+
+    # Directivas semánticas explícitas de variedad para orientar la selección del modelo (especialmente modelos de razonamiento)
+    norm_variety = variety_level
+    if isinstance(norm_variety, str):
+        try:
+            norm_variety = VarietyLevel(norm_variety)
+        except Exception:
+            norm_variety = VarietyLevel.MEDIUM
+    elif not norm_variety:
+        norm_variety = VarietyLevel.MEDIUM
+
+    variety_directives = {
+        VarietyLevel.VERY_LOW: (
+            "\nDIRECTIVA DE SELECCIÓN DE VARIEDAD (CLÁSICA / CONSERVADORA):\n"
+            "- El usuario exige recomendaciones 'seguras', prestigiosas y consagradas.\n"
+            "- Elige EXCLUSIVAMENTE los títulos más aclamados, premiados y universalmente reconocidos del pool de candidatos.\n"
+            "- Evita obras experimentales, títulos de culto poco conocidos o propuestas de nicho divisivas."
+        ),
+        VarietyLevel.LOW: (
+            "\nDIRECTIVA DE SELECCIÓN DE VARIEDAD (MODERADA):\n"
+            "- Prioriza títulos consolidados y con sólida reputación crítica dentro del pool.\n"
+            "- Mantén la recomendación centrada en lo más representativo del género o temática."
+        ),
+        VarietyLevel.MEDIUM: (
+            "\nDIRECTIVA DE SELECCIÓN DE VARIEDAD (EQUILIBRADA):\n"
+            "- Proporciona una selección balanceada y variada.\n"
+            "- Combina obras reconocidas con alternativas interesantes y afines a la temática."
+        ),
+        VarietyLevel.HIGH: (
+            "\nDIRECTIVA DE SELECCIÓN DE VARIEDAD (EXPLORATORIA / AMPLIA):\n"
+            "- El usuario desea expandir horizontes más allá de lo evidente.\n"
+            "- Explora títulos menos trillados, propuestas independientes o alternativas creativas del pool."
+        ),
+        VarietyLevel.VERY_HIGH: (
+            "\nDIRECTIVA DE SELECCIÓN DE VARIEDAD (CREATIVA / MÁXIMO FACTOR SORPRESA):\n"
+            "- El usuario busca activamente DESCUBRIMIENTOS AUDACES, JOYAS OCULTAS, CINE DE AUTOR, CULTO O PROPUESTAS INTERNACIONALES SINGULARES.\n"
+            "- NO elijas los títulos más obvios, comerciales o ultra-famosos del pool si dispones de alternativas fascinantes y menos conocidas que encajen con la búsqueda.\n"
+            "- Sorprende al usuario con recomendaciones memorables y fuera del radar masivo."
+        )
+    }
+    variety_instruction = variety_directives.get(norm_variety, variety_directives[VarietyLevel.MEDIUM])
 
     instructions_extra = ""
     if user_context and user_context.get("only_watched"):
@@ -188,6 +230,7 @@ El usuario está respondiendo a la repregunta previa del asistente. Si su respue
 
 IDIOMA OBLIGATORIO DE RESPUESTA: {lang_name} ({lang.upper()})
 DIRECTIVA CRÍTICA: Debes redactar el mensaje de apertura ('message') y ABSOLUTAMENTE TODAS las justificaciones ('reason') en {lang_name}. NO uses otro idioma bajo ninguna circunstancia.
+{variety_instruction}
 
 CONTEXTO DEL USUARIO:
 {context_text}{instructions_extra}
@@ -779,7 +822,8 @@ class AIRecommenderService:
             user_context,
             candidates,
             language=language,
-            clarification_context=clarification_context
+            clarification_context=clarification_context,
+            variety_level=active_variety
         )
         candidate_ids = {c["id"] for c in candidates}
 
