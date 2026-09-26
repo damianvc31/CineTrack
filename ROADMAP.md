@@ -87,7 +87,7 @@
   - Rollback transparente con notificaciones flotantes amigables (`ToastContext`) ante errores de red.
   - Suite de 81 tests de backend y pruebas de frontend en verde.
 
-### Fase 10: Robustecimiento del Pipeline de Sincronización TMDB y Rendimiento WAN (v1.2.1 - v1.2.2)
+### Fase 10: Robustecimiento del Pipeline TMDB, Ciclo de Vida de Estrenos y Cierre Pre-Entrega (v1.2.1 - v1.6.3)
 - [x] **Paginación Exhaustiva de `/changes` y Seguimiento Activo de Series (v1.2.1):**
   - Paginación dinámica hasta `total_pages` eliminando la pérdida silenciosa de modificaciones globales.
   - Tracking directo de series `Returning Series`, `In Production` y `Planned` desduplicadas de changes, garantizando la actualización determinística de estados y fechas de emisión.

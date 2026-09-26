@@ -113,3 +113,45 @@ Con los candidatos preseleccionados, se invoca al LLM para seleccionar entre 2 y
   - Los scripts de sincronización (`sync_embeddings.py`) implementan una cadencia de 4.0 segundos y enfriamiento automático de 20s para no disparar errores 429.
 - **Desacoplamiento para Desarrollo Local:**
   - La base de datos local SQLite opera 100% desacoplada: tanto el recomendador como los jobs diarios de TMDB ignoran las operaciones vectoriales cuando detectan `sqlite`, permitiendo trabajar offline sin gastar cuotas de APIs externas.
+
+---
+
+## 6. Cuotas de Uso por Proveedor, Claves y Capacidad Diaria Estimada
+
+CineTrack utiliza el tier gratuito (*Free Tier*) de los proveedores externos de IA, maximizando la disponibilidad y eliminando cualquier costo de operación mediante una arquitectura multiclave y una cascada de tolerancia a fallos.
+
+### 6.1. Límites Operativos por Proveedor y API Key
+
+| Proveedor | Modelo(s) | Claves Configuradas | Requests por Minuto (RPM) por clave | Requests por Día (RPD) por clave | Límite Tokens por Minuto (TPM) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Google AI Studio** | `gemini-3.6-flash`, `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-flash-lite-latest` | 2 claves (`GEMINI_API_KEY`) | 15 RPM | 1.500 RPD *(~20-50 RPD en previews rate-limitadas)* | 1.000.000 TPM |
+| **Groq Cloud** | `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b` | 2 claves (`GROQ_API_KEY`) | 30 RPM | 1.000 a 14.400 RPD *(1.000 RPD en modelos de razonamiento de 120b)* | 7.000 a 100.000 TPM |
+
+### 6.2. Estrategia de Rotación Multiclave y Mitigación de Errores
+
+1. **Rotación Secuencial Exhaustiva:**
+   Tanto `GEMINI_API_KEY` como `GROQ_API_KEY` admiten listas separadas por comas. El despachador (`ai_recommender_service.py`) itera todas las claves disponibles para el modelo activo antes de intentar el siguiente modelo en la jerarquía:
+   $$\text{Modelo } M \longrightarrow \text{Key}_1 \xrightarrow{429/503} \text{Key}_2 \xrightarrow{429/503} \text{Siguiente Modelo}$$
+2. **Fallo Rápido (Fail-Fast):**
+   Ante un código HTTP 429 (*Rate Limit Exceeded*) o 503 (*Service Unavailable*), no se introducen retardos bloqueantes (`sleep`); el recomendador conmuta instantáneamente a la siguiente clave o al siguiente modelo en menos de **300 ms**.
+3. **Desacople de Embeddings vs Chat:**
+   La cuota de embeddings (`gemini-embedding-001`, 1.000 requests/día) solo se consume una vez por título en la ingesta o sincronización diaria. En tiempo de recomendación del usuario, solo se genera **1 embedding de 768 float por consulta**, protegiendo la cuota global.
+
+### 6.3. Estimación de Capacidad Diaria Total
+
+La capacidad diaria de recomendaciones antes de que el sistema agote los proveedores de nube y recaiga en el Fallback Heurístico Local determinístico se calcula como la suma de las cuotas efectivas de los proveedores configurados:
+
+$$\text{Capacidad Diaria Total} = \sum (\text{RPD}_{\text{Gemini}} \times N_{\text{keys}}) + \sum (\text{RPD}_{\text{Groq}} \times N_{\text{keys}})$$
+
+- **Escenario Nominal (Disponibilidad Estándar de Previews):**
+  - Google Gemini (2 claves): $2 \times 1.500 = 3.000$ consultas/día.
+  - Groq Cloud (2 claves): $2 \times 1.000 = 2.000$ consultas/día (en razonamiento `gpt-oss-120b`).
+  - **Capacidad estimada:** **~5.000 recomendaciones con IA por día**.
+- **Escenario Restringido (Preview de Gemini bajo rate limit severo de 20-50 RPD):**
+  - Google Gemini (2 claves): $2 \times 50 = 100$ consultas/día.
+  - Groq Cloud (2 claves): $2 \times 1.000 = 2.000$ consultas/día.
+  - **Capacidad estimada:** **~2.100 recomendaciones con IA por día**.
+- **Escenario Extremo (Agotamiento Total o Caída Global de APIs):**
+  - Si ambas claves de Gemini y ambas claves de Groq agotan su cuota diaria, el **Nivel 3: Fallback Heurístico Local** asume el 100% de la carga sin interrupción.
+  - **Capacidad heurística:** **Ilimitada** (ejecución determinista en memoria/PostgreSQL con 0 dependencias externas).
+
