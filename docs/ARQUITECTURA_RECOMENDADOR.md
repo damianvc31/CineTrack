@@ -155,3 +155,12 @@ $$\text{Capacidad Diaria Total} = \sum (\text{RPD}_{\text{Gemini}} \times N_{\te
   - Si ambas claves de Gemini y ambas claves de Groq agotan su cuota diaria, el **Nivel 3: Fallback Heurístico Local** asume el 100% de la carga sin interrupción.
   - **Capacidad heurística:** **Ilimitada** (ejecución determinista en memoria/PostgreSQL con 0 dependencias externas).
 
+---
+
+## 7. Diagramas de Arquitectura y Flujo
+
+El flujo completo end-to-end (Frontend con slider de variedad, RAG multicapa, base de datos pgvector/SQLite, Reasoning Dispatcher y cascada multiclave) se encuentra documentado en:
+- **Diagrama Mermaid editable:** [`docs/UML/recomendador/arquitectura_recomendador_hibrido.mmd`](UML/recomendador/arquitectura_recomendador_hibrido.mmd)
+- **Infografía Vectorial SVG (Alta definición):** [`docs/diagrams/recomendador_hibrido_arquitectura.svg`](diagrams/recomendador_hibrido_arquitectura.svg)
+
+

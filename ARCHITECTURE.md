@@ -35,6 +35,8 @@ Se adopta **Single Table Inheritance** / Tabla Unificada para `titulos`:
 7. **`episodios_vistos`**: Historial atómico de episodios vistos por usuario y fecha.
 8. **`resenas`**: Reseñas y puntajes. Diseñado con autor polimórfico: `usuario_id` (FK nullable a `usuarios`) o `autor_tmdb` (texto) con identificador externo `tmdb_review_id` para deduplicación.
 
+> **Diagrama Entidad-Relación Consolidado:** El modelo relacional unificado en producción con todas las tablas, columnas, restricciones e índices pgvector se encuentra documentado en formato [docs/UML/modelo_datos/modelo_datos.mmd](docs/UML/modelo_datos/modelo_datos.mmd) y renderizado en alta definición en [docs/diagrams/modelo_datos.svg](docs/diagrams/modelo_datos.svg).
+
 ### 2.3. Desacoplamiento de Reglas de Negocio
 > *Las especificaciones funcionales y de dominio —incluyendo los criterios de curación de la Home, ventanas temporales, pools dinámicos, máquina de estados por episodios, fórmula de calificación unificada, políticas de ingesta inicial, sincronización diaria y reglas de créditos de elenco— están formalmente desacopladas en [docs/CATALOG_SPECS.md](docs/CATALOG_SPECS.md).*
 

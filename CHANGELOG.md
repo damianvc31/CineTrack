@@ -2,6 +2,17 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.7.2] - 2026-09-26
+### Documentación — Consolidación de Modelo de Datos y Diagramas Vectoriales Legibles
+- **Modelo de Datos Unificado:**
+  - Sustitución de diagramas disjuntos (mínima y superior) por un único modelo de datos relacional canónico (`docs/UML/modelo_datos/modelo_datos.mmd` e infografía vectorial en `docs/diagrams/modelo_datos.svg`) que refleja fielmente las 11 entidades, campos multi-país, `embedding vector(768)` HNSW, estados de catálogo TMDB y preferencia de variedad.
+- **Máquina de Estados de Usuario Actualizada:**
+  - Actualización de `maquina_estados_usuario.mmd` y `maquina_estados_usuario.svg` incorporando los guards de estreno para películas no estrenadas y series sin episodios emitidos a la fecha.
+- **Arquitectura del Recomendador Híbrido:**
+  - Actualización de `arquitectura_recomendador_hibrido.mmd` y `recomendador_hibrido_arquitectura.svg` incorporando el slider UX de 5 niveles, modulación RAG de votos, exención de entidades directas y Reasoning Dispatcher dinámico con tolerancia a fallos multiclave.
+- **Diseño Vectorial Nativo de Alta Definición:**
+  - Todos los diagramas de `docs/diagrams/` utilizan diseño infográfico SVG vectorial personalizado de alto contraste y legibilidad humana en modo oscuro.
+
 ## [v1.7.1] - 2026-09-26
 ### Corregido — Bloqueo de Marcado como Visto para Títulos No Estrenados
 - **Ocultamiento del Botón de Visto (👁) en Títulos No Estrenados:**

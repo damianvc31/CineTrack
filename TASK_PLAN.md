@@ -305,16 +305,41 @@
   - [x] Utilidad centralizada `releaseUtils.ts` (`isTitleUnreleased`) con suite de 5 tests unitarios en Vitest (7 tests frontend pasando).
   - [x] Blindaje e invariante de dominio en backend (`state_service.toggle_watched`) con HTTP 400 Bad Request y 2 tests unitarios en `test_state_machine.py` (111 tests backend pasando al 100%).
   - [x] Exposición de `status_tmdb` y `proximo_episodio_fecha` en `TitleCardResponse`.
+- [x] **Paso 11.10: Consolidación de Modelo de Datos y Diagramas Vectoriales de Alta Legibilidad:**
+  - [x] Unificación del modelo de datos de producción en un único diagrama canónico (`docs/UML/modelo_datos/modelo_datos.mmd` y `docs/diagrams/modelo_datos.svg`), retirando las versiones disjuntas mínimas/superiores.
+  - [x] Actualización de la máquina de estados de usuario (`docs/UML/estados/maquina_estados_usuario.mmd` y `docs/diagrams/maquina_estados_usuario.svg`) reflejando los guards de estreno en películas y series con 0 episodios emitidos.
+  - [x] Actualización del diagrama de arquitectura del recomendador (`docs/UML/recomendador/arquitectura_recomendador_hibrido.mmd` y `docs/diagrams/recomendador_hibrido_arquitectura.svg`) con el slider UX de 5 niveles, modulación RAG de votos, exención de entidades, guardrail de inanición y Reasoning Dispatcher con tolerancia a fallos multiclave.
+  - [x] Diseño infográfico en formato SVG vectorial nativo de alto contraste y legibilidad humana en modo oscuro.
 
 ---
 
-## Backlog / Versión Superior (Post-Entrega):
-- [ ] Carrusel y Filtro "Upcoming / Próximamente" en Home y Catálogo (sección destacada en Home y filtro en Catálogo con badges "Muy Pronto" y fechas confirmadas).
-- [ ] Purga selectiva de títulos en idiomas/alfabetos no legibles sin traducción.
-- [ ] Sistema de notificaciones in-app para estrenos y cambios de status en series.
-- [ ] Badge visual "Viendo Actualmente" (🔥).
-- [ ] Soporte multirregión para plataformas de streaming (JustWatch / TMDB Watch Providers).
-- [ ] Selector de idioma para títulos y sinopsis.
+## Próximas Fases y Backlog (Post-Entrega):
+
+### Próximas Fases Priorizadas:
+- [ ] **Fase 12: Sistema de Notificaciones In-App y Ciclo de Vida Reactivo de Series:**
+  - Panel de notificaciones en Header (campana) ante anuncios de renovación, cancelaciones y fechas de estreno.
+  - Reactivación automática de series en estado `vista` a `siguiendo` cuando se estrene una nueva temporada en TMDB.
+  - Preferencias de alertas configurables en `/settings`.
+- [ ] **Fase 13: Traducción de Contenidos y Selector de Idioma (I18n de Catálogo):**
+  - Ingesta de traducciones de títulos y sinopsis de películas y series desde TMDB.
+  - Traducción de nombres de temporada (si difieren) y nombres/sinopsis de episodios.
+  - Prioridad para Español Latinoamericano (`es-MX` / `es-419`) y Español España (`es-ES`).
+  - Sistema de fallback en cascada: variante regional $\rightarrow$ español alternativo $\rightarrow$ inglés (`en-US`) $\rightarrow$ idioma original.
+  - Selector de idioma preferido de contenidos en `/settings`.
+- [ ] **Fase 14: Plataformas de Streaming y Disponibilidad Multirregión (Watch Providers):**
+  - Integración de TMDB Watch Providers / JustWatch con tablas `plataformas` y `disponibilidad_streaming`.
+  - Detección de región por perfil o IP y filtros por servicios de streaming activos en Catálogo.
+
+### Backlog (Pendientes sin Priorizar):
+- [ ] Carrusel "Upcoming / Próximamente" en Home para obras con estreno confirmado en los próximos 30-90 días.
+- [ ] Ampliación del modelo de datos: reparto de series por temporada, título específico de temporada y sinopsis enriquecida de episodios.
+- [ ] Herramientas avanzadas en Biblioteca (`/library`): ordenamiento multidimensional, filtros por tipo/género, buscador in-place y paginación para colecciones grandes.
+- [ ] Autenticación ampliada: campo `email` al registrarse y login social con Google OAuth.
+- [ ] Badge visual "Viendo Actualmente" (🔥) con ventana de días configurable en `/settings`.
+- [ ] Diálogo de confirmación al desmarcar episodios intermedios de una serie.
+- [ ] PWA offline caching con Service Workers avanzados para fichas y biblioteca.
+- [ ] Compartir listas y perfiles públicos mediante OpenGraph cards.
+
 
 
 

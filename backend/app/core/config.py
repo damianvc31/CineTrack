@@ -18,7 +18,7 @@ class VarietyLevel(str, Enum):
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "CineTrack API"
-    VERSION: str = "1.7.1"
+    VERSION: str = "1.7.2"
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
     

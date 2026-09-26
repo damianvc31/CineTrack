@@ -1,184 +1,69 @@
 # ROADMAP.md — CineTrack
 
-## Próximas Fases (Hitos Planeados)
-
-### Versión Mínima (Hito Académico)
-- [x] **Fase 1: Arquitectura y Scaffolding Inicial**
-  - Evaluación crítica de arquitectura aprobada.
-  - Estructura base de backend (`FastAPI`) y frontend (`Vite + React + TS`).
-  - Configuración de runners de tests (`pytest`, `vitest`) con smoke tests en verde.
-- [x] **Fase 2: Persistencia y Modelo Relacional**
-  - Modelos SQLAlchemy 2.0 (Usuarios, Títulos, Temporadas, Episodios, Estados, Reseñas).
-  - Configuración de Alembic y migración inicial `0001_initial_schema.py`.
-  - Suite de tests de integridad y relaciones en verde (7 tests).
-- [x] **Fase 3: Autenticación y Motor de Estados de Título**
-  - Registro y login con hash `bcrypt` y tokens JWT con `AUTH_SECRET_KEY`.
-  - Lógica de estados: Favorito independiente, transiciones Watchlist/Siguiendo/Vista/Abandonar.
-  - Suite de tests unitarios exhaustivos para auth y máquina de estados en verde (16 tests totales).
-- [x] **Fase 4: Integración TMDB y Sincronización**
-  - Cliente asíncrono con `httpx` (Bearer auth, semáforo y reintentos).
-  - Ingesta inicial parametrizable (populares y top-rated con switch de prioridad).
-  - Sincronización periódica/diaria e importación manual por JSON con plantillas y búsqueda inteligente.
-  - Cálculo de percentiles de popularidad (`PERCENT_RANK`).
-  - Mocks y suite automatizada de tests de integración con cero consumo de cuota (23 tests pasando).
-- [x] **Fase 5: Frontend UI y Motor Integral de Reseñas (v0.6.0 - v0.7.0)**
-  - Home en 3 columnas (Asistente IA, catálogo curado central y panel personal del usuario).
-  - Look & feel cinematográfico dorado/carbón (`#0d0d0d`, `#141414`, `#262626`, `#f59e0b`).
-  - Explorador y catálogo con filtros multidimensionales (`/catalog`).
-  - Detalle de título (`/titles/:id`) con temporadas, episodios y selector interactivo de estados.
-  - Soporte de banderas de país, nombres completos e idiomas originales con `Intl.DisplayNames`.
-  - Motor Integral de Reseñas: 1 reseña por usuario con edición y borrado in-place, validación de saltos de 0.5, calificación opcional, visualización unificada (TMDB + local) y pantalla dedicada `/reviews`.
-  - Mi Biblioteca (`/library`) y Perfil de usuario (`/profile`).
-  - Suite de 49 tests en backend y pruebas en Vitest (100% pasando).
-- [x] **Fase 3 & 5 Complementarias: Progreso, Perfil, Fotos de Actores, Reseñas y Localización (v0.8.0 - v0.8.1)**
-  - Barra segmentada por temporada en Siguiendo (`SeasonProgressBar`) calculada sobre episodios estrenados y regla de regresión a la temporada incompleta más temprana.
-  - Orden cronológico estricto (`fecha_favorito DESC`, `fecha_estado DESC`) en biblioteca y actualización de `fecha_estado` en episodios.
-  - Perfil de usuario completo: edición con lápiz (bio, país, ciudad, avatar), métricas clave (total horas, promedio semanal cine, temporadas completadas), Top 5 con percentil normalizado, y gráfico Donut SVG de géneros con animaciones y tooltips interactivos.
-  - Encuadre interactivo de avatar desde la PC: zoom-out/in (0.2x a 3.0x), arrastre, canvas 256×256 px, persistencia binaria con cache-busting, prevención de *tainted canvas* vía conversión a Data URL local, botón para restablecer a default y soporte para URLs externas sin validaciones bloqueantes.
-  - Ingesta de fotos oficiales de actores y sección Top Cast en detalle de títulos, ubicada por encima de las temporadas en series.
-  - Restricción de reseñas para títulos no vistos (con preservación de edición para reseñas existentes).
-  - Localización reactiva completa al español en toda la interfaz (menú, catálogo "Explore", detalle de títulos, temporadas, reseñas y configuración).
-  - Pantalla dedicada de Configuración (`/settings`): cambio de contraseña seguro y selector de idioma de interfaz.
-  - Suite de 54 tests en backend y pruebas en Vitest (100% pasando).
-- [x] **Fase 6: Recomendador Inteligente con IA Embebida (v0.9.0 - v0.9.4)**
-  - Integración híbrida de IA: Google Gemini 2.0/3.6 Flash primario con fallback a Groq API y motor heurístico local determinista.
-  - Cascada jerárquica multi-modelo de 2 niveles entre proveedores priorizando modelos insignia (v0.9.3).
-  - Optimización de cuota con reducción del 70% en el payload de candidatos (v0.9.3).
-  - Afinación semántica bilingüe (`THEME_EXPANSION_MAP`) y búsqueda temática cruzada en SQL (v0.9.2).
-  - Filtro de rango temporal en estadísticas de perfil, tarjetas de seguimiento con póster vertical 2:3, avatares de actores con iniciales completas, validación determinista de entradas ininteligibles, cancelación instantánea de peticiones en vuelo y flujo de repregunta interactivo (v0.9.4).
-  - Endpoint `POST /api/v1/recommendations` con hidratación completa de `TitleCard`.
-  - Pantalla dedicada `/recommendations` (`RecommendationsPage.tsx`), filtros temáticos y suite de 71 tests en backend.
-- [x] **Fase 7: Despliegue a Producción y Entrega Final (v1.0.0 - v1.0.2)**
-  - Arquitectura PaaS cloud de costo cero (Render Web Service + Vercel Edge + Neon PostgreSQL 16 Serverless).
-  - Script de migración masiva y volcado del catálogo enriquecido (`export_to_postgres.py`) con 634k+ registros verificados.
-  - Ingesta masiva y sincronización de 25.116 fotos oficiales de actores (`populate_actor_photos.py`).
-  - Sincronización diaria automatizada mediante GitHub Actions (`.github/workflows/daily_sync.yml`).
-  - Mantenimiento mensual programado de fotos de elenco (`.github/workflows/monthly_actor_photos.yml`).
-  - Verificación funcional integral, normalizaciones de conexión y documentación de entrega final.
-
-### Fase 8: Robustecimiento y Calidad del Recomendador con IA (RAG Híbrido, Fuzzy Matching y Procedencia)
-- [x] **Corrección Integral del Validador Previo de Entrada:**
-  - Validador `is_unintelligible_prompt` rediseñado para erradicar falsos positivos (admite expresiones naturales como "80s", "sci-fi", "psychological", números y oraciones extensas en español e inglés, bloqueando exclusivamente teclado machacado real).
-- [x] **Manejo de Calidad de Recomendación y Ambigüedad (Opción C):**
-  - Ante prompts claros, recuperación semántica de alta fidelidad vía embeddings y justificaciones sólidas.
-  - Ante prompts ambiguos o vagos ("recomiéndame algo bueno"), respuesta amigable con 2 títulos contrastantes y sugerencias temáticas en chips para guiar al usuario.
-- [x] **Búsqueda Semántica Vectorial con Embeddings (RAG Híbrido):**
-  - Integración de `pgvector` en PostgreSQL Neon con columna `embedding VECTOR(768)` e índice HNSW (`vector_cosine_ops`).
-  - Generación de vectores con Google AI Studio (`gemini-embedding-001`), filtrado negativo estricto ("no anime", "sin comedia") y fallback automático a búsqueda léxica.
-- [x] **Jerarquización de Entidades y Fuzzy Matching (`pg_trgm`):**
-  - Tolerancia difusa a errores ortográficos en nombres propios de actores y directores (ej: "brad pit", "ian mckelen", "scorsece").
-- [x] **Procedencia Geográfica Dual-Track e Idioma Original:**
-  - Diferenciación sintáctica entre país de producción estricto (`Titulo.pais`) vs. ambientación/locación (setting/lore con inclusión de títulos nacionales y extranjeros fundamentados).
-  - Filtro estricto por idioma original (`Titulo.idioma_original`).
-- [x] **Inclusión Mixta de Biblioteca y Rewatch Avanzado:**
-  - Balance entre inclusión de obras vistas para revivir y no vistas para descubrir.
-- [x] **Batería de Pruebas y Cobertura (v1.1.0):**
-  - Suite de 20 casos de prueba de borde con 100% de éxito, 79 tests de backend (`pytest`) y 2 tests de frontend (`vitest`) en verde.
-
-### Fase 9: Optimización de Rendimiento, Latencia Cross-Web y UI Reactiva (v1.2.0)
-- [x] **Motor de Caché Asíncrono en Memoria (FastAPI):**
-  - Implementación de `MemoryCache` con TTL configurable y purga por prefijos sin dependencias externas pesadas ni costos cloud.
-  - Caché de pools candidatos en Home (Trending, Classics, Top Rated, New Releases, By Genre) manteniendo la rotación dinámica aleatoria con 0 queries a PostgreSQL.
-  - Hidratación atómica de estados de usuario autenticado en una sola consulta SQL optimizada.
-  - Caché de conteos y metadatos en Catálogo y optimización de carga diferida de episodios en Biblioteca de usuario.
-- [x] **React Query & Optimistic UI (0 ms de latencia percibida):**
-  - Integración de `@tanstack/react-query` en toda la aplicación con políticas de retención global.
-  - Mutaciones optimistas en `TitleCard` y `TitleDetailPage` para cambios instantáneos de favoritos, watchlist y vistos.
-  - Rollback transparente con notificaciones flotantes amigables (`ToastContext`) ante errores de red.
-  - Suite de 81 tests de backend y pruebas de frontend en verde.
-
-### Fase 10: Robustecimiento del Pipeline TMDB, Ciclo de Vida de Estrenos y Cierre Pre-Entrega (v1.2.1 - v1.6.3)
-- [x] **Paginación Exhaustiva de `/changes` y Seguimiento Activo de Series (v1.2.1):**
-  - Paginación dinámica hasta `total_pages` eliminando la pérdida silenciosa de modificaciones globales.
-  - Tracking directo de series `Returning Series`, `In Production` y `Planned` desduplicadas de changes, garantizando la actualización determinística de estados y fechas de emisión.
-- [x] **Refresco Masivo Diario de Métricas y Desacople de Reseñas (v1.2.1):**
-  - Pasada ligera `refresh_catalog_metrics` actualizando popularidad y votos de todo el catálogo en paralelo.
-  - Desacople de reseñas en sync diaria y creación de workflow mensual dedicado (`monthly_reviews_sync.yml`).
-  - Recálculo vectorizado de `rating_unificado` y soporte de lotes en importación administrativa.
-  - Regla de coherencia temporal en `TitleDetailPage` para episodios de emisión reciente.
-- [x] **Optimización de Series e Ingesta Selectiva de Temporadas (v1.2.2):**
-  - Omitido automático (`Season Skipping`) de temporadas concluidas y completas en `upsert_series`, reduciendo >85% de llamadas HTTP y roundtrips a la base de datos.
-  - Eliminación de consultas N+1 en episodios agrupando las consultas por temporada.
-  - Suite de 84 tests de backend pasando en verde (100%).
-- [x] **Soporte Multi-País, Países Históricos y Blindaje de Calidad de Catálogo (v1.2.3):**
-  - Soporte de coproducciones múltiples delimitadas por comas con fallback prioritario de `origin_country` a `production_countries`.
-  - Banderas vectoriales SVG dedicadas y nombres localizados para países históricos (`SU`, `YU`, `CS`).
-  - Módulo `is_latin_legible` y blindaje preventivo contra títulos sin fecha, sin país, sin idioma o en alfabetos no latinos.
-  - Jobs de backfill (`--backfill-countries`) y purga en cascada (`--purge-incomplete`) verificados al 100% (92 tests en verde).
-- [x] **Arquitectura Keep-Alive y Concurrencia de Sincronización en Producción (v1.3.0):**
-  - Prefetching concurrente en lotes (`asyncio.gather(*tasks)`) en `run_daily_sync`, reduciendo el tiempo de procesamiento de series y películas de ~17 minutos a ~1.5 - 2 minutos.
-  - Endpoints administrativos de estado y telemetría de jobs en segundo plano (`GET /api/v1/admin/sync/jobs/{job_name}/status`).
-  - Monitoreo continuo keep-alive en todos los workflows de GitHub Actions (`daily_sync.yml`, `monthly_actor_photos.yml`, `monthly_reviews_sync.yml`), previniendo el apagado prematuro por inactividad de Render Free Tier (15 min) y transmitiendo el progreso en tiempo real hasta su finalización exitosa.
-  - Suite de 93 tests de backend pasando en verde (100%).
-- [x] **Desacople de Sincronización Diaria Liviana y Sincronización Profunda Semanal (v1.4.0):**
-  - Desacople de `/changes` del flujo diario: `run_daily_sync` optimizado para series activas, cartelera simétrica y refresco de métricas en ~1 a 2 minutos diarios.
-  - Sincronización profunda semanal (`run_deep_sync`): recorrido exhaustivo de 7 días de cambios TMDB los domingos a las 02:00 UTC.
-  - Matriz de workflows de GitHub Actions sin colisiones (`daily_sync.yml` lun-sáb 03:00 UTC, `weekly_deep_sync.yml` dom 02:00 UTC).
-  - Nuevo endpoint administrativo `POST /api/v1/admin/sync/deep` y flags CLI `--deep` y `--changes-days`.
-  - Suite ampliada a 95 tests automatizados de backend en verde (100%).
-- [x] **Modo Upcoming en Expansión, Ingesta Manual Desbloqueada y Badges Visuales (v1.5.0):**
-  - Expansión de catálogo orientada a títulos futuros (`--expand --upcoming`) con ventana temporal configurable (`--upcoming-days`, default 365 días), sin filtros de votos y con umbral de popularidad mínima (`TMDB_DAILY_SYNC_POP_THRESHOLD >= 10.0`).
-  - Desacoplamiento de límites en upcoming: `--upcoming-days 0` para horizonte temporal infinito y `--limit 0` para ingesta de todos los títulos que califiquen en la ventana de días indicada.
-  - Target de 10 títulos por defecto para género específico, o 10 títulos en total global si no se especifica género (`TMDB_EXPAND_UPCOMING_TARGET`). Aliases `--limit` y `--target` en CLI y endpoint administrativo.
-  - Desbloqueo de `--allow-unreleased` en importaciones manuales (`--import-tmdb-id`, `--import-json` y API `POST /api/v1/admin/sync/import-tmdb`).
-  - Clasificación estricta de series con estreno el mismo día (upcoming vs released) y segregación total en carruseles de Home (`_apply_base_filters`).
-  - Desambiguación cromática de badges en detalle de título: "Renewed TBA" preserva púrpura (`purple-950`), "En Producción" adopta Teal (`teal-950/80`), y nuevo badge "Estrenada" (`Released`) en verde esmeralda para películas.
-  - Corrección de etiquetas e iconos en chips de sección de Catálogo (`⭐ Top Rated`, `🕒 New Releases`).
-  - Suite de backend ampliada a 101 tests unitarios e integración en verde (100%).
-- [x] **Ciclo de Vida de Próximos Estrenos, Embeddings Selectivos y Umbrales del Recomendador (v1.6.0):**
-  - Vectorización selectiva en `sync_embeddings`: exclusión estricta de obras no estrenadas (`get_released_filter_condition(today)`) para preservar cuota de Gemini.
-  - Sincronización automática de embeddings tras `expand_catalog` para títulos ya estrenados.
-  - Transición automática de estrenos en `refresh_catalog_metrics`: actualización liviana de `status_tmdb` y `duracion`, permitiendo que títulos recién estrenados sean detectados y vectorizados en la sync diaria.
-  - Blindaje estricto de candidatos en el recomendador con IA (`apply_base_filters` con `get_released_filter_condition(today)`).
-  - Umbrales de votos mínimos y excepción de estreno reciente desacoplados a variables operativas (`AI_RECOMMENDER_MIN_VOTES_VECTOR=25`, `AI_RECOMMENDER_MIN_VOTES_THEMATIC=80`, `AI_RECOMMENDER_MIN_VOTES_FALLBACK=150`, `AI_RECOMMENDER_NEW_RELEASE_DAYS=30`).
-- [x] **Pulido de Interfaz y Cierre de Calidad Pre-Entrega (v1.6.3):**
-  - Barra de búsqueda expandida y botón interactivo de lupa en Header y Catálogo.
-  - Reparto principal expandible ("Ver más / Ver menos") en detalle de título.
-  - Coherencia de temporadas con episodios ya emitidos a la fecha para series en emisión.
-  - Localización completa de reseñas y claves de interfaz.
-  - Reseñas con calificación directa opcional sin comentario de texto obligatorio, con restricción `CheckConstraint` de base de datos.
-  - Suite de 106 tests unitarios e integración en verde.
-- [x] **Fase 11: Factor Sorpresa y Variedad en Recomendador IA (v1.7.0 - v1.7.1):**
-  - Enum normalizado `VarietyLevel` (`VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`) y variable global `AI_RECOMMENDER_DEFAULT_VARIETY`.
-  - Persistencia de `preferencia_variedad_ia` en modelo `Usuario` y migración Alembic `0007_user_variety_preference.py` ejecutada en SQLite local, Neon Dev y Neon Prod.
-  - Modulación RAG de umbrales de votos ($\times 1.8$ a $\times 0.3$), filtro crítico `rating_unificado >= 7.5` para `VERY_LOW`, salvaguarda contra inanición (< 3 candidatos relaja filtro), y exención de entidad directa (director, actor, título explícito no se podan).
-  - Despachador dinámico de LLM desacoplado vía variable de entorno `AI_REASONING_MODELS` con inyección segura de `reasoning_effort` para modelos de razonamiento (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`) y exclusión en modelos estándar (Gemini Flash, Llama).
-  - Directivas semánticas explícitas inyectadas en el prompt para alinear el esfuerzo de razonamiento del LLM con el nivel de variedad elegido.
-  - Calibración de temperatura (`0.7` a `1.2` para reasoning; `0.1` a `0.9` para estándar).
-  - Resiliencia multiclave exhaustiva con iteración de todas las API keys por modelo en la cascada.
-  - Frontend: Slider interactivo de 5 pasos en `SettingsPage.tsx` con guía central fija (*Balanceada*) y selector rápido con badge en `RecommendationsPage.tsx`.
-  - Bloqueo e invariante de marcado como visto (👁) en películas no estrenadas y series sin episodios emitidos a la fecha, ocultando el botón en cards y detalle y preservando Favorito (♥) y Watchlist (🔖) (v1.7.1).
-  - Cobertura ampliada a 111 tests unitarios e integración en backend (`pytest`) y 7 tests en frontend (`vitest`) al 100%.
+> **Nota de Historial:** Las fases 1 a 11 (scaffolding inicial, modelos relacionales, autenticación JWT, sincronización TMDB, reseñas, perfil de usuario, despliegue a producción en Neon/Render/Vercel, RAG híbrido vectorial con pgvector, arquitectura keep-alive, invariantes de estreno y control de variedad con Reasoning Dispatcher) están **100% completadas y verificadas**. El detalle histórico de cada versión y tarea se encuentra en [TASK_PLAN.md](TASK_PLAN.md) y [CHANGELOG.md](CHANGELOG.md). Este archivo define exclusivamente la evolución futura del producto.
 
 ---
 
-## Backlog (Pendientes para Versión Superior)
+## 1. Próximas Fases (Hitos Planeados)
 
-- [x] Repaso e iconografía personalizada de géneros cinematográficos *(Completado en v0.8.5)*.
-- [x] Buscador integral por título, director, guionista y actor *(Completado en v0.8.4)*.
-- [x] Pantallas de extensión ("Ver más") con paginación para cada sección *(Completado: enlaces en carruseles de Home conectados a `/catalog` con filtros de sección/género y paginación completa)*.
-- [x] Panel de estadísticas avanzadas en el perfil (tiempo total, distribución de géneros, gráfico Donut SVG) *(Completado en v0.8.0)*.
-- [x] Selector de idioma de interfaz y diccionario de géneros *(Completado en v0.8.0 - v0.8.1)*.
-- [x] Ingesta de fotos de actores y sección Top Cast *(Completado en v0.8.0 - v0.8.1)*.
-- [x] Carga de avatar desde archivo local con centrado y zoom *(Completado en v0.8.0 - v0.8.1)*.
-- [x] **Control de Variabilidad / Factor Sorpresa del Recomendador IA (Slider UX):** *(Completado en v1.7.0)*
-  - Configuración normalizada de variedad (`VarietyLevel`) en 5 niveles con descripciones pedagógicas claras.
-  - Modulación multi-nivel de candidatos RAG (votos mínimos y filtro de rating crítico).
-  - Despacho armónico de LLM con inyección segura de `reasoning_effort` en Groq y calibración de temperatura.
-  - Slider interactivo en Settings y selector rápido al vuelo en el asistente IA.
-- [ ] **Sistema de notificaciones activas por panel in-app:**
-  - Avisos informativos por cambio de status de series en cualquier lista del usuario (renovación con/sin fecha, cancelación, finalización, hiatus entre temporadas o reboots sin alterar el estado del usuario).
-  - Alertas automáticas cuando una serie en estado "Vista" estrena nueva temporada/episodios, pasando automáticamente a "Siguiendo".
-- [ ] **Carrusel y Filtro "Upcoming / Próximamente" en Home y Catálogo:**
-  - Sección destacada en Home y filtro en Catálogo para explorar películas y series que estrenarán en las próximas semanas/meses (`allow_unreleased`), con fecha visible y badges contextuales ("Muy Pronto", "Próximo Estreno").
-- [ ] **Badge visual "Viendo Actualmente" (🔥):**
-  - Indicador en series de "Siguiendo" con episodios recientes, con ventana de días configurable por cada usuario desde su pantalla de Configuración (`/settings`).
-- [ ] **Soporte multirregión para plataformas de streaming:**
-  - Integración de JustWatch / TMDB Watch Providers según el país del usuario, requiriendo tabla relacional propia.
-- [ ] **Selector de idioma para el contenido (Títulos y Sinopsis):**
-  - Tabla de traducciones multilingüe conectada a TMDB, con regla de fallback al inglés/idioma original para contenidos o idiomas faltantes.
-- [x] **Expansión selectiva del catálogo mediante jobs dirigidos (Criterio 1):** *(Completado en v0.9.1)*
-  - Job CLI `python -m app.jobs.sync_tmdb --expand` con filtro por género (individual o masivo), tipo de medio (`both`, `movie`, `tv`) y umbrales configurables de votos (`min_vote_count`) y calificación (`min_vote_average`) sin duplicar títulos existentes ni rehacer la ingesta inicial completa.
-- [x] **Recomendador avanzado (RAG Híbrido):** *(Completado en Fase 8)*
-  - Búsqueda semántica vectorial con embeddings de 768 dimensiones vía Google AI Studio y `pgvector` en PostgreSQL Neon con índice HNSW, filtrado negativo estricto y fallback léxico.
-- [ ] Posible refinamiento UX en desmarques de episodios: diálogo opcional para advertir al usuario o resetear progreso posterior al desmarcar un episodio intermedio.
+### Fase 12: Sistema de Notificaciones In-App y Ciclo de Vida Reactivo de Series
+- [ ] **Centro de Notificaciones en la Interfaz (Campana en Header):**
+  - Panel flotante y persistente con alertas de actividad relevante para el usuario.
+  - Notificaciones inmediatas ante cambios de status en series seguidas o en watchlist (ej. *"Severance ha sido renovada para la Temporada 3"* o *"The Penguin fijó fecha de estreno de su próximo episodio"*).
+- [ ] **Reactivación Automática de Series Vistas a "Siguiendo":**
+  - Transición automática de estado cuando una serie que el usuario marcó como `vista` (100% completada) estrena una nueva temporada en TMDB, devolviéndola al carrusel activo de `Siguiendo` con el indicador de progreso correspondiente.
+- [ ] **Configuración Granular de Alertas por Usuario:**
+  - Preferencias en `/settings` para activar/desactivar notificaciones por tipo (estrenos de episodios, anuncios de renovación, cancelaciones).
+
+---
+
+### Fase 13: Traducción de Contenidos y Selector de Idioma (I18n de Catálogo)
+- [ ] **Ingesta y Persistencia de Traducciones Multilingües desde TMDB:**
+  - Consulta a `/movie/{id}/translations` y `/tv/{id}/translations` para almacenar títulos y sinopsis en múltiples variantes lingüísticas.
+  - Cobertura idéntica para temporadas (nombre de temporada si difiere del estándar, sinopsis) y episodios (nombre y sinopsis traducidos).
+- [ ] **Prioridad de Variantes en Español:**
+  - Soporte prioritario para **Español Latinoamericano (`es-MX` / `es-419`)** y **Español España (`es-ES`)**, con posibilidad de habilitar idiomas adicionales en el futuro.
+- [ ] **Sistema Resiliente de Fallbacks en Cascada:**
+  - Si una obra carece de traducción en la variante regional elegida (ej. `es-MX`), el sistema desciende fluidamente a la otra variante hispana (`es-ES`).
+  - Si no existe traducción en español, recae en el texto en inglés (`en-US`).
+  - Si no existe en inglés, se exhibe el título y sinopsis en el idioma original de la producción.
+- [ ] **Selector Interactivo de Idioma de Contenido:**
+  - Control en `/settings` para elegir el idioma preferido de los títulos y sinopsis del catálogo (independiente del idioma de los textos de la interfaz UI o sincronizable con él).
+
+---
+
+### Fase 14: Plataformas de Streaming y Disponibilidad Multirregión (Watch Providers)
+- [ ] **Integración de TMDB Watch Providers / JustWatch API:**
+  - Consulta y persistencia de proveedores de streaming (Netflix, Prime Video, Max, Disney+, Apple TV+, etc.) por título y país.
+  - Tablas relacionales en base de datos: `plataformas` (id, nombre, logo_url) y `disponibilidad_streaming` (titulo_id, plataforma_id, pais, tipo_acceso: flatrate, buy, rent).
+- [ ] **Detección Automática de Región:**
+  - Presentación de opciones de streaming personalizadas según el país configurado en el perfil del usuario (o geolocalización por IP en invitados).
+- [ ] **Filtrado por Plataforma en Catálogo:**
+  - Selector de servicios de suscripción activos del usuario para explorar únicamente títulos disponibles en sus plataformas contratadas.
+
+---
+
+## 2. Backlog (Pendientes sin Priorizar)
+
+- [ ] **Carrusel "Upcoming / Próximamente" en Home:**
+  - Carrusel horizontal dedicado en la página principal para explorar visualmente películas y series muy esperadas con fecha de estreno confirmada en los próximos 30 a 90 días.
+- [ ] **Ampliación del Modelo de Datos (Metadatos Granulares de Series):**
+  - Elenco de series segmentado por temporada (distinción de actores principales o recurrentes por entrega).
+  - Título propio de temporada cuando cuente con denominación temática específica (ej. *True Detective: Night Country*, *Fargo: Year 5*).
+  - Sinopsis enriquecida de episodios individuales.
+- [ ] **Herramientas Avanzadas en Sección Biblioteca (`/library`):**
+  - Ordenamiento multidimensional (por fecha de agregado, rating propio, rating TMDB, fecha de estreno o alfabético).
+  - Filtros rápidos por tipo (películas / series) y géneros dentro de cada pestaña de la biblioteca personal.
+  - Buscador in-place para localizar rápidamente obras dentro de listas extensas.
+  - Paginación o carga virtualizada optimizada para colecciones con cientos o miles de títulos.
+- [ ] **Autenticación Ampliada & Notificaciones Externas:**
+  - Campo `email` obligatorio o sugerido al registrarse para envío de notificaciones y recuperación segura de cuenta.
+  - Inicio de sesión social mediante Google OAuth (Single Sign-On).
+- [ ] **Badge Visual "Viendo Actualmente" (🔥):**
+  - Indicador destacado en series en curso dentro de `Siguiendo` con episodios vistos en los últimos 7 o 14 días (ventana configurable por el usuario desde `/settings`).
+- [ ] **Diálogo de Confirmación en Desmarques Intermedios de Episodios:**
+  - Modal de confirmación al desmarcar un episodio intermedio de una serie: opción de desmarcar únicamente ese episodio o resetear también los episodios posteriores.
+- [ ] **Soporte PWA Offline Avanzado con Service Workers:**
+  - Carga en caché local de biblioteca y fichas de títulos previamente visitadas para consulta fluida en movilidad sin conexión a internet.
+- [ ] **Compartir Listas y Perfiles Públicos:**
+  - Enlaces públicos compartibles para el perfil de usuario y listas curadas con vista de solo lectura y metadatos OpenGraph (Twitter/WhatsApp preview cards).
