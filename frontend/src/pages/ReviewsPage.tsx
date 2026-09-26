@@ -115,7 +115,7 @@ export const ReviewsPage: React.FC = () => {
   // Handle start edit
   const handleStartEdit = (r: UserReviewItem) => {
     setEditingReviewId(r.id)
-    setEditText(r.texto)
+    setEditText(r.texto || '')
     if (r.puntaje !== null && r.puntaje !== undefined) {
       setEditIncludeScore(true)
       setEditScore(r.puntaje)
@@ -127,12 +127,12 @@ export const ReviewsPage: React.FC = () => {
 
   // Handle save edit
   const handleSaveEdit = async (r: UserReviewItem) => {
-    if (!editText.trim()) return
+    if (!editText.trim() && !editIncludeScore) return
     setSubmittingEdit(true)
     try {
       const finalScore = editIncludeScore ? Math.round(editScore * 2) / 2 : null
-      await catalogService.addReview(r.titulo_id, editText.trim(), finalScore)
-      showSuccess('Review updated successfully.')
+      await catalogService.addReview(r.titulo_id, editText.trim() || undefined, finalScore)
+      showSuccess(t('reviewUpdatedSuccess'))
       setEditingReviewId(null)
       loadMyReviews(reviewPage)
     } catch (err) {
@@ -144,13 +144,14 @@ export const ReviewsPage: React.FC = () => {
 
   // Handle delete review
   const handleDeleteReview = async (r: UserReviewItem) => {
-    if (!window.confirm(`Are you sure you want to delete your review for "${r.titulo_nombre}"?`)) {
+    const confirmMsg = t('deleteReviewConfirm').replace('{title}', r.titulo_nombre)
+    if (!window.confirm(confirmMsg)) {
       return
     }
     setDeletingId(r.id)
     try {
       await catalogService.deleteReview(r.titulo_id)
-      showSuccess('Review deleted successfully.')
+      showSuccess(t('reviewDeletedSuccess'))
       loadMyReviews(reviewPage)
       loadPendingTitles()
     } catch (err) {
@@ -162,12 +163,12 @@ export const ReviewsPage: React.FC = () => {
 
   // Handle submit review for pending title
   const handleSubmitPendingReview = async (titleId: number) => {
-    if (!newText.trim()) return
+    if (!newText.trim() && !newIncludeScore) return
     setSubmittingNew(true)
     try {
       const finalScore = newIncludeScore ? Math.round(newScore * 2) / 2 : null
-      await catalogService.addReview(titleId, newText.trim(), finalScore)
-      showSuccess('Review submitted successfully.')
+      await catalogService.addReview(titleId, newText.trim() || undefined, finalScore)
+      showSuccess(t('reviewSubmittedSuccess'))
       setWritingForTitleId(null)
       setNewText('')
       setNewScore(8.0)
@@ -185,7 +186,7 @@ export const ReviewsPage: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div className="w-10 h-10 border-3 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-        <p className="text-xs text-gray-400 font-medium">Loading reviews...</p>
+        <p className="text-xs text-gray-400 font-medium">{t('loadingReviews')}</p>
       </div>
     )
   }
@@ -194,22 +195,22 @@ export const ReviewsPage: React.FC = () => {
     return (
       <div className="max-w-md mx-auto my-24 p-8 bg-[#141414] border border-[#262626] rounded-2xl text-center space-y-4">
         <MessageSquare className="w-12 h-12 text-amber-500 mx-auto" />
-        <h2 className="text-xl font-bold text-white">Sign in to manage your reviews</h2>
+        <h2 className="text-xl font-bold text-white">{t('signInManageReviews')}</h2>
         <p className="text-xs text-gray-400">
-          Track all your written opinions, edit ratings, and review titles you have already watched.
+          {t('signInManageReviewsDesc')}
         </p>
         <div className="flex items-center justify-center gap-3 pt-2">
           <button
             onClick={() => openAuth('login')}
             className="px-5 py-2.5 rounded-xl bg-[#1a1a1a] hover:bg-[#222222] border border-[#333333] text-gray-200 text-xs font-semibold transition-all active:scale-95"
           >
-            Log In
+            {t('logIn')}
           </button>
           <button
             onClick={() => openAuth('register')}
             className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all active:scale-95"
           >
-            Create Account
+            {t('createAccount')}
           </button>
         </div>
       </div>
@@ -222,10 +223,10 @@ export const ReviewsPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#262626] pb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <MessageSquare className="w-7 h-7 text-amber-500" /> Reviews & Opinions
+            <MessageSquare className="w-7 h-7 text-amber-500" /> {t('reviewsAndOpinions')}
           </h1>
           <p className="text-xs text-gray-400 mt-1">
-            Manage your written reviews and discover titles in your history waiting for your opinion.
+            {t('reviewsAndOpinionsDesc')}
           </p>
         </div>
 
@@ -240,7 +241,7 @@ export const ReviewsPage: React.FC = () => {
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            <span>My Reviews</span>
+            <span>{t('myReviewsTab')}</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                 activeTab === 'my_reviews' ? 'bg-black/30 text-black' : 'bg-[#222222] text-gray-400'
@@ -259,7 +260,7 @@ export const ReviewsPage: React.FC = () => {
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            <span>Pending Reviews</span>
+            <span>{t('pendingReviewsTab')}</span>
             {pendingTitles.length > 0 && (
               <span
                 className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
@@ -287,14 +288,14 @@ export const ReviewsPage: React.FC = () => {
           {loadingReviews ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-              <p className="text-xs text-gray-400">Loading your reviews...</p>
+              <p className="text-xs text-gray-400">{t('loadingYourReviews')}</p>
             </div>
           ) : reviews.length === 0 ? (
             <div className="p-12 rounded-2xl bg-[#141414] border border-[#262626] text-center space-y-4 max-w-lg mx-auto">
               <MessageSquare className="w-12 h-12 text-gray-600 mx-auto" />
-              <h3 className="text-lg font-bold text-white">No reviews yet</h3>
+              <h3 className="text-lg font-bold text-white">{t('noReviewsYet')}</h3>
               <p className="text-xs text-gray-400">
-                You have not shared any reviews yet. Share your thoughts on titles you have watched or check the pending tab!
+                {t('noReviewsYetDesc')}
               </p>
               <div className="flex justify-center gap-3 pt-2">
                 <button
@@ -302,13 +303,13 @@ export const ReviewsPage: React.FC = () => {
                   onClick={() => setTab('pending')}
                   className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all"
                 >
-                  View Pending Titles ({pendingTitles.length})
+                  {t('viewPendingTitles')} ({pendingTitles.length})
                 </button>
                 <Link
                   to="/catalog"
                   className="px-4 py-2 rounded-xl bg-[#202020] hover:bg-[#282828] text-white text-xs font-bold border border-[#333] transition-all"
                 >
-                  {t('explore')}
+                  {t('exploreCatalog')}
                 </Link>
               </div>
             </div>
@@ -345,11 +346,11 @@ export const ReviewsPage: React.FC = () => {
                             <span className="flex items-center gap-1">
                               {r.titulo_tipo === 'movie' ? (
                                 <>
-                                  <Film className="w-3 h-3 text-amber-500" /> Movie
+                                  <Film className="w-3 h-3 text-amber-500" /> {t('movieBadge')}
                                 </>
                               ) : (
                                 <>
-                                  <Tv className="w-3 h-3 text-amber-500" /> TV Series
+                                  <Tv className="w-3 h-3 text-amber-500" /> {t('tvSeriesBadge')}
                                 </>
                               )}
                             </span>
@@ -375,14 +376,14 @@ export const ReviewsPage: React.FC = () => {
                             <span>{r.puntaje.toFixed(1)}/10</span>
                           </div>
                         ) : (
-                          <span className="text-xs text-gray-500 italic px-2 py-1">No rating</span>
+                          <span className="text-xs text-gray-500 italic px-2 py-1">{t('noRating')}</span>
                         )}
 
                         <button
                           type="button"
                           onClick={() => handleStartEdit(r)}
                           className="p-2 rounded-xl bg-[#1e1e1e] hover:bg-[#282828] text-gray-300 hover:text-white border border-[#333333] transition-colors"
-                          title="Edit review"
+                          title={t('editReview')}
                         >
                           <Pencil className="w-3.5 h-3.5 text-amber-400" />
                         </button>
@@ -392,7 +393,7 @@ export const ReviewsPage: React.FC = () => {
                           onClick={() => handleDeleteReview(r)}
                           disabled={deletingId === r.id}
                           className="p-2 rounded-xl bg-red-950/20 hover:bg-red-900/40 text-red-400 border border-red-900/40 transition-colors disabled:opacity-50"
-                          title="Delete review"
+                          title={t('deleteReview')}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -403,7 +404,7 @@ export const ReviewsPage: React.FC = () => {
                     {isEditing ? (
                       <div className="p-4 rounded-xl bg-[#0d0d0d] border border-[#262626] space-y-4">
                         <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                          Editing Review for {r.titulo_nombre}
+                          {t('editingReviewFor')} {r.titulo_nombre}
                         </h4>
 
                         <div className="space-y-2">
@@ -414,7 +415,7 @@ export const ReviewsPage: React.FC = () => {
                               onChange={(e) => setEditIncludeScore(e.target.checked)}
                               className="w-4 h-4 rounded border-[#333333] bg-[#1a1a1a] text-amber-500 focus:ring-amber-500"
                             />
-                            <span className="font-medium">Include rating / Calificar con puntaje</span>
+                            <span className="font-medium">{t('includeRating')}</span>
                           </label>
 
                           {editIncludeScore && (
@@ -469,6 +470,7 @@ export const ReviewsPage: React.FC = () => {
                           rows={3}
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
+                          placeholder={t('writeReviewPlaceholder')}
                           className="w-full p-3 text-sm bg-[#141414] border border-[#262626] rounded-xl text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                         />
 
@@ -478,21 +480,25 @@ export const ReviewsPage: React.FC = () => {
                             onClick={() => setEditingReviewId(null)}
                             className="px-4 py-1.5 rounded-xl bg-[#222222] hover:bg-[#2c2c2c] text-gray-300 hover:text-white text-xs font-semibold"
                           >
-                            Cancel
+                            {t('cancel')}
                           </button>
                           <button
                             type="button"
                             onClick={() => handleSaveEdit(r)}
-                            disabled={submittingEdit}
+                            disabled={submittingEdit || (!editText.trim() && !editIncludeScore)}
                             className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md disabled:opacity-50"
                           >
-                            {submittingEdit ? 'Saving...' : 'Save Changes'}
+                            {submittingEdit ? t('saving') : t('saveChanges')}
                           </button>
                         </div>
                       </div>
-                    ) : (
+                    ) : r.texto ? (
                       <p className="text-xs sm:text-sm text-gray-300 leading-relaxed whitespace-pre-line">
                         {r.texto}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500 italic">
+                        {t('noCommentWritten')}
                       </p>
                     )}
                   </div>
@@ -503,8 +509,8 @@ export const ReviewsPage: React.FC = () => {
               {totalReviews > 15 && (
                 <div className="flex items-center justify-between pt-4 border-t border-[#262626]">
                   <span className="text-xs text-gray-400">
-                    Showing {(reviewPage - 1) * 15 + 1} to {Math.min(reviewPage * 15, totalReviews)} of{' '}
-                    {totalReviews} reviews
+                    {t('showingReviews')} {(reviewPage - 1) * 15 + 1} - {Math.min(reviewPage * 15, totalReviews)} {t('ofLabel')}{' '}
+                    {totalReviews} {t('reviewsCountLabel')}
                   </span>
 
                   <div className="flex items-center gap-2">
@@ -514,16 +520,16 @@ export const ReviewsPage: React.FC = () => {
                       disabled={reviewPage <= 1}
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#141414] hover:bg-[#202020] border border-[#262626] text-xs font-semibold text-gray-300 hover:text-white disabled:opacity-40"
                     >
-                      <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                      <ChevronLeft className="w-3.5 h-3.5" /> {t('previous')}
                     </button>
-                    <span className="text-xs text-amber-500 font-bold px-2">Page {reviewPage}</span>
+                    <span className="text-xs text-amber-500 font-bold px-2">{t('pageLabel')} {reviewPage}</span>
                     <button
                       type="button"
                       onClick={() => setReviewPage((p) => p + 1)}
                       disabled={reviewPage * 15 >= totalReviews}
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#141414] hover:bg-[#202020] border border-[#262626] text-xs font-semibold text-gray-300 hover:text-white disabled:opacity-40"
                     >
-                      Next <ChevronRight className="w-3.5 h-3.5" />
+                      {t('next')} <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -539,90 +545,90 @@ export const ReviewsPage: React.FC = () => {
           {loadingPending ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-              <p className="text-xs text-gray-400">Loading pending titles...</p>
+              <p className="text-xs text-gray-400">{t('loadingPendingTitles')}</p>
             </div>
           ) : pendingTitles.length === 0 ? (
             <div className="p-12 rounded-2xl bg-[#141414] border border-[#262626] text-center space-y-4 max-w-lg mx-auto">
               <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
-              <h3 className="text-lg font-bold text-white">All caught up!</h3>
+              <h3 className="text-lg font-bold text-white">{t('allCaughtUp')}</h3>
               <p className="text-xs text-gray-400">
-                You have reviewed all watched and in-progress titles in your library.
+                {t('allCaughtUpDesc')}
               </p>
               <Link
                 to="/catalog"
                 className="inline-block px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md transition-all"
               >
-                Discover More Titles
+                {t('discoverMoreTitles')}
               </Link>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="p-4 rounded-xl bg-[#141414] border border-[#262626] flex items-center justify-between flex-wrap gap-2">
                 <span className="text-xs text-gray-300 font-medium">
-                  {pendingTitles.length} watched or in-progress titles waiting for your review.
+                  {pendingTitles.length} {t('pendingTitlesWaiting')}
                 </span>
                 <span className="text-[11px] text-amber-500/90 font-medium">
-                  Rate them to refine your recommendations!
+                  {t('rateToRefineRecommendations')}
                 </span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pendingTitles.map((t) => {
-                  const isWriting = writingForTitleId === t.id
+                {pendingTitles.map((tItem) => {
+                  const isWriting = writingForTitleId === tItem.id
 
                   return (
                     <div
-                      key={t.id}
+                      key={tItem.id}
                       className="p-4 rounded-2xl bg-[#141414] border border-[#262626] hover:border-[#333333] transition-all space-y-3"
                     >
                       <div className="flex gap-3">
-                        <Link to={`/titles/${t.id}`} className="shrink-0 group">
+                        <Link to={`/titles/${tItem.id}`} className="shrink-0 group">
                           <img
-                            src={t.portada_url || posterFallback}
-                            alt={t.nombre}
+                            src={tItem.portada_url || posterFallback}
+                            alt={tItem.nombre}
                             className="w-16 h-24 object-cover rounded-xl border border-[#262626] group-hover:border-amber-500 transition-colors"
                           />
                         </Link>
 
                         <div className="flex-1 min-w-0 space-y-1">
                           <Link
-                            to={`/titles/${t.id}`}
+                            to={`/titles/${tItem.id}`}
                             className="text-sm font-bold text-white hover:text-amber-400 transition-colors line-clamp-1"
                           >
-                            {t.nombre}
+                            {tItem.nombre}
                           </Link>
 
                           <div className="flex items-center gap-2 text-[11px] text-gray-400 flex-wrap">
                             <span className="flex items-center gap-1">
-                              {t.tipo === 'movie' ? (
+                              {tItem.tipo === 'movie' ? (
                                 <>
-                                  <Film className="w-3 h-3 text-amber-500" /> Movie
+                                  <Film className="w-3 h-3 text-amber-500" /> {t('movieBadge')}
                                 </>
                               ) : (
                                 <>
-                                  <Tv className="w-3 h-3 text-amber-500" /> TV Series
+                                  <Tv className="w-3 h-3 text-amber-500" /> {t('tvSeriesBadge')}
                                 </>
                               )}
                             </span>
                             <span>•</span>
-                            <span>{t.anio_estreno || '-'}</span>
-                            {t.user_estado && (
+                            <span>{tItem.anio_estreno || '-'}</span>
+                            {tItem.user_estado && (
                               <>
                                 <span>•</span>
                                 <span
                                   className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
-                                    t.user_estado === 'siguiendo'
+                                    tItem.user_estado === 'siguiendo'
                                       ? 'bg-blue-950/40 text-blue-300 border-blue-800/60'
-                                      : t.user_estado === 'vista'
+                                      : tItem.user_estado === 'vista'
                                       ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/60'
                                       : 'bg-red-950/40 text-red-300 border-red-800/60'
                                   }`}
                                 >
-                                  {t.user_estado === 'siguiendo'
-                                    ? 'Watching'
-                                    : t.user_estado === 'vista'
-                                    ? 'Watched'
-                                    : 'Dropped'}
+                                  {tItem.user_estado === 'siguiendo'
+                                    ? t('watchingBadge')
+                                    : tItem.user_estado === 'vista'
+                                    ? t('watchedBadge')
+                                    : t('droppedBadge')}
                                 </span>
                               </>
                             )}
@@ -630,8 +636,8 @@ export const ReviewsPage: React.FC = () => {
 
                           <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold pt-1">
                             <Star className="w-3 h-3 fill-current" />
-                            <span>{t.rating_unificado ? t.rating_unificado.toFixed(1) : '-'}</span>
-                            <span className="text-gray-500 font-normal">TMDB community</span>
+                            <span>{tItem.rating_unificado ? tItem.rating_unificado.toFixed(1) : '-'}</span>
+                            <span className="text-gray-500 font-normal">{t('tmdbCommunity')}</span>
                           </div>
                         </div>
 
@@ -639,7 +645,7 @@ export const ReviewsPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              setWritingForTitleId(t.id)
+                              setWritingForTitleId(tItem.id)
                               setNewText('')
                               setNewScore(8.0)
                               setNewIncludeScore(true)
@@ -647,7 +653,7 @@ export const ReviewsPage: React.FC = () => {
                             className="self-start px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md transition-all shrink-0 flex items-center gap-1.5"
                           >
                             <Pencil className="w-3 h-3" />
-                            <span>Write Review</span>
+                            <span>{t('writeReview')}</span>
                           </button>
                         )}
                       </div>
@@ -663,7 +669,7 @@ export const ReviewsPage: React.FC = () => {
                                 onChange={(e) => setNewIncludeScore(e.target.checked)}
                                 className="w-4 h-4 rounded border-[#333333] bg-[#0d0d0d] text-amber-500 focus:ring-amber-500"
                               />
-                              <span className="font-medium">Include rating / Calificar</span>
+                              <span className="font-medium">{t('includeRating')}</span>
                             </label>
 
                             {newIncludeScore && (
@@ -718,7 +724,7 @@ export const ReviewsPage: React.FC = () => {
                             rows={2}
                             value={newText}
                             onChange={(e) => setNewText(e.target.value)}
-                            placeholder="What did you think of this title? Share your thoughts..."
+                            placeholder={t('writeReviewPlaceholder')}
                             className="w-full p-2.5 text-xs bg-[#0d0d0d] border border-[#262626] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                           />
 
@@ -728,16 +734,16 @@ export const ReviewsPage: React.FC = () => {
                               onClick={() => setWritingForTitleId(null)}
                               className="px-3 py-1.5 rounded-xl bg-[#222222] hover:bg-[#2c2c2c] text-gray-300 hover:text-white text-xs font-semibold"
                             >
-                              Cancel
+                              {t('cancel')}
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleSubmitPendingReview(t.id)}
-                              disabled={submittingNew}
+                              onClick={() => handleSubmitPendingReview(tItem.id)}
+                              disabled={submittingNew || (!newText.trim() && !newIncludeScore)}
                               className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md disabled:opacity-50"
                             >
                               <Send className="w-3 h-3" />
-                              <span>{submittingNew ? 'Publishing...' : 'Publish'}</span>
+                              <span>{submittingNew ? t('publishing') : t('publish')}</span>
                             </button>
                           </div>
                         </div>

@@ -24,6 +24,7 @@ const UI_STRINGS: Record<string, { en: string; es: string }> = {
     en: 'Search titles, actors, directors, writers...',
     es: 'Buscar títulos, actores, directores, guionistas...'
   },
+  searchAction: { en: 'Search', es: 'Buscar' },
   logIn: { en: 'Log In', es: 'Iniciar Sesión' },
   signUp: { en: 'Sign Up', es: 'Registrarse' },
   signUpRegister: { en: 'Sign Up / Register', es: 'Registrarse' },
@@ -252,6 +253,78 @@ const UI_STRINGS: Record<string, { en: string; es: string }> = {
   lastYear: { en: 'Last Year', es: 'Último Año' },
   last5Years: { en: 'Last 5 Years', es: 'Últimos 5 Años' },
   last10Years: { en: 'Last 10 Years', es: 'Últimos 10 Años' },
+
+  // Reviews Page
+  reviewsAndOpinions: { en: 'Reviews & Opinions', es: 'Reseñas y Opiniones' },
+  reviewsAndOpinionsDesc: {
+    en: 'Manage your written reviews and discover titles in your history waiting for your opinion.',
+    es: 'Gestiona tus reseñas y descubre títulos en tu historial esperando tu opinión.'
+  },
+  myReviewsTab: { en: 'My Reviews', es: 'Mis Reseñas' },
+  pendingReviewsTab: { en: 'Pending Reviews', es: 'Reseñas Pendientes' },
+  noCommentWritten: {
+    en: 'No written review (rating only)',
+    es: 'Sin reseña escrita (solo calificación)'
+  },
+  movieBadge: { en: 'Movie', es: 'Película' },
+  tvSeriesBadge: { en: 'TV Series', es: 'Serie de TV' },
+  reviewUpdatedSuccess: { en: 'Review updated successfully.', es: 'Reseña actualizada correctamente.' },
+  reviewDeletedSuccess: { en: 'Review deleted successfully.', es: 'Reseña eliminada correctamente.' },
+  reviewSubmittedSuccess: { en: 'Review submitted successfully.', es: 'Reseña publicada correctamente.' },
+  deleteReviewConfirm: {
+    en: 'Are you sure you want to delete your review for "{title}"?',
+    es: '¿Estás seguro de que deseas eliminar tu reseña de "{title}"?'
+  },
+  loadingReviews: { en: 'Loading reviews...', es: 'Cargando reseñas...' },
+  loadingYourReviews: { en: 'Loading your reviews...', es: 'Cargando tus reseñas...' },
+  loadingPendingTitles: { en: 'Loading pending titles...', es: 'Cargando títulos pendientes...' },
+  signInManageReviews: { en: 'Sign in to manage your reviews', es: 'Inicia sesión para gestionar tus reseñas' },
+  signInManageReviewsDesc: {
+    en: 'Track all your written opinions, edit ratings, and review titles you have already watched.',
+    es: 'Lleva un registro de tus opiniones, edita calificaciones y reseña títulos que ya viste.'
+  },
+  noReviewsYet: { en: 'No reviews yet', es: 'Aún no tienes reseñas' },
+  noReviewsYetDesc: {
+    en: 'You have not shared any reviews yet. Share your thoughts on titles you have watched or check the pending tab!',
+    es: 'Todavía no has compartido ninguna reseña. Comparte tu opinión sobre títulos que hayas visto o revisa la pestaña de pendientes.'
+  },
+  viewPendingTitles: { en: 'View Pending Titles', es: 'Ver Títulos Pendientes' },
+  noRating: { en: 'No rating', es: 'Sin calificación' },
+  editReview: { en: 'Edit review', es: 'Editar reseña' },
+  deleteReview: { en: 'Delete review', es: 'Eliminar reseña' },
+  editingReviewFor: { en: 'Editing Review for', es: 'Editando reseña de' },
+  includeRating: { en: 'Include rating', es: 'Calificar con puntaje' },
+  saveChanges: { en: 'Save Changes', es: 'Guardar Cambios' },
+  saving: { en: 'Saving...', es: 'Guardando...' },
+  cancel: { en: 'Cancel', es: 'Cancelar' },
+  allCaughtUp: { en: 'All caught up!', es: '¡Todo al día!' },
+  allCaughtUpDesc: {
+    en: 'You have reviewed all watched and in-progress titles in your library.',
+    es: 'Has calificado o reseñado todos los títulos vistos y en curso de tu biblioteca.'
+  },
+  discoverMoreTitles: { en: 'Discover More Titles', es: 'Descubrir Más Títulos' },
+  pendingTitlesWaiting: {
+    en: 'watched or in-progress titles waiting for your review.',
+    es: 'títulos vistos o en curso esperando tu opinión.'
+  },
+  rateToRefineRecommendations: {
+    en: 'Rate them to refine your recommendations!',
+    es: '¡Califícalos para afinar tus recomendaciones!'
+  },
+  writeReview: { en: 'Write Review', es: 'Escribir Reseña' },
+  writeReviewPlaceholder: {
+    en: 'What did you think of this title? Share your thoughts...',
+    es: '¿Qué te pareció este título? Comparte tu opinión...'
+  },
+  publish: { en: 'Publish', es: 'Publicar' },
+  publishing: { en: 'Publishing...', es: 'Publicando...' },
+  watchingBadge: { en: 'Watching', es: 'Viendo' },
+  watchedBadge: { en: 'Watched', es: 'Vista' },
+  droppedBadge: { en: 'Dropped', es: 'Abandonada' },
+  tmdbCommunity: { en: 'TMDB community', es: 'Comunidad TMDB' },
+  showingReviews: { en: 'Showing', es: 'Mostrando' },
+  reviewsCountLabel: { en: 'reviews', es: 'reseñas' },
+
   // Footer
   footerTagline: {
     en: 'Your ultimate movie and TV series tracker, with intelligent AI-powered recommendations.',

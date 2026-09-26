@@ -101,7 +101,7 @@ export interface ReviewItem {
   avatar_url?: string | null
   autor_tmdb?: string | null
   puntaje?: number | null
-  texto: string
+  texto?: string | null
   fecha: string
 }
 
@@ -147,7 +147,7 @@ export interface UserReviewItem {
   titulo_portada_url?: string | null
   titulo_fecha_estreno?: string | null
   puntaje?: number | null
-  texto: string
+  texto?: string | null
   fecha: string
 }
 

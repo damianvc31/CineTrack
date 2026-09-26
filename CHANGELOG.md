@@ -2,6 +2,24 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.6.3] - 2026-09-26
+### Corregido y Mejorado (Pulido de Interfaz y Cierre de Calidad Pre-Entrega)
+- **Barra de Búsqueda y Botón Interactivo de Lupa:**
+  - Ampliación del ancho del contenedor del buscador en `Header.tsx` (`max-w-md lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl`) para que el placeholder en español ("Buscar películas, series...") y en otros idiomas entre de forma completa y holgada sin truncarse.
+  - Incorporación de botón interactivo de lupa (`<button type="submit">`) con foco y hover dorado accesible (`text-zinc-500 hover:text-amber-400 focus:outline-none`) tanto en el Header (desktop y móvil) como en el buscador de la página de Catálogo (`CatalogPage.tsx`).
+- **Reparto Principal Expandible en Detalle de Título:**
+  - En `TitleDetailPage.tsx`, incorporación de selector dinámico "Ver más / Ver menos" (`Show all cast / Show less`) que amplía el reparto más allá del límite estándar de 12 actores (2 filas de 6) cuando la obra cuente con más integrantes en su elenco principal cargado.
+- **Coherencia de Temporadas con Episodios Emitidos:**
+  - Corrección del cálculo optimista en el cliente (`TitleDetailPage.tsx`) para la marcación automática de temporada completa: ahora evalúa los episodios vistos exclusivamente contra los episodios ya estrenados a la fecha actual (`!isUnreleased(e.fecha_estreno)`), permitiendo completar entregas en emisión que cuenten con todos sus episodios emitidos vistos sin quedar bloqueadas por episodios futuros. Si a futuro se emiten nuevos episodios, la temporada vuelve a reflejarse como incompleta automáticamente.
+- **Localización Completa de Reseñas:**
+  - Adición de todas las claves faltantes en `LanguageContext.tsx` (`reviewsAndOpinions`, `myReviewsTab`, `pendingReviewsTab`, `noCommentWritten`, `markAsWatchedToReview`, `searchAction`, etc.) y erradicación de textos hardcodeados en inglés en `ReviewsPage.tsx`.
+- **Calificaciones Directas sin Texto Obligatorio (Rating-Only Reviews):**
+  - Admisión de reseñas con calificación numérica directa sin requerir un comentario de texto escrito.
+  - Modificación del modelo `Resena.texto` a campo nullable (`Mapped[str | None] = mapped_column(Text, nullable=True)`) con migración Alembic `0006_nullable_review_text.py`.
+  - Validación de dominio en esquema Pydantic `ReviewCreate` y `ReviewUpdate`: el usuario debe proveer al menos `puntaje` o `texto` (no pueden estar ambos vacíos). Si no envía puntaje, el texto debe contener al menos 5 caracteres.
+  - Adecuación en frontend (`ReviewsPage.tsx` y `TitleDetailPage.tsx`) para habilitar el guardado con rating directo y renderizar un mensaje de respaldo accesible (`t('noCommentWritten')`) en reseñas sin comentario.
+  - Cobertura de tests ampliada a 106 pruebas en backend (`test_review_score_only_without_text`).
+
 ## [v1.6.2] - 2026-09-26
 ### Corregido (Resiliencia ante Latencia de Episodios TMDB, Badges y Simplificación de Daily Sync)
 - **Desbloqueo Inmediato de Episodios Estrenados (`isUnreleased`):**

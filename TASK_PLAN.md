@@ -335,6 +335,22 @@
   - [x] Parametrización de `releases_days_window` (default: 15) en `workflow_dispatch` de `.github/workflows/daily_sync.yml` y `weekly_deep_sync.yml`.
   - [x] Verificación completa: suite de 105 tests de backend en verde y build de frontend verificado.
 
+- [x] **Pulido de Interfaz y Cierre de Calidad Pre-Entrega (v1.6.3):**
+  - [x] **Paso 1: Header y Búsqueda Interactiva:**
+    - [x] Ampliación de ancho de contenedor de búsqueda en `Header.tsx` (`max-w-md lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl`) para albergar placeholders completos en todos los idiomas.
+    - [x] Botones de lupa interactivos con `type="submit"` y hover dorado tanto en Header como en Catálogo.
+  - [x] **Paso 2: Reparto Principal Expandible:**
+    - [x] Selector interactivo "Ver más / Ver menos" en `TitleDetailPage.tsx` para mostrar más de 12 actores cuando el reparto exceda las 2 filas base.
+  - [x] **Paso 3: Coherencia de Temporadas con Episodios Emitidos:**
+    - [x] Ajuste en `TitleDetailPage.tsx` para que el cálculo optimista de temporada vista compare contra los episodios emitidos a la fecha (`!isUnreleased(e.fecha_estreno)`).
+  - [x] **Paso 4: Localización Completa de Reseñas:**
+    - [x] Incorporación de claves faltantes en `LanguageContext.tsx` y reemplazo de strings hardcodeados en `ReviewsPage.tsx`.
+  - [x] **Paso 5: Calificaciones sin Texto (Rating Directo):**
+    - [x] Soporte de texto opcional en modelo `Resena` y esquema `ReviewCreate` con validación estricta de presencia de texto o puntaje.
+    - [x] Migración Alembic `0006_nullable_review_text.py`.
+    - [x] Soporte en interfaz de `ReviewsPage.tsx` y `TitleDetailPage.tsx`.
+    - [x] Batería de pruebas automatizadas y verificación (106 tests pasando).
+
 ---
 
 ## Backlog / Versión Superior (Post-Entrega):

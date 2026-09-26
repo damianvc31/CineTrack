@@ -322,9 +322,15 @@ export const CatalogPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Catalog search bar with clear button 'X' */}
-        <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-96 md:w-[420px] lg:w-[460px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        {/* Catalog search bar with submit button and clear button 'X' */}
+        <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-96 md:w-[420px] lg:w-[460px] xl:w-[500px]">
+          <button
+            type="submit"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-amber-400 transition-colors focus:outline-none"
+            title={t('searchAction')}
+          >
+            <Search className="w-4 h-4" />
+          </button>
           <input
             type="text"
             value={searchInput}

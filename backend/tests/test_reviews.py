@@ -198,3 +198,69 @@ async def test_review_optional_score_and_pending(async_client: AsyncClient, db_s
     s3_abandoned_item = next(p for p in pending_items4 if p["id"] == 3)
     assert s3_abandoned_item["user_estado"] == "abandonada"
 
+
+@pytest.mark.asyncio
+async def test_review_score_only_without_text(async_client: AsyncClient, db_session: AsyncSession):
+    # 1. Crear título
+    title = Titulo(
+        id=99,
+        tmdb_id=9999,
+        tipo="movie",
+        nombre="Dune: Part Two",
+        fecha_estreno=date(2024, 3, 1),
+        popularidad=150.0,
+        vote_average_tmdb=8.5,
+        vote_count_tmdb=2000,
+        rating_unificado=8.5
+    )
+    db_session.add(title)
+    await db_session.commit()
+
+    user_id, token = await create_user_and_token(async_client, "score_only_user")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. Reseña sin puntaje ni texto debe fallar con 422
+    res_empty = await async_client.post(
+        "/api/v1/titles/99/reviews",
+        json={"puntaje": None, "texto": ""},
+        headers=headers
+    )
+    assert res_empty.status_code == 422
+
+    # 3. Reseña sin puntaje con texto demasiado corto (< 5 chars) debe fallar con 422
+    res_short = await async_client.post(
+        "/api/v1/titles/99/reviews",
+        json={"puntaje": None, "texto": "meh"},
+        headers=headers
+    )
+    assert res_short.status_code == 422
+
+    # 4. Reseña con SOLO puntaje y texto nulo/vacío debe guardarse exitosamente
+    res_score_only = await async_client.post(
+        "/api/v1/titles/99/reviews",
+        json={"puntaje": 9.5, "texto": None},
+        headers=headers
+    )
+    assert res_score_only.status_code == 201
+    data = res_score_only.json()
+    assert data["puntaje"] == 9.5
+    assert data["texto"] is None
+    assert data["usuario_id"] == user_id
+
+    # 5. Listar reseñas del título
+    res_list = await async_client.get("/api/v1/titles/99/reviews")
+    assert res_list.status_code == 200
+    revs = res_list.json()
+    assert len(revs) == 1
+    assert revs[0]["puntaje"] == 9.5
+    assert revs[0]["texto"] is None
+
+    # 6. Listar en /api/v1/users/me/reviews
+    res_my = await async_client.get("/api/v1/users/me/reviews", headers=headers)
+    assert res_my.status_code == 200
+    my_revs = res_my.json()
+    assert my_revs["total"] == 1
+    assert my_revs["items"][0]["puntaje"] == 9.5
+    assert my_revs["items"][0]["texto"] is None
+
+

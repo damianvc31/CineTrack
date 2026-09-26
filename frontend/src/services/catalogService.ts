@@ -73,8 +73,8 @@ export const catalogService = {
   getReviews: (titleId: number, page: number = 1, pageSize: number = 20) =>
     api.get<ReviewItem[]>(`/titles/${titleId}/reviews`, { page, page_size: pageSize }),
 
-  addReview: (titleId: number, texto: string, puntaje?: number | null) =>
-    api.post<ReviewItem>(`/titles/${titleId}/reviews`, { texto, puntaje }),
+  addReview: (titleId: number, texto?: string | null, puntaje?: number | null) =>
+    api.post<ReviewItem>(`/titles/${titleId}/reviews`, { texto: texto || null, puntaje }),
 
   deleteReview: (titleId: number) =>
     api.delete<{ message: string }>(`/titles/${titleId}/reviews`),

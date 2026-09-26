@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 
 class GenreResponse(BaseModel):
@@ -127,13 +127,13 @@ class ReviewResponse(BaseModel):
     avatar_url: str | None = None
     autor_tmdb: str | None = None
     puntaje: float | None = None
-    texto: str
+    texto: str | None = None
     fecha: datetime
 
 
 class ReviewCreate(BaseModel):
     puntaje: float | None = Field(default=None, ge=0.0, le=10.0, description="Calificación opcional de 0.0 a 10.0 en saltos de 0.5")
-    texto: str = Field(..., min_length=5, max_length=5000, description="Texto de la reseña")
+    texto: str | None = Field(default=None, max_length=5000, description="Texto opcional de la reseña")
 
     @field_validator("puntaje")
     @classmethod
@@ -143,6 +143,16 @@ class ReviewCreate(BaseModel):
         if not abs(v * 2 - round(v * 2)) < 1e-6:
             raise ValueError("El puntaje debe ser un número entre 0.0 y 10.0 en saltos de 0.5 (ej. 7.0, 7.5, 8.0).")
         return round(v * 2) / 2
+
+    @model_validator(mode="after")
+    def validate_texto_or_puntaje(self) -> "ReviewCreate":
+        clean_text = self.texto.strip() if self.texto else None
+        self.texto = clean_text if clean_text else None
+        if self.texto is None and self.puntaje is None:
+            raise ValueError("Debe ingresar un puntaje o un texto para la reseña.")
+        if self.texto is not None and len(self.texto) < 5 and self.puntaje is None:
+            raise ValueError("El texto de la reseña debe tener al menos 5 caracteres si no incluye puntaje.")
+        return self
 
 
 class UserReviewItemResponse(BaseModel):
@@ -155,7 +165,7 @@ class UserReviewItemResponse(BaseModel):
     titulo_portada_url: str | None = None
     titulo_fecha_estreno: date | None = None
     puntaje: float | None = None
-    texto: str
+    texto: str | None = None
     fecha: datetime
 
 

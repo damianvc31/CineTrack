@@ -68,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
 
           {/* Área Central: Botón Explore + Botón IA + Barra de Búsqueda */}
           {!isCatalog && (
-            <div className="hidden md:flex items-center justify-center gap-3 absolute left-1/2 -translate-x-1/2 w-full max-w-sm md:max-w-md lg:max-w-lg pointer-events-auto z-10">
+            <div className="hidden md:flex items-center justify-center gap-3 absolute left-1/2 -translate-x-1/2 w-full max-w-sm md:max-w-md lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl pointer-events-auto z-10">
               {/* Botón Explore Catálogo */}
               <Link
                 to="/catalog"
@@ -88,9 +88,15 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                 <span>{t('aiAssistant')}</span>
               </Link>
 
-              {/* Barra de Búsqueda con X de limpieza */}
-              <form onSubmit={handleSearchSubmit} className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              {/* Barra de Búsqueda con botón Lupa interactivo y X de limpieza */}
+              <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[200px]">
+                <button
+                  type="submit"
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-amber-400 transition-colors focus:outline-none"
+                  title={t('searchAction')}
+                >
+                  <Search className="w-3.5 h-3.5" />
+                </button>
                 <input
                   type="text"
                   value={searchQuery}
@@ -103,6 +109,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                     type="button"
                     onClick={() => setSearchQuery('')}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-0.5"
+                    title={t('clearSearch')}
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -260,7 +267,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
         <div className="md:hidden bg-[#0d0d0d] border-b border-[#262626] px-4 pt-2 pb-6 space-y-3">
           {!isCatalog && (
             <form onSubmit={handleSearchSubmit} className="relative mt-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <button
+                type="submit"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-amber-400 transition-colors focus:outline-none"
+                title={t('searchAction')}
+              >
+                <Search className="w-4 h-4" />
+              </button>
               <input
                 type="text"
                 value={searchQuery}
@@ -273,6 +286,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   type="button"
                   onClick={() => setSearchQuery('')}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-0.5"
+                  title={t('clearSearch')}
                 >
                   <X className="w-4 h-4" />
                 </button>

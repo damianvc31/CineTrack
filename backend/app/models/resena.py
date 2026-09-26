@@ -18,7 +18,7 @@ class Resena(Base):
     usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
     autor_tmdb: Mapped[str | None] = mapped_column(String(100), nullable=True)
     puntaje: Mapped[float | None] = mapped_column(Float, nullable=True)  # 1.0 a 10.0, opcional
-    texto: Mapped[str] = mapped_column(Text, nullable=False)
+    texto: Mapped[str | None] = mapped_column(Text, nullable=True)
     fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     tmdb_review_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True, index=True)
 

@@ -90,6 +90,7 @@ export const TitleDetailPage: React.FC = () => {
   const [episodesCollapsed, setEpisodesCollapsed] = useState(false)
   const [seasonWatchLoading, setSeasonWatchLoading] = useState(false)
   const [episodeNotice, setEpisodeNotice] = useState<string | null>(null)
+  const [showAllCast, setShowAllCast] = useState(false)
 
   // Estados de hover y supresión inmediata post-clic para botones de acción
   const [isFavHovered, setIsFavHovered] = useState(false)
@@ -313,6 +314,11 @@ export const TitleDetailPage: React.FC = () => {
     // 1. Parche optimista instantáneo (0 ms) en temporadas y episodios
     setTitle((prev) => {
       if (!prev || !prev.temporadas) return prev
+      const todayStr = new Date().toISOString().split('T')[0]
+      const isTitleEnded = !!(
+        prev.status_tmdb &&
+        (prev.status_tmdb.toLowerCase().includes('ended') || prev.status_tmdb.toLowerCase().includes('cancel'))
+      )
       const updatedSeasons = prev.temporadas.map((s) => {
         if (s.numero !== seasonNum) return s
         const updatedEpisodes =
@@ -321,11 +327,24 @@ export const TitleDetailPage: React.FC = () => {
             return { ...e, visto: nextWatched }
           }) || []
         const watchedCount = updatedEpisodes.filter((e) => e.visto).length
+
+        // Episodios disponibles para ver (emitidos hasta la fecha)
+        const availableEpisodes = updatedEpisodes.filter((e) => {
+          const isEpUnreleased = !isTitleEnded && !!(
+            !e.fecha_estreno ||
+            e.fecha_estreno > todayStr ||
+            (prev.proximo_episodio_fecha && prev.proximo_episodio_fecha > todayStr && e.fecha_estreno && e.fecha_estreno >= prev.proximo_episodio_fecha)
+          )
+          return !isEpUnreleased
+        }).length
+
+        const isSeasonComplete = availableEpisodes > 0 && watchedCount >= availableEpisodes
+
         return {
           ...s,
           episodios: updatedEpisodes,
           episodios_vistos: watchedCount,
-          temporada_vista: s.cantidad_episodios > 0 && watchedCount === s.cantidad_episodios,
+          temporada_vista: isSeasonComplete,
         }
       })
       return { ...prev, temporadas: updatedSeasons }
@@ -433,7 +452,7 @@ export const TitleDetailPage: React.FC = () => {
 
   const handleStartEdit = (rev: ReviewItem) => {
     setIsEditingReview(true)
-    setReviewText(rev.texto)
+    setReviewText(rev.texto || '')
     if (rev.puntaje !== null && rev.puntaje !== undefined) {
       setIncludeScore(true)
       setReviewScore(rev.puntaje)
@@ -456,12 +475,12 @@ export const TitleDetailPage: React.FC = () => {
       openAuth()
       return
     }
-    if (!reviewText.trim()) return
+    if (!reviewText.trim() && !includeScore) return
 
     setSubmittingReview(true)
     try {
       const finalScore = includeScore ? Math.round(reviewScore * 2) / 2 : null
-      const saved = await catalogService.addReview(titleId, reviewText.trim(), finalScore)
+      const saved = await catalogService.addReview(titleId, reviewText.trim() || undefined, finalScore)
       setReviews((prev) => {
         const idx = prev.findIndex((r) => r.usuario_id === user.id)
         if (idx >= 0) {
@@ -1276,33 +1295,66 @@ export const TitleDetailPage: React.FC = () => {
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
-              {title.elenco.slice(0, 12).map((actor) => (
-                <Link
-                  key={`${actor.actor_id}-${actor.orden}`}
-                  to={`/catalog?actor=${encodeURIComponent(actor.nombre)}`}
-                  className="p-3 rounded-2xl bg-[#141414] border border-[#262626] hover:border-amber-500/40 transition-all flex flex-col items-center text-center space-y-2.5 group shadow-sm block"
-                >
-                  {/* Foto de perfil del actor con fallback e iniciales completas */}
-                  <ActorAvatar nombre={actor.nombre} fotoUrl={actor.foto_url} />
-
-                  <div className="min-w-0 w-full space-y-0.5">
-                    <h4
-                      className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors truncate"
-                    >
-                      {actor.nombre}
-                    </h4>
-                    {actor.personaje && (
-                      <p
-                        className="text-[11px] text-gray-400 truncate"
+            {(() => {
+              const displayedCast = showAllCast ? title.elenco : title.elenco.slice(0, 12)
+              return (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+                    {displayedCast.map((actor) => (
+                      <Link
+                        key={`${actor.actor_id}-${actor.orden}`}
+                        to={`/catalog?actor=${encodeURIComponent(actor.nombre)}`}
+                        className="p-3 rounded-2xl bg-[#141414] border border-[#262626] hover:border-amber-500/40 transition-all flex flex-col items-center text-center space-y-2.5 group shadow-sm block"
                       >
-                        {actor.personaje}
-                      </p>
-                    )}
+                        {/* Foto de perfil del actor con fallback e iniciales completas */}
+                        <ActorAvatar nombre={actor.nombre} fotoUrl={actor.foto_url} />
+
+                        <div className="min-w-0 w-full space-y-0.5">
+                          <h4
+                            className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors truncate"
+                          >
+                            {actor.nombre}
+                          </h4>
+                          {actor.personaje && (
+                            <p
+                              className="text-[11px] text-gray-400 truncate"
+                            >
+                              {actor.personaje}
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
                   </div>
-                </Link>
-              ))}
-            </div>
+
+                  {title.elenco.length > 12 && (
+                    <div className="flex justify-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowAllCast(!showAllCast)}
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold bg-[#141414] hover:bg-[#1a1a1a] border border-[#262626] hover:border-amber-500/40 text-gray-300 hover:text-amber-400 transition-all shadow-sm active:scale-95"
+                      >
+                        {showAllCast ? (
+                          <>
+                            <span>{language === 'es' ? 'Ver menos' : 'Show less'}</span>
+                            <ChevronUp className="w-3.5 h-3.5 text-amber-500" />
+                          </>
+                        ) : (
+                          <>
+                            <span>
+                              {language === 'es'
+                                ? `Ver reparto completo (+${title.elenco.length - 12})`
+                                : `Show all cast (+${title.elenco.length - 12})`}
+                            </span>
+                            <ChevronDown className="w-3.5 h-3.5 text-amber-500" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </section>
         )}
 
@@ -1633,9 +1685,15 @@ export const TitleDetailPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <p className="text-xs sm:text-sm text-gray-200 leading-relaxed whitespace-pre-line">
-                      {userReview.texto}
-                    </p>
+                    {userReview.texto ? (
+                      <p className="text-xs sm:text-sm text-gray-200 leading-relaxed whitespace-pre-line">
+                        {userReview.texto}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">
+                        {language === 'es' ? 'Sin reseña escrita (solo calificación)' : 'No written review (rating only)'}
+                      </p>
+                    )}
 
                     <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 border-t border-[#262626]">
                       <span>
@@ -1761,7 +1819,6 @@ export const TitleDetailPage: React.FC = () => {
                   </div>
 
                   <textarea
-                    required
                     rows={3}
                     value={reviewText}
                     onChange={(e) => setReviewText(e.target.value)}
@@ -1785,7 +1842,7 @@ export const TitleDetailPage: React.FC = () => {
                     )}
                     <button
                       type="submit"
-                      disabled={submittingReview}
+                      disabled={submittingReview || (!reviewText.trim() && !includeScore)}
                       className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
                     >
                       <Send className="w-3.5 h-3.5" />
@@ -1863,9 +1920,15 @@ export const TitleDetailPage: React.FC = () => {
                         )}
                       </div>
 
-                      <p className="text-xs sm:text-sm text-gray-300 leading-relaxed whitespace-pre-line">
-                        {rev.texto}
-                      </p>
+                      {rev.texto ? (
+                        <p className="text-xs sm:text-sm text-gray-300 leading-relaxed whitespace-pre-line">
+                          {rev.texto}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-500 italic">
+                          {language === 'es' ? 'Sin reseña escrita (solo calificación)' : 'No written review (rating only)'}
+                        </p>
+                      )}
                       <span className="text-[10px] text-gray-500 block">
                         {rev.fecha ? new Date(rev.fecha).toLocaleDateString() : '-'}
                       </span>
