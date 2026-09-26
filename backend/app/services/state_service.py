@@ -120,15 +120,18 @@ async def toggle_watchlist(
     )
 
 
+UPCOMING_STATUSES = ("In Production", "Planned", "Post Production", "Upcoming")
+
+
 async def toggle_watched(
     db: AsyncSession,
     usuario_id: int,
     titulo_id: int
 ) -> StateChangeResponse:
     """Marca o desmarca un título completo como Visto (👁).
-    En películas: toggle simple Vista <-> SinEstado.
+    En películas: toggle simple Vista <-> SinEstado (rechaza no estrenadas).
     En series:
-      - Si no está Vista: marca todos los episodios disponibles como vistos y pasa a Vista.
+      - Si no está Vista: marca todos los episodios disponibles como vistos y pasa a Vista (rechaza series sin episodios emitidos o no estrenadas).
       - Si ya está Vista: borra todos los episodios vistos de esa serie (reseteo) y pasa a SinEstado.
     """
     titulo = await db.get(Titulo, titulo_id)
@@ -136,6 +139,7 @@ async def toggle_watched(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Título no encontrado.")
 
     estado_obj = await get_or_create_title_state(db, usuario_id, titulo_id)
+    today = date.today()
 
     if titulo.tipo == "movie":
         if estado_obj.estado == "vista":
@@ -143,12 +147,20 @@ async def toggle_watched(
             estado_obj.fecha_estado = None
             mensaje = "Película desmarcada como vista."
         else:
+            is_unreleased = (
+                (titulo.fecha_estreno and titulo.fecha_estreno > today)
+                or (titulo.status_tmdb and titulo.status_tmdb in UPCOMING_STATUSES)
+            )
+            if is_unreleased:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No se puede marcar como vista una película no estrenada."
+                )
             estado_obj.estado = "vista"
             estado_obj.fecha_estado = _now()
             mensaje = "Película marcada como vista."
     else:
         # Es una serie: obtener los IDs de episodios emitidos hasta la fecha
-        today = date.today()
         ep_query = (
             select(Episodio.id)
             .join(Temporada, Episodio.temporada_id == Temporada.id)
@@ -180,20 +192,35 @@ async def toggle_watched(
             estado_obj.fecha_estado = None
             mensaje = "Serie desmarcada por completo (progreso reiniciado)."
         else:
-            # Marcar serie completa: marcar todos los episodios emitidos como vistos
-            if eligible_episode_ids:
-                vistos_query = select(EpisodioVisto.episodio_id).where(
-                    EpisodioVisto.usuario_id == usuario_id,
-                    EpisodioVisto.episodio_id.in_(eligible_episode_ids)
+            is_tv_unreleased = (
+                (titulo.fecha_estreno and titulo.fecha_estreno > today)
+                or (titulo.status_tmdb and titulo.status_tmdb in UPCOMING_STATUSES)
+                or (
+                    titulo.fecha_estreno == today
+                    and (titulo.proximo_episodio_fecha is None or titulo.proximo_episodio_fecha >= today)
                 )
-                vistos_res = await db.execute(vistos_query)
-                already_watched = {row[0] for row in vistos_res.all()}
+                or not eligible_episode_ids
+            )
+            if is_tv_unreleased:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No se puede marcar como vista una serie que aún no tiene episodios estrenados."
+                )
 
-                now_ts = _now()
-                new_vistos = [
-                    EpisodioVisto(usuario_id=usuario_id, episodio_id=eid, fecha_visto=now_ts)
-                    for eid in eligible_episode_ids if eid not in already_watched
-                ]
+            # Marcar serie completa: marcar todos los episodios emitidos como vistos
+            vistos_query = select(EpisodioVisto.episodio_id).where(
+                EpisodioVisto.usuario_id == usuario_id,
+                EpisodioVisto.episodio_id.in_(eligible_episode_ids)
+            )
+            vistos_res = await db.execute(vistos_query)
+            already_watched = {row[0] for row in vistos_res.all()}
+
+            now_ts = _now()
+            new_vistos = [
+                EpisodioVisto(usuario_id=usuario_id, episodio_id=eid, fecha_visto=now_ts)
+                for eid in eligible_episode_ids if eid not in already_watched
+            ]
+            if new_vistos:
                 db.add_all(new_vistos)
 
             estado_obj.estado = "vista"

@@ -40,6 +40,8 @@ export interface TitleCard {
   seasons_progress?: SeasonProgress[] | null
   following_status_text?: string | null
   user_rating?: number | null
+  status_tmdb?: string | null
+  proximo_episodio_fecha?: string | null
 }
 
 export interface HomeSections {

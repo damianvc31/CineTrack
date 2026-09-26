@@ -95,6 +95,8 @@ class TitleCardResponse(BaseModel):
     seasons_progress: list[SeasonProgressResponse] | None = None
     following_status_text: str | None = None
     user_rating: float | None = None
+    status_tmdb: str | None = None
+    proximo_episodio_fecha: date | None = None
 
     @computed_field
     @property
@@ -109,10 +111,6 @@ class TitleDetailResponse(TitleCardResponse):
 
     director: str | None = None
     guionista: str | None = None
-    pais: str | None = None
-    idioma_original: str | None = None
-    status_tmdb: str | None = None
-    proximo_episodio_fecha: date | None = None
     elenco: list[CastMemberResponse] = Field(default_factory=list)
     temporadas: list[SeasonResponse] = Field(default_factory=list)
 

@@ -195,6 +195,8 @@ def _build_title_card(
         seasons_progress=seasons_progress,
         following_status_text=following_status_text,
         user_rating=user_rating,
+        status_tmdb=titulo.status_tmdb,
+        proximo_episodio_fecha=titulo.proximo_episodio_fecha,
     )
 
 
@@ -1046,8 +1048,6 @@ async def get_title_detail(
         **card.model_dump(),
         director=titulo.director,
         guionista=titulo.guionista,
-        status_tmdb=titulo.status_tmdb,
-        proximo_episodio_fecha=titulo.proximo_episodio_fecha,
         elenco=elenco_list,
         temporadas=temporadas_list
     )

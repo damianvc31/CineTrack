@@ -8,6 +8,7 @@ import { CountryFlag } from '@/components/common/CountryFlag'
 import { SeasonProgressBar } from '@/components/profile/SeasonProgressBar'
 import { useLanguage } from '@/context/LanguageContext'
 import { useTitleMutations } from '@/hooks/useTitleMutations'
+import { isTitleUnreleased } from '@/utils/releaseUtils'
 
 interface TitleCardProps {
   title: TitleCardType
@@ -117,6 +118,7 @@ export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOp
     if (onStateChange) onStateChange(action, title.id)
   }
 
+  const isUnreleased = isTitleUnreleased(title)
   const isWatched = userEstado === 'vista'
   const isSiguiendo = userEstado === 'siguiendo'
   const isWatchlist = userEstado === 'watchlist'
@@ -211,36 +213,38 @@ export const TitleCard: React.FC<TitleCardProps> = ({ title, onStateChange, onOp
             <Heart className={`w-4 h-4 transition-all ${isFavorite && !favUnfilled ? 'fill-current' : ''}`} />
           </button>
 
-          {/* Botón Visto con inversión dinámica en hover y supresión post-click */}
-          <button
-            onClick={(e) => handleQuickAction(e, 'watched')}
-            onMouseEnter={() => setIsWatchedHovered(true)}
-            onMouseLeave={() => {
-              setIsWatchedHovered(false)
-              setJustToggledWatched(false)
-            }}
-            disabled={isUpdating}
-            title={
-              isWatched
-                ? (language === 'es' ? 'Marcar como no vista' : 'Mark as unwatched')
-                : (language === 'es' ? 'Marcar como vista' : 'Mark as watched')
-            }
-            className={`p-1.5 rounded-full transition-all ${
-              showingWatched
-                ? 'text-emerald-400 bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30'
-                : isWatched && effectiveHoverWatched
-                ? 'text-emerald-300 bg-[#18261e] border border-emerald-600/70'
-                : effectiveHoverWatched
-                ? 'text-emerald-300 bg-emerald-950/40 border border-emerald-500/40'
-                : 'text-gray-400 hover:text-emerald-400 hover:bg-black/60'
-            }`}
-          >
-            {showingWatched ? (
-              <Eye className="w-4 h-4 stroke-[2.2]" />
-            ) : (
-              <EyeOff className={`w-4 h-4 ${isWatched && effectiveHoverWatched ? 'text-emerald-300' : ''}`} />
-            )}
-          </button>
+          {/* Botón Visto con inversión dinámica en hover y supresión post-click (oculto para títulos no estrenados) */}
+          {!isUnreleased && (
+            <button
+              onClick={(e) => handleQuickAction(e, 'watched')}
+              onMouseEnter={() => setIsWatchedHovered(true)}
+              onMouseLeave={() => {
+                setIsWatchedHovered(false)
+                setJustToggledWatched(false)
+              }}
+              disabled={isUpdating}
+              title={
+                isWatched
+                  ? (language === 'es' ? 'Marcar como no vista' : 'Mark as unwatched')
+                  : (language === 'es' ? 'Marcar como vista' : 'Mark as watched')
+              }
+              className={`p-1.5 rounded-full transition-all ${
+                showingWatched
+                  ? 'text-emerald-400 bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30'
+                  : isWatched && effectiveHoverWatched
+                  ? 'text-emerald-300 bg-[#18261e] border border-emerald-600/70'
+                  : effectiveHoverWatched
+                  ? 'text-emerald-300 bg-emerald-950/40 border border-emerald-500/40'
+                  : 'text-gray-400 hover:text-emerald-400 hover:bg-black/60'
+              }`}
+            >
+              {showingWatched ? (
+                <Eye className="w-4 h-4 stroke-[2.2]" />
+              ) : (
+                <EyeOff className={`w-4 h-4 ${isWatched && effectiveHoverWatched ? 'text-emerald-300' : ''}`} />
+              )}
+            </button>
+          )}
 
           {/* Botón Watchlist / Siguiendo / Abandonada */}
           {isSiguiendo ? (

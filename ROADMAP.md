@@ -138,7 +138,7 @@
   - Localización completa de reseñas y claves de interfaz.
   - Reseñas con calificación directa opcional sin comentario de texto obligatorio, con restricción `CheckConstraint` de base de datos.
   - Suite de 106 tests unitarios e integración en verde.
-- [x] **Fase 11: Factor Sorpresa y Variedad en Recomendador IA (v1.7.0):**
+- [x] **Fase 11: Factor Sorpresa y Variedad en Recomendador IA (v1.7.0 - v1.7.1):**
   - Enum normalizado `VarietyLevel` (`VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`) y variable global `AI_RECOMMENDER_DEFAULT_VARIETY`.
   - Persistencia de `preferencia_variedad_ia` en modelo `Usuario` y migración Alembic `0007_user_variety_preference.py` ejecutada en SQLite local, Neon Dev y Neon Prod.
   - Modulación RAG de umbrales de votos ($\times 1.8$ a $\times 0.3$), filtro crítico `rating_unificado >= 7.5` para `VERY_LOW`, salvaguarda contra inanición (< 3 candidatos relaja filtro), y exención de entidad directa (director, actor, título explícito no se podan).
@@ -147,7 +147,8 @@
   - Calibración de temperatura (`0.7` a `1.2` para reasoning; `0.1` a `0.9` para estándar).
   - Resiliencia multiclave exhaustiva con iteración de todas las API keys por modelo en la cascada.
   - Frontend: Slider interactivo de 5 pasos en `SettingsPage.tsx` con guía central fija (*Balanceada*) y selector rápido con badge en `RecommendationsPage.tsx`.
-  - Cobertura ampliada a 109 tests unitarios e integración en verde y batería de pruebas en dos fases (sin autenticar y con usuario real) verificada al 100%.
+  - Bloqueo e invariante de marcado como visto (👁) en películas no estrenadas y series sin episodios emitidos a la fecha, ocultando el botón en cards y detalle y preservando Favorito (♥) y Watchlist (🔖) (v1.7.1).
+  - Cobertura ampliada a 111 tests unitarios e integración en backend (`pytest`) y 7 tests en frontend (`vitest`) al 100%.
 
 ---
 

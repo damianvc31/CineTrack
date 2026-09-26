@@ -1,6 +1,6 @@
 # TASK_PLAN.md — Plan de Trabajo Activo: CineTrack
 
-## Estado General: Fase 11 Completada (v1.7.0)
+## Estado General: Fase 11 Completada (v1.7.1)
 
 - [x] **Fase 1:** Scaffolding inicial y smoke tests en verde (v0.1.0).
 - [x] **Fase 2:** Persistencia y modelos relacionales completos en SQLAlchemy 2.0 (v0.2.0).
@@ -299,6 +299,12 @@
   - [x] Fase 1 (11 escenarios sin usuario autenticado: G1, G2, G3, G4 y G5 transversal).
   - [x] Fase 2 (Usuario real `damianvc31`: lectura automática de preferencia de variedad e interacción con 49 títulos vistos y favoritos).
   - [x] Prueba desafiante de nicho con baja calificación (*La señal*, 5.92★, 25 votos) verificada en `VERY_LOW`.
+- [x] **Paso 11.9: Bloqueo de Marcado como Visto en Títulos No Estrenados (v1.7.1):**
+  - [x] Ocultamiento del botón del ojo (👁) en `TitleCard.tsx` y en `TitleDetailPage.tsx` para películas no estrenadas (fecha futura o status de producción/planificación) y series sin episodios emitidos a la fecha, preservando Favorito (♥) y Watchlist (🔖).
+  - [x] Condición en `TitleDetailPage.tsx` para botón "Marcar Temporada Completa", visible únicamente si la temporada cuenta con episodios emitidos.
+  - [x] Utilidad centralizada `releaseUtils.ts` (`isTitleUnreleased`) con suite de 5 tests unitarios en Vitest (7 tests frontend pasando).
+  - [x] Blindaje e invariante de dominio en backend (`state_service.toggle_watched`) con HTTP 400 Bad Request y 2 tests unitarios en `test_state_machine.py` (111 tests backend pasando al 100%).
+  - [x] Exposición de `status_tmdb` y `proximo_episodio_fecha` en `TitleCardResponse`.
 
 ---
 

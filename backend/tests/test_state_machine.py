@@ -393,3 +393,72 @@ async def test_series_with_future_episodes_only_marks_released(async_client: Asy
     unreleased_ep_id = episodes[1]["id"]
     err_res = await async_client.post(f"/api/v1/episodes/{unreleased_ep_id}/watch", headers=headers)
     assert err_res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_unreleased_movie_cannot_be_marked_as_watched(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica que una película no estrenada (fecha futura o status upcoming) rechace marcarse como vista (👁)."""
+    future_date = date.today() + timedelta(days=60)
+    peli_futura = Titulo(
+        tmdb_id=9901,
+        tipo="movie",
+        nombre="Avatar 4: The Tulkun Rider",
+        fecha_estreno=future_date,
+        status_tmdb="Post Production"
+    )
+    db_session.add(peli_futura)
+    await db_session.commit()
+    await db_session.refresh(peli_futura)
+
+    token = await create_user_and_get_token(async_client, "user_unreleased_movie")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Intentar marcar con ojo (👁) -> 400 Bad Request
+    res = await async_client.post(f"/api/v1/titles/{peli_futura.id}/watched", headers=headers)
+    assert res.status_code == 400
+    assert "No se puede marcar como vista una película no estrenada" in res.json()["detail"]
+
+    # Favorito y Watchlist sí deben funcionar
+    fav_res = await async_client.post(f"/api/v1/titles/{peli_futura.id}/favorite", headers=headers)
+    assert fav_res.status_code == 200
+    assert fav_res.json()["favorito"] is True
+
+    wl_res = await async_client.post(f"/api/v1/titles/{peli_futura.id}/watchlist", headers=headers)
+    assert wl_res.status_code == 200
+    assert wl_res.json()["nuevo_estado"] == "watchlist"
+
+
+@pytest.mark.asyncio
+async def test_unreleased_series_without_aired_episodes_cannot_be_marked_as_watched(async_client: AsyncClient, db_session: AsyncSession):
+    """Verifica que una serie sin episodios estrenados no permita marcarse entera como vista (👁)."""
+    future_date = date.today() + timedelta(days=45)
+    serie_futura = Titulo(
+        tmdb_id=9902,
+        tipo="tv",
+        nombre="Harry Potter HBO Series",
+        fecha_estreno=future_date,
+        status_tmdb="In Production"
+    )
+    temp = Temporada(titulo=serie_futura, numero=1)
+    ep1 = Episodio(temporada=temp, numero=1, nombre="Chapter 1", fecha_estreno=future_date)
+    db_session.add_all([serie_futura, temp, ep1])
+    await db_session.commit()
+    await db_session.refresh(serie_futura)
+
+    token = await create_user_and_get_token(async_client, "user_unreleased_series")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Intentar marcar con ojo (👁) -> 400 Bad Request
+    res = await async_client.post(f"/api/v1/titles/{serie_futura.id}/watched", headers=headers)
+    assert res.status_code == 400
+    assert "No se puede marcar como vista una serie que aún no tiene episodios estrenados" in res.json()["detail"]
+
+    # Favorito y Watchlist sí deben funcionar
+    fav_res = await async_client.post(f"/api/v1/titles/{serie_futura.id}/favorite", headers=headers)
+    assert fav_res.status_code == 200
+    assert fav_res.json()["favorito"] is True
+
+    wl_res = await async_client.post(f"/api/v1/titles/{serie_futura.id}/watchlist", headers=headers)
+    assert wl_res.status_code == 200
+    assert wl_res.json()["nuevo_estado"] == "watchlist"
+
