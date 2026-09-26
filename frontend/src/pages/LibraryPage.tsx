@@ -51,7 +51,7 @@ export const LibraryPage: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div className="w-10 h-10 border-3 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-        <p className="text-xs text-gray-400 font-medium">Loading library...</p>
+        <p className="text-xs text-gray-400 font-medium">{language === 'es' ? 'Cargando biblioteca...' : 'Loading library...'}</p>
       </div>
     )
   }

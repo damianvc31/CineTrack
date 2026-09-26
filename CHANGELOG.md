@@ -2,6 +2,11 @@
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
+## [v1.7.4] - 2026-09-26
+### Corregido — Localización de Carruseles y Textos de Carga
+- **Traducción de Enlaces "Ver Todos":** En `CarouselRow.tsx`, integración con el hook `useLanguage` y diccionario i18n (`t('viewAll')`) para alternar a "Ver Todos" en español.
+- **Mensajes de Carga Dinámicos:** En `HomePage.tsx`, `LibraryPage.tsx` y `ProfilePage.tsx`, soporte bilingüe para los mensajes transitorios de carga ("Cargando películas y series...", "Cargando biblioteca...", "Cargando perfil...").
+
 ## [v1.7.3] - 2026-09-26
 ### Corregido — Localización Completa de Modales de Autenticación (Login y Registro)
 - **Localización Dinámica en `AuthModal.tsx` con `useLanguage`:**

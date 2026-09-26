@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { TitleCard as TitleCardType } from '@/types/catalog'
 import { TitleCard } from './TitleCard'
+import { useLanguage } from '@/context/LanguageContext'
 
 interface CarouselRowProps {
   title: string
@@ -24,6 +25,7 @@ export const CarouselRow: React.FC<CarouselRowProps> = ({
   onStateChange,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const { t } = useLanguage()
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
 
@@ -72,7 +74,7 @@ export const CarouselRow: React.FC<CarouselRowProps> = ({
             to={viewMoreLink}
             className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-amber-400 transition-colors group/link py-1"
           >
-            <span>View all</span>
+            <span>{t('viewAll')}</span>
             <ChevronRight className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 transition-transform" />
           </Link>
         )}
