@@ -1,0 +1,124 @@
+classDiagram
+    direction TB
+    %% =========================================================================
+    %% CINETRACK — MODELO DE DATOS UNIFICADO (PRODUCCIÓN)
+    %% Entidades relacionales, tipos, restricciones y pgvector embedding
+    %% =========================================================================
+
+    class Titulo {
+        +int id PK
+        +int tmdb_id
+        +string tipo "movie | tv"
+        +string nombre
+        +string sinopsis
+        +string portada_url
+        +date fecha_estreno
+        +date fecha_fin
+        +int duracion "solo peliculas"
+        +string director
+        +string guionista
+        +string pais
+        +string idioma_original
+        +float popularidad
+        +float popularidad_percentil
+        +float vote_average_tmdb
+        +int vote_count_tmdb
+        +float rating_unificado
+        +string status_tmdb "Ended | Returning | etc."
+        +date proximo_episodio_fecha "solo series"
+        +vector(768) embedding "Google text-embedding"
+    }
+
+    class Actor {
+        +int id PK
+        +int tmdb_id
+        +string nombre
+        +string foto_url
+    }
+
+    class TituloElenco {
+        +int titulo_id PK, FK
+        +int actor_id PK, FK
+        +string personaje
+        +int orden
+    }
+
+    class Genero {
+        +int id PK
+        +int tmdb_id
+        +string nombre
+    }
+
+    class Temporada {
+        +int id PK
+        +int titulo_id FK
+        +int numero
+        +string sinopsis
+        +date fecha_estreno
+    }
+
+    class Episodio {
+        +int id PK
+        +int temporada_id FK
+        +int numero
+        +string nombre
+        +date fecha_estreno
+        +int duracion
+    }
+
+    class Usuario {
+        +int id PK
+        +string nombre_usuario UNIQUE
+        +string password_hash
+        +string pais
+        +string ciudad
+        +string descripcion
+        +datetime fecha_registro
+        +string avatar_url
+        +bytes avatar_binario
+        +bool es_admin
+        +string preferencia_variedad_ia "VERY_LOW..VERY_HIGH"
+    }
+
+    class EstadoUsuarioTitulo {
+        +int id PK
+        +int usuario_id FK
+        +int titulo_id FK
+        +bool favorito
+        +datetime fecha_favorito
+        +string estado "watchlist | siguiendo | vista | null"
+        +datetime fecha_estado
+    }
+
+    class EpisodioVisto {
+        +int id PK
+        +int usuario_id FK
+        +int episodio_id FK
+        +datetime fecha_visto
+    }
+
+    class Resena {
+        +int id PK
+        +int titulo_id FK
+        +int usuario_id FK "nullable"
+        +string autor_tmdb "nullable"
+        +float puntaje "1.0..10.0, nullable"
+        +string texto "nullable"
+        +datetime fecha
+        +string tmdb_review_id "UNIQUE, nullable"
+    }
+
+    %% Relaciones de Catálogo
+    Titulo "1" --> "*" TituloElenco : tiene elenco
+    Actor "1" --> "*" TituloElenco : participa en
+    Titulo "*" --> "*" Genero : categorizado en
+    Titulo "1" --> "*" Temporada : temporadas (tipo=tv)
+    Temporada "1" --> "*" Episodio : contiene
+
+    %% Relaciones de Usuario e Interacciones
+    Usuario "1" --> "*" EstadoUsuarioTitulo : registra biblioteca
+    Titulo "1" --> "*" EstadoUsuarioTitulo : catalogado por
+    Usuario "1" --> "*" EpisodioVisto : marca visto
+    Episodio "1" --> "*" EpisodioVisto : completado por
+    Titulo "1" --> "*" Resena : recibe
+    Usuario "0..1" --> "*" Resena : escribe

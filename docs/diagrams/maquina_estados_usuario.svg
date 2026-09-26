@@ -44,19 +44,21 @@
 
     <!-- Watchlist -> Vista -->
     <path d="M 720 120 L 860 120" stroke="#10b981" stroke-width="2" marker-end="url(#arrow-emerald)" fill="none"/>
-    <text x="790" y="112" font-size="11" fill="#10b981" text-anchor="middle">Marcar Vista (Ojo)</text>
+    <text x="790" y="106" font-size="11" font-weight="bold" fill="#10b981" text-anchor="middle">Marcar Vista (Ojo)</text>
+    <text x="790" y="122" font-size="9.5" fill="#34d399" text-anchor="middle">[Solo si estrenada]</text>
 
     <!-- SinEstado -> Vista Directo -->
     <path d="M 210 210 L 210 260 L 970 260 L 970 210" stroke="#10b981" stroke-width="2" marker-end="url(#arrow-emerald)" fill="none"/>
-    <text x="590" y="252" font-size="11.5" fill="#10b981" text-anchor="middle">Marcar directamente como Vista (sin pasar por Watchlist)</text>
+    <text x="590" y="246" font-size="11.5" font-weight="bold" fill="#10b981" text-anchor="middle">Marcar directamente como Vista (sin pasar por Watchlist)</text>
+    <text x="590" y="262" font-size="10" fill="#34d399" text-anchor="middle">[Guard: Requiere fecha_estreno ≤ hoy • Si no estrenó, botón Ojo oculto y API rechaza con HTTP 400]</text>
 
     <!-- Vista -> SinEstado (Desmarcar Vista) -->
     <path d="M 970 210 L 970 295 L 210 295 L 210 210" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#arrow-slate)" fill="none"/>
     <text x="590" y="287" font-size="11" fill="#94a3b8" text-anchor="middle">Desmarcar Vista (Ojo tachado / Reset a Sin Estado)</text>
 
     <!-- Card: SIN ESTADO -->
-    <g transform="translate(100, 80)">
-      <rect width="210" height="130" rx="12" fill="#090d16" stroke="#475569" stroke-width="1.5"/>
+    <g transform="translate(100, 75)">
+      <rect width="210" height="135" rx="12" fill="#090d16" stroke="#475569" stroke-width="1.5"/>
       <rect x="20" y="15" width="170" height="26" rx="13" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
       <text x="105" y="32" font-size="12" font-weight="bold" fill="#e2e8f0" text-anchor="middle">Sin Estado</text>
       <text x="105" y="65" font-size="11" fill="#94a3b8" text-anchor="middle">Fuera de biblioteca</text>
@@ -65,26 +67,28 @@
     </g>
 
     <!-- Card: EN WATCHLIST -->
-    <g transform="translate(470, 80)">
-      <rect width="240" height="130" rx="12" fill="#090d16" stroke="#f59e0b" stroke-width="1.8"/>
+    <g transform="translate(470, 75)">
+      <rect width="240" height="135" rx="12" fill="#090d16" stroke="#f59e0b" stroke-width="1.8"/>
       <rect x="20" y="15" width="200" height="26" rx="13" fill="#451a03" stroke="#f59e0b" stroke-width="1"/>
       <text x="120" y="32" font-size="12" font-weight="bold" fill="#fef3c7" text-anchor="middle">🔖 En Watchlist</text>
       <text x="120" y="65" font-size="11" fill="#fde68a" text-anchor="middle">Icono Bookmark dorado lleno</text>
       <text x="120" y="85" font-size="11" fill="#cbd5e1" text-anchor="middle">Pestaña 'Watchlist' en /library</text>
-      <text x="120" y="105" font-size="10.5" fill="#94a3b8" text-anchor="middle">Lista de pendientes por ver</text>
+      <text x="120" y="105" font-size="10" fill="#fde68a" text-anchor="middle">✓ Admite obras no estrenadas</text>
     </g>
 
     <!-- Card: VISTA -->
-    <g transform="translate(860, 80)">
-      <rect width="220" height="130" rx="12" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
-      <rect x="20" y="15" width="180" height="26" rx="13" fill="#022c22" stroke="#34d399" stroke-width="1"/>
-      <text x="110" y="32" font-size="12" font-weight="bold" fill="#a7f3d0" text-anchor="middle">👁️ Vista (Watched)</text>
-      <text x="110" y="65" font-size="11" fill="#ecfdf5" text-anchor="middle">Icono Ojo verde lleno</text>
-      <text x="110" y="85" font-size="11" fill="#a7f3d0" text-anchor="middle">Pestaña 'Watched' /library</text>
-      <text x="110" y="105" font-size="10" fill="#fde047" text-anchor="middle">⚠️ Bookmark bloqueado/oculto</text>
+    <g transform="translate(860, 75)">
+      <rect width="230" height="135" rx="12" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
+      <rect x="15" y="15" width="200" height="26" rx="13" fill="#022c22" stroke="#34d399" stroke-width="1"/>
+      <text x="115" y="32" font-size="12" font-weight="bold" fill="#a7f3d0" text-anchor="middle">👁️ Vista (Watched)</text>
+      <text x="115" y="63" font-size="11" fill="#ecfdf5" text-anchor="middle">Icono Ojo verde lleno</text>
+      <text x="115" y="80" font-size="10.5" fill="#a7f3d0" text-anchor="middle">Pestaña 'Watched' /library</text>
+      <text x="115" y="98" font-size="10" fill="#fde047" text-anchor="middle">⚠️ Bookmark bloqueado/oculto</text>
+      <text x="115" y="116" font-size="9.5" font-weight="bold" fill="#fca5a5" text-anchor="middle">🛡️ Ojo bloqueado si no estrenó</text>
     </g>
 
-    <text x="560" y="355" font-size="11.5" fill="#94a3b8" text-anchor="middle">Regla UX: Una película vista no puede estar en Watchlist simultáneamente. Para volver a Watchlist primero debe desmarcarse.</text>
+    <text x="560" y="338" font-size="11.5" fill="#94a3b8" text-anchor="middle">Regla UX: Una película vista no puede estar en Watchlist simultáneamente. Para volver a Watchlist primero debe desmarcarse.</text>
+    <text x="560" y="358" font-size="11" font-weight="bold" fill="#38bdf8" text-anchor="middle">🛡️ Invariante de Estreno: Si fecha_estreno &gt; hoy, el botón Ojo se oculta en UI y la API responde HTTP 400. Bookmark y Favorito siguen disponibles.</text>
   </g>
 
   <!-- ========================================================================= -->
@@ -108,11 +112,13 @@
 
     <!-- SinEstado -> Siguiendo -->
     <path d="M 175 165 L 175 270 L 370 270" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrow-blue)" fill="none"/>
-    <text x="260" y="262" font-size="10.5" fill="#3b82f6" text-anchor="middle">Marca 1er episodio</text>
+    <text x="260" y="258" font-size="10.5" font-weight="bold" fill="#3b82f6" text-anchor="middle">Marca 1er episodio</text>
+    <text x="260" y="272" font-size="9" fill="#93c5fd" text-anchor="middle">[Solo si tiene eps emitidos]</text>
 
     <!-- SinEstado -> Vista (Marcar serie completa) -->
     <path d="M 175 165 L 175 420 L 730 420" stroke="#10b981" stroke-width="2" marker-end="url(#arrow-emerald)" fill="none"/>
-    <text x="350" y="412" font-size="10.5" fill="#10b981">Marca serie entera con Ojo</text>
+    <text x="350" y="408" font-size="10.5" font-weight="bold" fill="#10b981">Marca serie entera con Ojo</text>
+    <text x="350" y="422" font-size="9" fill="#34d399">[Requiere ≥1 ep. emitido • Si tiene 0, botón Ojo oculto / HTTP 400]</text>
 
     <!-- Siguiendo -> Vista (100% de episodios completados) -->
     <path d="M 640 270 L 730 270" stroke="#10b981" stroke-width="2.5" marker-end="url(#arrow-emerald)" fill="none"/>
@@ -155,22 +161,24 @@
 
     <!-- Card 3: SIGUIENDO (IN PROGRESS) -->
     <g transform="translate(380, 220)">
-      <rect width="250" height="105" rx="12" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+      <rect width="250" height="115" rx="12" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
       <rect x="20" y="12" width="210" height="24" rx="12" fill="#1e3a8a" stroke="#60a5fa" stroke-width="1"/>
       <text x="125" y="28" font-size="12" font-weight="bold" fill="#dbeafe" text-anchor="middle">▶️ Siguiendo (Following)</text>
       <text x="125" y="55" font-size="11" fill="#93c5fd" text-anchor="middle">Barra segmentada por temporada</text>
       <text x="125" y="73" font-size="10.5" fill="#e0e7ff" text-anchor="middle">0 &lt; Eps vistos &lt; Total emitidos</text>
       <text x="125" y="90" font-size="10" fill="#fde047" text-anchor="middle">⚠️ Bloquea Watchlist</text>
+      <text x="125" y="105" font-size="9.5" fill="#93c5fd" text-anchor="middle">Requiere episodios ya emitidos</text>
     </g>
 
     <!-- Card 4: VISTA COMPLETADA -->
     <g transform="translate(740, 220)">
-      <rect width="230" height="105" rx="12" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
-      <rect x="20" y="12" width="190" height="24" rx="12" fill="#022c22" stroke="#34d399" stroke-width="1"/>
-      <text x="115" y="28" font-size="12" font-weight="bold" fill="#a7f3d0" text-anchor="middle">👁️ Vista (Completada)</text>
-      <text x="115" y="55" font-size="11" fill="#ecfdf5" text-anchor="middle">100% de episodios emitidos vistos</text>
-      <text x="115" y="73" font-size="10.5" fill="#a7f3d0" text-anchor="middle">Pestaña 'Watched' /library</text>
-      <text x="115" y="90" font-size="10" fill="#fde047" text-anchor="middle">⚠️ Bloquea Watchlist</text>
+      <rect width="240" height="115" rx="12" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
+      <rect x="15" y="12" width="210" height="24" rx="12" fill="#022c22" stroke="#34d399" stroke-width="1"/>
+      <text x="120" y="28" font-size="12" font-weight="bold" fill="#a7f3d0" text-anchor="middle">👁️ Vista (Completada)</text>
+      <text x="120" y="55" font-size="11" fill="#ecfdf5" text-anchor="middle">100% de episodios emitidos vistos</text>
+      <text x="120" y="73" font-size="10.5" fill="#a7f3d0" text-anchor="middle">Pestaña 'Watched' /library</text>
+      <text x="120" y="90" font-size="10" fill="#fde047" text-anchor="middle">⚠️ Bloquea Watchlist</text>
+      <text x="120" y="105" font-size="9.5" font-weight="bold" fill="#fca5a5" text-anchor="middle">🛡️ Ojo bloqueado si eps emitidos = 0</text>
     </g>
 
     <!-- Card 5: ABANDONADA (PAUSED) -->
@@ -184,17 +192,18 @@
     </g>
 
     <!-- Regla de Abandono y Reanudación -->
-    <g transform="translate(680, 480)">
-      <rect width="400" height="140" rx="10" fill="#090d16" stroke="#475569" stroke-dasharray="4,4"/>
-      <text x="20" y="25" font-size="12" font-weight="bold" fill="#f8fafc">💡 Invariante de Estado 'Abandonada':</text>
-      <text x="20" y="47" font-size="11" fill="#cbd5e1">• Si el usuario hace clic en el botón [X] de Siguiendo,</text>
-      <text x="20" y="65" font-size="11" fill="#cbd5e1">  se remueve de la lista activa sin borrar sus episodios vistos.</text>
-      <text x="20" y="87" font-size="11" fill="#cbd5e1">• CineTrack computa automáticamente 'Abandonada'.</text>
-      <text x="20" y="107" font-size="11" fill="#38bdf8">• Con el botón [Reanudar / Follow] o al marcar un nuevo</text>
-      <text x="20" y="125" font-size="11" fill="#38bdf8">  episodio, regresa a 'Siguiendo' inmediatamente.</text>
+    <g transform="translate(680, 465)">
+      <rect width="400" height="155" rx="10" fill="#090d16" stroke="#475569" stroke-dasharray="4,4"/>
+      <text x="20" y="24" font-size="12" font-weight="bold" fill="#f8fafc">💡 Invariantes de Estado &amp; Reglas de Dominio:</text>
+      <text x="20" y="44" font-size="11" fill="#cbd5e1">• Clic en [X] remueve de Siguiendo conservando episodios vistos.</text>
+      <text x="20" y="62" font-size="11" fill="#cbd5e1">• CineTrack computa automáticamente 'Abandonada'.</text>
+      <text x="20" y="80" font-size="11" fill="#38bdf8">• Con [Reanudar / Follow] o nuevo ep., regresa a 'Siguiendo'.</text>
+      <text x="20" y="104" font-size="11" font-weight="bold" fill="#fca5a5">• 🛡️ Series No Estrenadas (0 episodios emitidos):</text>
+      <text x="28" y="122" font-size="10.5" fill="#fecdd3">El botón Ojo se oculta en UI y la API responde HTTP 400.</text>
+      <text x="28" y="139" font-size="10.5" fill="#fde68a">Watchlist y Favoritos se mantienen totalmente habilitados.</text>
     </g>
 
-    <text x="560" y="680" font-size="11.5" fill="#94a3b8" text-anchor="middle">CineTrack actualiza el orden cronológico de 'Siguiendo' en tiempo real cada vez que se marca un nuevo episodio.</text>
+    <text x="560" y="685" font-size="11.5" fill="#94a3b8" text-anchor="middle">CineTrack actualiza el orden cronológico de 'Siguiendo' en tiempo real cada vez que se marca un nuevo episodio.</text>
   </g>
 
   <!-- ========================================================================= -->

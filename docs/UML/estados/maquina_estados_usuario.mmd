@@ -30,12 +30,15 @@ stateDiagram-v2
             Icono: Ojo lleno.
             Bookmark bloqueado/oculto.
             Aparece en 'Watched' / Reseñas pendientes.
+            *Guard*: Requiere que la película esté estrenada
+            (fecha_estreno <= hoy). Si no está estrenada,
+            el botón se oculta y la API responde HTTP 400.
         end note
 
         M_SinEstado --> M_Watchlist: Agregar a Watchlist (Bookmark)
         M_Watchlist --> M_SinEstado: Quitar de Watchlist
-        M_SinEstado --> M_Vista: Marcar como Vista (Ojo)
-        M_Watchlist --> M_Vista: Marcar como Vista (Ojo)
+        M_SinEstado --> M_Vista: Marcar como Vista (Ojo)\n[Guard: solo si estrenada]
+        M_Watchlist --> M_Vista: Marcar como Vista (Ojo)\n[Guard: solo si estrenada]
         M_Vista --> M_SinEstado: Desmarcar Vista (Ojo tachado)
     }
 
@@ -70,16 +73,19 @@ stateDiagram-v2
             Icono: Ojo lleno.
             Todos los episodios disponibles completados.
             Bookmark bloqueado.
+            *Guard*: Requiere que la serie tenga al menos
+            1 episodio emitido. Si no tiene episodios emitidos,
+            el botón se oculta y la API responde HTTP 400.
         end note
 
         S_SinEstado --> S_Watchlist: Agregar a Watchlist
         S_Watchlist --> S_SinEstado: Quitar de Watchlist
         
-        S_SinEstado --> S_Siguiendo: Marca 1er episodio visto (o botón Follow)
-        S_Watchlist --> S_Siguiendo: Marca 1er episodio visto (o botón Follow)
+        S_SinEstado --> S_Siguiendo: Marca 1er episodio visto (o botón Follow)\n[Guard: solo si tiene episodios emitidos]
+        S_Watchlist --> S_Siguiendo: Marca 1er episodio visto (o botón Follow)\n[Guard: solo si tiene episodios emitidos]
         
-        S_SinEstado --> S_Vista: Marca serie entera como vista (Ojo)
-        S_Watchlist --> S_Vista: Marca serie entera como vista (Ojo)
+        S_SinEstado --> S_Vista: Marca serie entera como vista (Ojo)\n[Guard: solo si tiene episodios emitidos]
+        S_Watchlist --> S_Vista: Marca serie entera como vista (Ojo)\n[Guard: solo si tiene episodios emitidos]
 
         S_Siguiendo --> S_Vista: Completa el 100% de episodios emitidos
         S_Siguiendo --> S_Abandonada: Clic en Dejar de Seguir (X) conservando episodios
