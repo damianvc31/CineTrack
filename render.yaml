@@ -89,6 +89,8 @@ services:
         value: "openai/gpt-oss-120b"
       - key: GROQ_FALLBACK_MODELS
         value: "openai/gpt-oss-20b,qwen/qwen3.8-27b"
+      - key: AI_REASONING_MODELS
+        value: "openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.8-27b"
       - key: RECOMMENDATION_CANDIDATES_LIMIT
         value: "20"
       - key: AI_RECOMMENDER_DEFAULT_VARIETY

@@ -375,7 +375,7 @@ flowchart TD
    - `GEMINI_API_KEY`: tu API Key de Google AI Studio
    - `GROQ_API_KEY`: tu API Key de Groq Cloud
 4. Desplegar el servicio y copiar la URL pública asignada (ej. `https://cinetrack-api-zsen.onrender.com`).
-   *Verificar salud en `https://cinetrack-api-zsen.onrender.com/health` $\rightarrow$ `{"status": "ok", "version": "1.6.0"}`.*
+   *Verificar salud en `https://cinetrack-api-zsen.onrender.com/health` $\rightarrow$ `{"status": "ok", "version": "1.7.0"}`.*
 
 ### Paso 3: Frontend en Vercel (SPA React 19)
 1. Crear una cuenta en [Vercel](https://vercel.com) e importar el repositorio.

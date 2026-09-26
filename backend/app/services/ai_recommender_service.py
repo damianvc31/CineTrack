@@ -490,8 +490,9 @@ class AIRecommenderService:
             "response_format": {"type": "json_object"}
         }
 
-        # Modelos de razonamiento: inyectar reasoning_effort y temperatura adecuada
-        if groq_model in REASONING_MODELS:
+        # Modelos de razonamiento: inyectar reasoning_effort y temperatura adecuada según configuración
+        reasoning_set = getattr(settings, "reasoning_models_set", REASONING_MODELS)
+        if groq_model in reasoning_set:
             payload["temperature"] = mapping["reasoning"]["temperature"]
             payload["reasoning_effort"] = mapping["reasoning"]["reasoning_effort"]
         else:

@@ -400,28 +400,42 @@ Para mitigar la latencia de red entre servicios de nube en tiers gratuitos (Fast
  
 ---
  
-## 10. Factor Sorpresa y Variedad en Recomendaciones IA (v1.7.0)
+## 10. Factor Sorpresa y Variedad en Recomendaciones IA — Fase 11 (v1.7.0)
  
-### 10.1. Clasificación Armónica de Modelos y Despacho Dinámico
-El sistema clasifica los modelos de lenguaje en dos categorías funcionales para sincronizar parámetros sin errores de protocolo:
-1. **Modelos de Razonamiento (`REASONING_MODELS`):**
-   - Groq: `openai/gpt-oss-120b`, `openai/gpt-oss-20b`.
+### 10.1. Clasificación Dinámica de Modelos (`AI_REASONING_MODELS`)
+Para permitir cambiar, alternar o agregar modelos en Groq o Gemini libremente desde variables de entorno sin tocar el código fuente, el sistema desacopla la clasificación mediante `AI_REASONING_MODELS`:
+1. **Modelos de Razonamiento (Configurados vía `AI_REASONING_MODELS`):**
+   - Modelos por defecto: `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`.
    - Adopta `temperature` en rango 0.7 a 1.2 e inyecta el parámetro `reasoning_effort` (`"low"`, `"medium"`, `"high"`).
-2. **Modelos Estándar (`STANDARD_MODELS`):**
-   - Google Gemini: `gemini-3.6-flash`, `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-flash-lite-latest`.
-   - Groq: `meta-llama/llama-3.3-70b-specdec`.
-   - Adopta `temperature` calibrada (0.1 a 0.9) y **nunca** envía `reasoning_effort` (lo que causaría un `HTTP 400 Bad Request` en la API de Groq).
- 
-### 10.2. Modulación Multi-Nivel de Candidatos en RAG
+2. **Modelos Estándar (Gemini Flash, Llama, etc.):**
+   - Cualquier modelo no presente en `AI_REASONING_MODELS` se gestiona automáticamente como estándar.
+   - Adopta `temperature` calibrada (0.1 a 0.9) y **nunca** envía `reasoning_effort` (evitando errores `HTTP 400 Bad Request` en APIs que no soportan este parámetro).
+
+### 10.2. Directivas Semánticas Explícitas en el Prompt
+Los modelos de razonamiento tienden por inercia analítica a seleccionar las obras más masivas y consagradas. Para sincronizar su razonamiento con el nivel de variedad elegido, el generador de prompts (`_build_user_message`) inyecta directivas de comportamiento inequívocas:
+- `VERY_LOW` (Clásica): Exige exclusivamente títulos universalmente aclamados, multipremiados y consolidados, vetando propuestas divisivas o de culto menor.
+- `MEDIUM` (Balanceada): Ofrece un balance natural entre títulos reconocidos y alternativas afines a la temática.
+- `VERY_HIGH` (Creativa / Factor Sorpresa): Prohíbe explícitamente seleccionar los títulos más obvios o comerciales si hay alternativas fascinantes, ordenando buscar activamente joyas ocultas, cine de autor o culto internacional.
+
+### 10.3. Modulación Multi-Nivel de Candidatos en RAG y Guardrails
 El RAG híbrido modula los umbrales de votos configurados en `.env` mediante multiplicadores dinámicos según el `VarietyLevel`:
-- `VERY_LOW` ($\times 2.0$): Exige obras con doble piso de votos y restringe estrictamente a obras con `rating_unificado >= 7.5`.
-- `LOW` ($\times 1.5$): Enfoque familiar con alto consenso popular.
+- `VERY_LOW` ($\times 1.8$): Exige obras con piso alto de votos y aplica filtro estricto `rating_unificado >= 7.5`.
+- `LOW` ($\times 1.4$): Enfoque familiar con sólido consenso crítico.
 - `MEDIUM` ($\times 1.0$): Punto medio calibrado (25 votos vectoriales, 80 temáticos, 150 de respaldo).
 - `HIGH` ($\times 0.6$): Relaja el filtro de votos para incluir cine de culto y títulos independientes.
 - `VERY_HIGH` ($\times 0.3$): Máxima audacia, habilitando gemas ocultas y rarezas temáticas, expandiendo el pool de candidatos a 25.
- 
-### 10.3. Persistencia y Experiencia de Usuario
+
+**Guardrails de Seguridad:**
+1. **Exención de Entidades Directas:** Si el usuario busca un director, actor o título específico (ej: *"películas dirigidas por Ricardo Darín"* o *"David Lynch"*), el filtro de rating >= 7.5 se desactiva para no podar la única obra que coincide con la búsqueda aunque tenga calificación modesta (como *La señal*, 5.92★, 25 votos).
+2. **Salvaguarda de Inanición (Starvation Protection):** Si tras aplicar los filtros de variedad los candidatos disponibles son menos de 3, el RAG relaja automáticamente las restricciones de votos y rating para garantizar que nunca se entreguen 0 resultados si el catálogo cuenta con obras afines.
+
+### 10.4. Resiliencia Multiclave en Cascada Jerárquica
+- La cascada recorre todas las API keys configuradas (ej: Key 1 y Key 2 separadas por comas) para cada modelo antes de descender al siguiente nivel.
+- Si Gemini Key 1 satura cuota (429), prueba de inmediato Gemini Key 2; si ambas fallan o están no disponibles (503), conmuta a Groq Insignia (`openai/gpt-oss-120b`).
+- Si Groq alcanza límites de velocidad por ráfagas de consultas, la cascada conmuta hacia los fallbacks de Gemini (`gemini-3.8-flash`, `gemini-3.5-flash-lite`) y Groq (`openai/gpt-oss-20b`, `qwen/qwen3.8-27b`), con fallback heurístico local determinista como red de seguridad final.
+
+### 10.5. Persistencia y Experiencia de Usuario
 - **Nivel Normalizado (`VarietyLevel`):** `VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.
-- **Preferencia de Usuario:** Columna `Usuario.preferencia_variedad_ia` (default `"MEDIUM"`) persistida con migración Alembic `0007_user_variety_preference.py`. Los usuarios invitados utilizan almacenamiento local en navegador (`cinetrack_variety_guest`).
-- **UI:** Slider interactivo de 5 pasos en `SettingsPage.tsx` y selector rápido en píldoras con badge de resultado en `RecommendationsPage.tsx`.
+- **Preferencia de Usuario:** Columna `Usuario.preferencia_variedad_ia` (default `"MEDIUM"`) persistida con migración Alembic `0007_user_variety_preference.py`. El backend la lee automáticamente si no se envía override en la petición.
+- **UI:** Slider de 5 pasos en `SettingsPage.tsx` con guía central fija (*Balanceada*) y selector rápido en `RecommendationsPage.tsx` con badge de resultado visual.
 

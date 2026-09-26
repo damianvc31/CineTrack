@@ -18,7 +18,7 @@ class VarietyLevel(str, Enum):
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "CineTrack API"
-    VERSION: str = "1.6.3"
+    VERSION: str = "1.7.0"
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
     
@@ -124,7 +124,8 @@ class Settings(BaseSettings):
     EMBEDDING_DIMENSION: int = 768
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "openai/gpt-oss-120b"
-    GROQ_FALLBACK_MODELS: str = "openai/gpt-oss-20b,meta-llama/llama-3.3-70b-specdec"
+    GROQ_FALLBACK_MODELS: str = "openai/gpt-oss-20b,qwen/qwen3.8-27b"
+    AI_REASONING_MODELS: str = "openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.8-27b"
     AI_RECOMMENDER_PRIMARY: str = "gemini"  # "gemini" o "groq"
     RECOMMENDATION_CANDIDATES_LIMIT: int = 20
     AI_RECOMMENDER_DEFAULT_VARIETY: VarietyLevel = VarietyLevel.MEDIUM
@@ -132,6 +133,10 @@ class Settings(BaseSettings):
     AI_RECOMMENDER_MIN_VOTES_THEMATIC: int = 80
     AI_RECOMMENDER_MIN_VOTES_FALLBACK: int = 150
     AI_RECOMMENDER_NEW_RELEASE_DAYS: int = 30
+
+    @property
+    def reasoning_models_set(self) -> set[str]:
+        return {m.strip() for m in self.AI_REASONING_MODELS.split(",") if m.strip()}
 
     # Home Sections & Pools Configuration
     HOME_SECTION_SAMPLE_SIZE: int = 10

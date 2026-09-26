@@ -138,14 +138,16 @@
   - Localización completa de reseñas y claves de interfaz.
   - Reseñas con calificación directa opcional sin comentario de texto obligatorio, con restricción `CheckConstraint` de base de datos.
   - Suite de 106 tests unitarios e integración en verde.
-- [x] **Factor Sorpresa y Variedad en Recomendador IA (v1.7.0):**
+- [x] **Fase 11: Factor Sorpresa y Variedad en Recomendador IA (v1.7.0):**
   - Enum normalizado `VarietyLevel` (`VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`) y variable global `AI_RECOMMENDER_DEFAULT_VARIETY`.
   - Persistencia de `preferencia_variedad_ia` en modelo `Usuario` y migración Alembic `0007_user_variety_preference.py` ejecutada en SQLite local, Neon Dev y Neon Prod.
-  - Modulación RAG de umbrales de votos ($\times 2.0$ a $\times 0.3$), filtro crítico `rating_unificado >= 7.5` para `VERY_LOW` y ampliación de candidatos a 25.
-  - Despachador dinámico de LLM con inyección segura de `reasoning_effort` para modelos de razonamiento en Groq (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`) y exclusión en modelos estándar (`llama-3.3-70b-specdec`).
+  - Modulación RAG de umbrales de votos ($\times 1.8$ a $\times 0.3$), filtro crítico `rating_unificado >= 7.5` para `VERY_LOW`, salvaguarda contra inanición (< 3 candidatos relaja filtro), y exención de entidad directa (director, actor, título explícito no se podan).
+  - Despachador dinámico de LLM desacoplado vía variable de entorno `AI_REASONING_MODELS` con inyección segura de `reasoning_effort` para modelos de razonamiento (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`) y exclusión en modelos estándar (Gemini Flash, Llama).
+  - Directivas semánticas explícitas inyectadas en el prompt para alinear el esfuerzo de razonamiento del LLM con el nivel de variedad elegido.
   - Calibración de temperatura (`0.7` a `1.2` para reasoning; `0.1` a `0.9` para estándar).
-  - Frontend: Slider interactivo de 5 pasos en `SettingsPage.tsx` con guardado reactivo y selector rápido con badge en `RecommendationsPage.tsx`.
-  - Cobertura ampliada a 109 tests unitarios e integración en verde.
+  - Resiliencia multiclave exhaustiva con iteración de todas las API keys por modelo en la cascada.
+  - Frontend: Slider interactivo de 5 pasos en `SettingsPage.tsx` con guía central fija (*Balanceada*) y selector rápido con badge en `RecommendationsPage.tsx`.
+  - Cobertura ampliada a 109 tests unitarios e integración en verde y batería de pruebas en dos fases (sin autenticar y con usuario real) verificada al 100%.
 
 ---
 
