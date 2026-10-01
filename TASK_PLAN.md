@@ -317,32 +317,45 @@
 
 ---
 
-## Próximas Fases y Backlog (Post-Entrega):
+## Próximas Fases y Backlog (Post-Entrega / V2):
 
-### Próximas Fases Priorizadas:
-- [ ] **Fase 12: Sistema de Notificaciones In-App y Ciclo de Vida Reactivo de Series:**
-  - Panel de notificaciones en Header (campana) ante anuncios de renovación, cancelaciones y fechas de estreno.
-  - Reactivación automática de series en estado `vista` a `siguiendo` cuando se estrene una nueva temporada en TMDB.
-  - Preferencias de alertas configurables en `/settings`.
-- [ ] **Fase 13: Traducción de Contenidos y Selector de Idioma (I18n de Catálogo):**
-  - Ingesta de traducciones de títulos y sinopsis de películas y series desde TMDB.
-  - Traducción de nombres de temporada (si difieren) y nombres/sinopsis de episodios.
-  - Prioridad para Español Latinoamericano (`es-MX` / `es-419`) y Español España (`es-ES`).
-  - Sistema de fallback en cascada: variante regional $\rightarrow$ español alternativo $\rightarrow$ inglés (`en-US`) $\rightarrow$ idioma original.
-  - Selector de idioma preferido de contenidos en `/settings`.
-- [ ] **Fase 14: Plataformas de Streaming y Disponibilidad Multirregión (Watch Providers):**
-  - Integración de TMDB Watch Providers / JustWatch con tablas `plataformas` y `disponibilidad_streaming`.
-  - Detección de región por perfil o IP y filtros por servicios de streaming activos en Catálogo.
+> La planificación detallada y completa de los bloques se encuentra documentada en [ROADMAP.md](ROADMAP.md).
 
-### Backlog (Pendientes sin Priorizar):
-- [ ] Carrusel "Upcoming / Próximamente" en Home para obras con estreno confirmado en los próximos 30-90 días.
-- [ ] Ampliación del modelo de datos: reparto de series por temporada, título específico de temporada y sinopsis enriquecida de episodios.
-- [ ] Herramientas avanzadas en Biblioteca (`/library`): ordenamiento multidimensional, filtros por tipo/género, buscador in-place y paginación para colecciones grandes.
-- [ ] Autenticación ampliada: campo `email` al registrarse y login social con Google OAuth.
-- [ ] Badge visual "Viendo Actualmente" (🔥) con ventana de días configurable en `/settings`.
-- [ ] Diálogo de confirmación al desmarcar episodios intermedios de una serie.
-- [ ] PWA offline caching con Service Workers avanzados para fichas y biblioteca.
-- [ ] Compartir listas y perfiles públicos mediante OpenGraph cards.
+### 1. Bloque Inmediato: Deuda Técnica, Calidad y Seguridad (Quick Wins)
+- [ ] Quality Gate en CI (GitHub Actions: `pytest` + `npm test` + `npm run build` en push/PR).
+- [ ] Fail-Closed de Seguridad en Arranque (`config.py` con `RuntimeError` en prod ante claves default).
+- [ ] Reporte formal de Cobertura con `pytest-cov` (terminal + HTML).
+- [ ] Rate Limiting en Autenticación (`slowapi` en `/api/v1/auth/login`).
+- [ ] Estandarización de verbos HTTP de mantenimiento a `DELETE`.
+- [ ] Endpoints granulares de limpieza de BD (estados, reseñas por tipo, usuarios de prueba).
+- [ ] Persistencia y exportación de logs detallados de jobs a disco.
+
+### 2. Bloque de Optimización Operativa: Sincronización TMDB (Daily & Weekly)
+- [ ] Auditoría de `weekly_deep_sync` vs `/changes` (análisis de redundancia/tráfico).
+- [ ] Sintonía fina de `daily_sync` (pre-refresh de métricas, acotamiento a `Returning Series`, ventanas diferenciadas unreleased vs releases, y desglose en reportes).
+
+### 3. Bloque Recomendador IA: Filtros Duros y Semántica
+- [ ] Filtros duros deterministas de duración (películas) y longitud/temporadas (series).
+- [ ] *(Backlog IA)* Ingesta de keywords temáticas de TMDB para enriquecer el espacio vectorial.
+
+### 4. Bloque UX, Interacción y Frontend
+- [ ] Selector de idioma en el Header con persistencia híbrida (`localStorage` invitados + DB autenticados).
+- [ ] Diálogo modal de advertencia antes de desmarcar títulos/temporadas/episodios vistos.
+- [ ] Filtros avanzados en Explorador de Catálogo (`/explore`) por badges de estado.
+- [ ] Herramientas avanzadas en Mi Biblioteca (`/library`): ordenamiento, buscador in-place, filtros y paginación.
+- [ ] Badge visual "Viendo Actualmente" (🔥) con ventana temporal configurable.
+
+### 5. Grandes Fases Funcionales (Evolución)
+- [ ] **Fase 12: Sistema de Notificaciones In-App y Ciclo de Vida Reactivo de Series.**
+- [ ] **Fase 13: Traducción de Contenidos y Expansión Multilingüe (TMDB i18n).**
+- [ ] **Fase 14: JustWatch y Disponibilidad de Streaming (Watch Providers).**
+- [ ] **Fase 15: Catálogo Extendido y Enriquecimiento de Series.**
+
+### 6. Bloque Avanzado y Visión de Negocio (Largo Plazo)
+- [ ] Registro con email obligatorio + Google OAuth (SSO) + notificaciones por correo.
+- [ ] Optimización de layout responsive en navegadores móviles (Home).
+- [ ] Estrategia de BD Dev (evaluar Docker Postgres local si se requiere paridad con pgvector).
+- [ ] Escala de negocio (App mobile nativa y modelos de monetización).
 
 
 
